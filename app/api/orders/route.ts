@@ -90,7 +90,20 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { orderId, workspaceId, status, driverId } = body
+  const {
+    orderId,
+    workspaceId,
+    status,
+    driverId,
+    recipientName,
+    recipientPhone,
+    recipientAddress,
+    notes,
+    collectionUsd,
+    deliveryFeeUsd,
+    driverPayUsd,
+    areaId,
+  } = body
 
   // Fetch membership
   const { data: member } = await supabase
@@ -134,10 +147,30 @@ export async function PATCH(req: NextRequest) {
       updates.delivered_at = new Date().toISOString()
     }
   }
-  if (driverId !== undefined && (member.role === 'owner' || member.role === 'manager')) {
-    updates.driver_id = driverId || null
-    if (driverId && order.status === 'pending') {
-      updates.status = 'assigned'
+
+  // Manager / Owner editing fields
+  if (member.role === 'owner' || member.role === 'manager') {
+    if (driverId !== undefined) {
+      updates.driver_id = driverId || null
+      if (driverId && order.status === 'pending') {
+        updates.status = 'assigned'
+      }
+    }
+    if (recipientName !== undefined) updates.recipient_name = recipientName ? String(recipientName).trim() : null
+    if (recipientPhone !== undefined) updates.recipient_phone = recipientPhone ? String(recipientPhone).trim() : null
+    if (recipientAddress !== undefined) updates.recipient_address = recipientAddress ? String(recipientAddress).trim() : null
+    if (notes !== undefined) updates.notes = notes ? String(notes).trim() : null
+    if (areaId !== undefined) updates.area_id = areaId || null
+
+    if (collectionUsd !== undefined) updates.collection_usd = Number(collectionUsd)
+    if (deliveryFeeUsd !== undefined) updates.delivery_fee_usd = Number(deliveryFeeUsd)
+    if (driverPayUsd !== undefined) updates.driver_pay_usd = Number(driverPayUsd)
+
+    // Recalculate shop balance if financials were changed
+    const finalCollection = updates.collection_usd !== undefined ? Number(updates.collection_usd) : Number(order.collection_usd)
+    const finalFee = updates.delivery_fee_usd !== undefined ? Number(updates.delivery_fee_usd) : Number(order.delivery_fee_usd)
+    if (updates.collection_usd !== undefined || updates.delivery_fee_usd !== undefined) {
+      updates.shop_balance_usd = finalCollection - finalFee
     }
   }
 
@@ -150,22 +183,28 @@ export async function PATCH(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // If newly delivered, update driver cash_held and pay_owed
-  if (status === 'delivered' && order.status !== 'delivered' && updated.driver_id) {
-    const { data: drv } = await serviceClient
-      .from('drivers')
-      .select('cash_held_usd, pay_owed_usd')
-      .eq('id', updated.driver_id)
-      .single()
+  // Financial accounting when status is or becomes delivered:
+  const wasDelivered = order.status === 'delivered'
+  const isDelivered = updated.status === 'delivered'
 
-    if (drv) {
-      await serviceClient
+  // Case A: Newly delivered
+  if (!wasDelivered && isDelivered) {
+    if (updated.driver_id) {
+      const { data: drv } = await serviceClient
         .from('drivers')
-        .update({
-          cash_held_usd: Number(drv.cash_held_usd) + Number(updated.collection_usd),
-          pay_owed_usd: Number(drv.pay_owed_usd) + Number(updated.driver_pay_usd),
-        })
+        .select('cash_held_usd, pay_owed_usd')
         .eq('id', updated.driver_id)
+        .single()
+
+      if (drv) {
+        await serviceClient
+          .from('drivers')
+          .update({
+            cash_held_usd: Math.max(0, Number(drv.cash_held_usd) + Number(updated.collection_usd)),
+            pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) + Number(updated.driver_pay_usd)),
+          })
+          .eq('id', updated.driver_id)
+      }
     }
 
     if (updated.shop_id) {
@@ -182,6 +221,47 @@ export async function PATCH(req: NextRequest) {
             balance_usd: Number(shp.balance_usd) + Number(updated.shop_balance_usd),
           })
           .eq('id', updated.shop_id)
+      }
+    }
+  }
+
+  // Case B: Already delivered, and driver assignment was modified
+  if (wasDelivered && isDelivered && order.driver_id !== updated.driver_id) {
+    // Deduct from previous driver if there was one
+    if (order.driver_id) {
+      const { data: oldDrv } = await serviceClient
+        .from('drivers')
+        .select('cash_held_usd, pay_owed_usd')
+        .eq('id', order.driver_id)
+        .single()
+
+      if (oldDrv) {
+        await serviceClient
+          .from('drivers')
+          .update({
+            cash_held_usd: Math.max(0, Number(oldDrv.cash_held_usd) - Number(order.collection_usd)),
+            pay_owed_usd: Math.max(0, Number(oldDrv.pay_owed_usd) - Number(order.driver_pay_usd)),
+          })
+          .eq('id', order.driver_id)
+      }
+    }
+
+    // Add to new driver if one is assigned
+    if (updated.driver_id) {
+      const { data: newDrv } = await serviceClient
+        .from('drivers')
+        .select('cash_held_usd, pay_owed_usd')
+        .eq('id', updated.driver_id)
+        .single()
+
+      if (newDrv) {
+        await serviceClient
+          .from('drivers')
+          .update({
+            cash_held_usd: Math.max(0, Number(newDrv.cash_held_usd) + Number(updated.collection_usd)),
+            pay_owed_usd: Math.max(0, Number(newDrv.pay_owed_usd) + Number(updated.driver_pay_usd)),
+          })
+          .eq('id', updated.driver_id)
       }
     }
   }
