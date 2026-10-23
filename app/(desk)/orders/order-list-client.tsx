@@ -74,6 +74,7 @@ export function OrderListClient({
   const [error, setError] = useState('')
 
   // New Order Form state
+  const [customCode, setCustomCode] = useState('')
   const [shopId, setShopId] = useState(shops[0]?.id || '')
   const [driverId, setDriverId] = useState('')
   const [areaId, setAreaId] = useState(areas[0]?.id || '')
@@ -95,6 +96,7 @@ export function OrderListClient({
   // Edit Order Modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
+  const [editCode, setEditCode] = useState('')
   const [editDriverId, setEditDriverId] = useState('')
   const [editStatus, setEditStatus] = useState<OrderStatus>('pending')
   const [editAreaId, setEditAreaId] = useState('')
@@ -131,6 +133,7 @@ export function OrderListClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
+          code: customCode.trim() || undefined,
           shopId: shopId || null,
           driverId: driverId || null,
           areaId: areaId || null,
@@ -158,6 +161,7 @@ export function OrderListClient({
       setOrders(prev => [newOrderWithRels, ...prev])
       setIsModalOpen(false)
       // Reset form
+      setCustomCode('')
       setRecipientName('')
       setRecipientPhone('')
       setRecipientAddress('')
@@ -277,6 +281,7 @@ export function OrderListClient({
   // Open Full Edit Order Modal
   function openEditOrderModal(order: Order) {
     setEditingOrder(order)
+    setEditCode(order.code || '')
     setEditDriverId(order.driver?.id || '')
     setEditStatus(order.status)
     setEditAreaId(order.area?.id || '')
@@ -305,6 +310,7 @@ export function OrderListClient({
         body: JSON.stringify({
           orderId: editingOrder.id,
           workspaceId,
+          code: editCode.trim() || undefined,
           driverId: editDriverId || null,
           status: editStatus,
           areaId: editAreaId || null,
@@ -883,6 +889,53 @@ export function OrderListClient({
       >
         <form onSubmit={handleSaveEditOrder}>
           <div className="form-grid">
+            {/* Custom Tracking Code / Waybill # */}
+            <div className="field full" style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--line)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <label style={{ margin: 0, color: 'var(--brand)', fontWeight: 700, fontSize: 13 }}>
+                  🏷️ Tracking Code / Waybill #
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      const prefix = editingOrder?.shop?.name ? editingOrder.shop.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() : 'ORD'
+                      const randomNum = Math.floor(100 + Math.random() * 900)
+                      setEditCode(`${prefix}-${randomNum}`)
+                    }}
+                    style={{ fontSize: 11, padding: '2px 8px' }}
+                    title="Generate code with shop prefix"
+                  >
+                    🏷️ Shop Prefix
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase()
+                      setEditCode(`CD-${randomHex}`)
+                    }}
+                    style={{ fontSize: 11, padding: '2px 8px' }}
+                    title="Generate standard Cedar CD-XXXX code"
+                  >
+                    🎲 Random CD-XXXX
+                  </button>
+                </div>
+              </div>
+              <input
+                type="text"
+                value={editCode}
+                onChange={e => setEditCode(e.target.value.toUpperCase())}
+                placeholder="e.g. ZARA-101, CD-A1B2C3D4"
+                required
+                style={{ fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.5px' }}
+              />
+              <small style={{ color: 'var(--muted)', fontSize: 11, display: 'block', marginTop: 4 }}>
+                Public tracking link: <code>/track/{editCode || '...'}</code>
+              </small>
+            </div>
+
             {/* Assign Driver */}
             <div className="field full" style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }}>
               <label style={{ color: 'var(--brand)', fontWeight: 700 }}>Courier / Driver Assignment</label>
@@ -1080,6 +1133,64 @@ export function OrderListClient({
               >
                 Apply $2 Refund Preset
               </button>
+            </div>
+
+            {/* Custom Tracking Code / Waybill # */}
+            <div className="field full" style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--line)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ margin: 0, fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
+                  🏷️ Custom Tracking Code / Waybill # <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      const selectedShop = shops.find(s => s.id === shopId)
+                      const prefix = selectedShop ? selectedShop.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() : 'ORD'
+                      const randomNum = Math.floor(100 + Math.random() * 900)
+                      setCustomCode(`${prefix}-${randomNum}`)
+                    }}
+                    style={{ fontSize: 11, padding: '2px 8px' }}
+                    title="Generate code with shop prefix (e.g. ZARA-101)"
+                  >
+                    🏷️ Shop Prefix
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase()
+                      setCustomCode(`CD-${randomHex}`)
+                    }}
+                    style={{ fontSize: 11, padding: '2px 8px' }}
+                    title="Generate standard Cedar CD-XXXX code"
+                  >
+                    🎲 Random CD-XXXX
+                  </button>
+                  {customCode && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setCustomCode('')}
+                      style={{ fontSize: 11, padding: '2px 8px', color: '#dc2626' }}
+                      title="Clear custom code (auto-generate upon creation)"
+                    >
+                      ✕ Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              <input
+                type="text"
+                placeholder="Leave empty for auto CD-XXXX, or enter custom code (e.g. ZARA-101, INV-4022)"
+                value={customCode}
+                onChange={e => setCustomCode(e.target.value.toUpperCase())}
+                style={{ fontFamily: 'monospace', fontWeight: 600, letterSpacing: '0.5px' }}
+              />
+              <small style={{ color: 'var(--muted)', fontSize: 11, display: 'block', marginTop: 4 }}>
+                Public customer tracking link: <code>/track/{customCode || 'CD-XXXXXXXX'}</code>
+              </small>
             </div>
 
             <div className="field">

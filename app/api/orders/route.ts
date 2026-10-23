@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const {
     workspaceId,
+    code: rawCode,
     shopId,
     driverId,
     areaId,
@@ -34,6 +35,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden: only owners and managers can create orders' }, { status: 403 })
   }
 
+  const serviceClient = createServiceClient()
+
+  // Sanitize and validate custom tracking code if provided
+  const customCode = typeof rawCode === 'string' && rawCode.trim() ? rawCode.trim().toUpperCase() : null
+  if (customCode) {
+    const { data: existing } = await serviceClient
+      .from('orders')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .ilike('code', customCode)
+      .maybeSingle()
+
+    if (existing) {
+      return NextResponse.json({ error: `Tracking code "${customCode}" is already in use in this workspace.` }, { status: 400 })
+    }
+  }
+
   // Get current workspace exchange rate
   const { data: ws } = await supabase
     .from('workspaces')
@@ -43,12 +61,11 @@ export async function POST(req: NextRequest) {
 
   const usdToLbpRate = ws?.usd_to_lbp || 89500
 
-  const serviceClient = createServiceClient()
-
   const { data: order, error } = await serviceClient
     .from('orders')
     .insert({
       workspace_id: workspaceId,
+      code: customCode || '',
       shop_id: shopId || null,
       driver_id: driverId || null,
       area_id: areaId || null,
@@ -93,6 +110,7 @@ export async function PATCH(req: NextRequest) {
   const {
     orderId,
     workspaceId,
+    code: rawCode,
     status,
     driverId,
     recipientName,
@@ -164,6 +182,23 @@ export async function PATCH(req: NextRequest) {
 
   // Manager / Owner editing fields
   if (member.role === 'owner' || member.role === 'manager') {
+    if (rawCode !== undefined) {
+      const customCode = typeof rawCode === 'string' && rawCode.trim() ? rawCode.trim().toUpperCase() : null
+      if (customCode && customCode !== order.code) {
+        const { data: existing } = await serviceClient
+          .from('orders')
+          .select('id')
+          .eq('workspace_id', workspaceId)
+          .ilike('code', customCode)
+          .neq('id', orderId)
+          .maybeSingle()
+
+        if (existing) {
+          return NextResponse.json({ error: `Tracking code "${customCode}" is already in use by another order.` }, { status: 400 })
+        }
+        updates.code = customCode
+      }
+    }
     if (driverId !== undefined) {
       updates.driver_id = driverId || null
       if (driverId && order.status === 'pending') {
