@@ -39,6 +39,33 @@ export function getWhatsAppUrl(phone: string, message: string): string {
 }
 
 /**
+ * Builds direct customer WhatsApp URL from order parameters
+ */
+export function getCustomerOrderWhatsAppUrl(order: {
+  customerPhone?: string | null
+  customerName?: string | null
+  orderCode: string
+  shopName?: string | null
+  collectionUsd: number
+  collectionLbp?: number
+  driverName?: string | null
+  status?: string | null
+}): string {
+  if (!order.customerPhone) return '#'
+  const customer = order.customerName?.trim() || 'Customer'
+  let msg = `Hello ${customer} 👋\n\nThis is Cedar Delivery Desk regarding your order *#${order.orderCode}*`
+  if (order.shopName) msg += ` from *${order.shopName}*`
+  if (order.driverName) msg += ` handled by courier *${order.driverName}*`
+  msg += `.\n\n`
+  if (order.collectionUsd > 0) {
+    msg += `💵 *COD to Collect:* ${formatUSD(order.collectionUsd)}\n`
+  }
+  msg += `📦 *Live Tracking:* https://delivery-five-roan.vercel.app/track/${order.orderCode}\n\n`
+  msg += `Please reply with your delivery instructions or live location pin 📍. Thank you! 🌲`
+  return getWhatsAppUrl(order.customerPhone, msg)
+}
+
+/**
  * Generates customer delivery notification message
  */
 export function buildCustomerOrderMessage(order: {

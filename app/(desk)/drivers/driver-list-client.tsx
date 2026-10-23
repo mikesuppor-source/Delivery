@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { Modal } from '@/components/modal'
 import { formatUSD } from '@/lib/utils'
@@ -105,12 +106,31 @@ export function DriverListClient({
                 <th>Cash Held (To Remit)</th>
                 <th>Pay Owed (Earnings)</th>
                 <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {drivers.map(driver => (
                 <tr key={driver.id}>
-                  <td><strong>{driver.name}</strong></td>
+                  <td>
+                    <Link
+                      href={`/drivers/${driver.id}`}
+                      style={{
+                        fontWeight: 700,
+                        color: 'var(--brand)',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                      title="View Driver Profile & P&L"
+                    >
+                      <span>{driver.name}</span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </Link>
+                  </td>
                   <td>
                     {driver.phone ? (
                       <a
@@ -137,6 +157,15 @@ export function DriverListClient({
                     <span className={`badge ${driver.active ? 'badge-delivered' : 'badge-returned'}`}>
                       {driver.active ? 'Active' : 'Inactive'}
                     </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <Link
+                      href={`/drivers/${driver.id}`}
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none' }}
+                    >
+                      View Profile
+                    </Link>
                   </td>
                 </tr>
               ))}
