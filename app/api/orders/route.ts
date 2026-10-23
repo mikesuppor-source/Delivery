@@ -145,6 +145,20 @@ export async function PATCH(req: NextRequest) {
     updates.status = status as OrderStatus
     if (status === 'delivered') {
       updates.delivered_at = new Date().toISOString()
+    } else if (status === 'returned') {
+      // Automatic $2.00 fee for retail refunds / returns, customer COD set to 0
+      if (deliveryFeeUsd === undefined) {
+        updates.delivery_fee_usd = 2.00
+      }
+      if (collectionUsd === undefined) {
+        updates.collection_usd = 0.00
+      }
+      if (driverPayUsd === undefined) {
+        updates.driver_pay_usd = Math.min(1.00, Number(order.driver_pay_usd) || 1.00)
+      }
+      const finalCol = updates.collection_usd !== undefined ? Number(updates.collection_usd) : 0
+      const finalFee = updates.delivery_fee_usd !== undefined ? Number(updates.delivery_fee_usd) : 2.00
+      updates.shop_balance_usd = finalCol - finalFee // e.g. 0 - 2 = -2.00
     }
   }
 
@@ -183,9 +197,11 @@ export async function PATCH(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Financial accounting when status is or becomes delivered:
+  // Financial accounting when status transitions to delivered or returned:
   const wasDelivered = order.status === 'delivered'
   const isDelivered = updated.status === 'delivered'
+  const wasReturned = order.status === 'returned'
+  const isReturned = updated.status === 'returned'
 
   // Case A: Newly delivered
   if (!wasDelivered && isDelivered) {
@@ -197,11 +213,13 @@ export async function PATCH(req: NextRequest) {
         .single()
 
       if (drv) {
+        // If it was previously returned, reverse the return driver pay first
+        const prevReturnPay = wasReturned ? Number(order.driver_pay_usd) || 0 : 0
         await serviceClient
           .from('drivers')
           .update({
             cash_held_usd: Math.max(0, Number(drv.cash_held_usd) + Number(updated.collection_usd)),
-            pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) + Number(updated.driver_pay_usd)),
+            pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) - prevReturnPay + Number(updated.driver_pay_usd)),
           })
           .eq('id', updated.driver_id)
       }
@@ -215,10 +233,55 @@ export async function PATCH(req: NextRequest) {
         .single()
 
       if (shp) {
+        // If it was previously returned, reverse the previous return fee charge first
+        const prevReturnNet = wasReturned ? Number(order.shop_balance_usd) || 0 : 0
         await serviceClient
           .from('shops')
           .update({
-            balance_usd: Number(shp.balance_usd) + Number(updated.shop_balance_usd),
+            balance_usd: Number(shp.balance_usd) - prevReturnNet + Number(updated.shop_balance_usd),
+          })
+          .eq('id', updated.shop_id)
+      }
+    }
+  }
+
+  // Case B: Newly returned (retail refund: charged as a billable $2 fee to merchant, credited to driver)
+  if (!wasReturned && isReturned) {
+    if (updated.driver_id) {
+      const { data: drv } = await serviceClient
+        .from('drivers')
+        .select('cash_held_usd, pay_owed_usd')
+        .eq('id', updated.driver_id)
+        .single()
+
+      if (drv) {
+        // If previously delivered, customer was refunded COD cash, so deduct order.collection_usd from driver cash held
+        const prevCol = wasDelivered ? Number(order.collection_usd) || 0 : 0
+        const prevDriverPay = wasDelivered ? Number(order.driver_pay_usd) || 0 : 0
+        await serviceClient
+          .from('drivers')
+          .update({
+            cash_held_usd: Math.max(0, Number(drv.cash_held_usd) - prevCol),
+            pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) - prevDriverPay + Number(updated.driver_pay_usd)),
+          })
+          .eq('id', updated.driver_id)
+      }
+    }
+
+    if (updated.shop_id) {
+      const { data: shp } = await serviceClient
+        .from('shops')
+        .select('balance_usd')
+        .eq('id', updated.shop_id)
+        .single()
+
+      if (shp) {
+        // If previously delivered, reverse previous COD credit, and apply -$2.00 return fee charge
+        const prevShopNet = wasDelivered ? Number(order.shop_balance_usd) || 0 : 0
+        await serviceClient
+          .from('shops')
+          .update({
+            balance_usd: Number(shp.balance_usd) - prevShopNet + Number(updated.shop_balance_usd),
           })
           .eq('id', updated.shop_id)
       }

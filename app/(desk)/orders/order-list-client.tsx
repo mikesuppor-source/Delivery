@@ -226,9 +226,10 @@ export function OrderListClient({
         }),
       })
 
-      if (res.ok) {
+      const data = await res.json()
+      if (res.ok && data.order) {
         setOrders(prev =>
-          prev.map(o => (o.id === orderId ? { ...o, status: newStatus } : o))
+          prev.map(o => (o.id === orderId ? { ...o, ...data.order } : o))
         )
       }
     } catch (err) {
@@ -906,16 +907,40 @@ export function OrderListClient({
               <label>Order Status</label>
               <select
                 value={editStatus}
-                onChange={e => setEditStatus(e.target.value as OrderStatus)}
+                onChange={e => {
+                  const newSt = e.target.value as OrderStatus
+                  setEditStatus(newSt)
+                  if (newSt === 'returned') {
+                    setEditDeliveryFeeUsd('2')
+                    setEditCollectionUsd('0')
+                    setEditDriverPayUsd('1')
+                  }
+                }}
               >
                 <option value="pending">Pending</option>
                 <option value="assigned">Assigned</option>
                 <option value="picked_up">Picked Up</option>
                 <option value="delivered">Delivered</option>
                 <option value="failed">Failed</option>
-                <option value="returned">Returned</option>
+                <option value="returned">Returned / Retail Refund ($2 Fee)</option>
               </select>
             </div>
+
+            {editStatus === 'returned' && (
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  padding: '8px 12px',
+                  background: 'rgba(2, 132, 199, 0.08)',
+                  border: '1px solid #bae6fd',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 12,
+                  color: '#0369a1',
+                }}
+              >
+                🔄 <strong>Retail Refund / Return:</strong> Delivery fee is automatically set to <strong>$2.00</strong> (charged as a payable delivery service to merchant), customer collection is set to <strong>$0.00</strong>, and driver pay is set to <strong>$1.00</strong>.
+              </div>
+            )}
 
             {/* Area */}
             <div className="field">
@@ -1036,6 +1061,27 @@ export function OrderListClient({
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Delivery Order">
         <form onSubmit={handleCreateOrder}>
           <div className="form-grid">
+            {/* Quick Preset for Retail Return / Refund */}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }}>
+              <div>
+                <strong style={{ fontSize: 12, display: 'block' }}>🔄 Retail Return / Refund Pickup?</strong>
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>Automatically set fee to $2.00, customer COD to $0.00, and courier pay to $1.00</small>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setCollectionUsd('0')
+                  setDeliveryFeeUsd('2')
+                  setDriverPayUsd('1')
+                  setNotes('Retail return pickup ($2 fee)')
+                }}
+                style={{ fontSize: 11, padding: '4px 10px', borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 600 }}
+              >
+                Apply $2 Refund Preset
+              </button>
+            </div>
+
             <div className="field">
               <label>Select Shop</label>
               <select value={shopId} onChange={e => setShopId(e.target.value)} required>

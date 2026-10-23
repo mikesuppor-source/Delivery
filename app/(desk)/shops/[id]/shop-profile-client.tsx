@@ -140,14 +140,20 @@ export function ShopProfileClient({
   )
   const totalCodCollectedLBP = usdToLbp(totalCodCollectedUSD, workspace.usd_to_lbp)
 
-  // Total Delivery fees charged to merchant in this timeframe
+  // Billable orders include delivered orders + retail returns/refunds ($2 flat fee)
+  const billableOrders = useMemo(
+    () => dateScopedOrders.filter(o => o.status === 'delivered' || o.status === 'returned'),
+    [dateScopedOrders]
+  )
+
+  // Total Delivery fees charged to merchant in this timeframe (including $2 retail refund fees)
   const totalDeliveryFeesUSD = useMemo(
-    () => deliveredOrders.reduce((sum, o) => sum + (Number(o.delivery_fee_usd) || 0), 0),
-    [deliveredOrders]
+    () => billableOrders.reduce((sum, o) => sum + (Number(o.delivery_fee_usd) || 0), 0),
+    [billableOrders]
   )
   const totalDeliveryFeesLBP = usdToLbp(totalDeliveryFeesUSD, workspace.usd_to_lbp)
 
-  // Net Balance credited to shop from deliveries in this timeframe
+  // Net Balance credited to shop from deliveries & returns in this timeframe
   const totalNetShopCreditedUSD = totalCodCollectedUSD - totalDeliveryFeesUSD
 
   // Total Lifetime Payouts made to shop
@@ -768,7 +774,9 @@ export function ShopProfileClient({
           </div>
 
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line)' }}>
-            Deducted from gross collections
+            {returnedCount > 0
+              ? `Deducted from collections (incl. ${returnedCount} refund fees @ $2)`
+              : 'Deducted from gross collections'}
           </div>
         </div>
 
@@ -1163,6 +1171,10 @@ export function ShopProfileClient({
                           <strong style={{ color: 'var(--brand)', fontSize: 13.5 }}>
                             {formatUSD(netCredited)}
                           </strong>
+                        ) : order.status === 'returned' ? (
+                          <strong style={{ color: '#b91c1c', fontSize: 13.5 }} title="Retail return / refund fee ($2.00) billed to store">
+                            {formatUSD(netCredited)}
+                          </strong>
                         ) : (
                           <span style={{ color: 'var(--muted)', fontSize: 12 }}>Pending delivery</span>
                         )}
@@ -1387,9 +1399,9 @@ export function ShopProfileClient({
                 </div>
               </div>
 
-              {/* Itemized Deliveries Table */}
+              {/* Itemized Deliveries & Returns Table */}
               <h4 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: '#374151', margin: '24px 0 8px' }}>
-                Delivered Orders Breakdown ({deliveredCount} Deliveries · {getDateRangeLabel(datePreset, customStart, customEnd)})
+                Deliveries & Returns Breakdown ({billableOrders.length} Billable Orders · {getDateRangeLabel(datePreset, customStart, customEnd)})
               </h4>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
@@ -1402,33 +1414,41 @@ export function ShopProfileClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {deliveredOrders.slice(0, 30).map(order => {
+                  {billableOrders.slice(0, 50).map(order => {
                     const net = (Number(order.collection_usd) || 0) - (Number(order.delivery_fee_usd) || 0)
+                    const isReturn = order.status === 'returned'
                     return (
-                      <tr key={order.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <tr key={order.id} style={{ borderBottom: '1px solid #e5e7eb', background: isReturn ? 'rgba(254, 226, 226, 0.25)' : 'transparent' }}>
                         <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontWeight: 700 }}>
                           #{order.code}
                         </td>
                         <td style={{ padding: '8px 10px' }}>
-                          <div>{order.recipient_name || 'Customer'}</div>
+                          <div>
+                            {order.recipient_name || 'Customer'}
+                            {isReturn && (
+                              <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 4, background: '#fee2e2', color: '#991b1b', fontWeight: 700 }}>
+                                Retail Refund ($2 Fee)
+                              </span>
+                            )}
+                          </div>
                           {order.area && <small style={{ color: '#6b7280' }}>{order.area.name}</small>}
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600 }}>
                           {formatUSD(Number(order.collection_usd))}
                         </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', color: '#4b5563' }}>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: isReturn ? '#b91c1c' : '#4b5563', fontWeight: isReturn ? 700 : 500 }}>
                           {formatUSD(Number(order.delivery_fee_usd))}
                         </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: net < 0 ? '#b91c1c' : '#15803d' }}>
                           {formatUSD(net)}
                         </td>
                       </tr>
                     )
                   })}
-                  {deliveredOrders.length === 0 && (
+                  {billableOrders.length === 0 && (
                     <tr>
                       <td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#6b7280' }}>
-                        No delivered orders yet for this merchant.
+                        No delivered or returned orders in this timeframe.
                       </td>
                     </tr>
                   )}
@@ -1440,7 +1460,12 @@ export function ShopProfileClient({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div>
                     <div style={{ fontSize: 12, color: '#4b5563' }}>
-                      Total Packages Delivered: <strong>{deliveredCount}</strong>
+                      Delivered Packages: <strong>{deliveredCount}</strong>
+                      {returnedCount > 0 && (
+                        <span style={{ marginLeft: 6, color: '#b91c1c' }}>
+                          · Retail Refunds: <strong>{returnedCount}</strong> ($2 fee each)
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4 }}>
                       Gross COD Collected: <strong>{formatUSD(totalCodCollectedUSD)}</strong>
@@ -1454,8 +1479,8 @@ export function ShopProfileClient({
                     <div style={{ fontSize: 12, color: '#4b5563' }}>
                       Lifetime Payouts Disbursed: <strong>{formatUSD(totalPayoutsUSD)}</strong>
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#15803d', marginTop: 6 }}>
-                      Current Net Payable: {formatUSD(currentBalanceUSD)}
+                    <div style={{ fontSize: 14, fontWeight: 800, color: currentBalanceUSD >= 0 ? '#15803d' : '#0284c7', marginTop: 6 }}>
+                      {currentBalanceUSD >= 0 ? 'Current Net Payable:' : 'Current Net Receivable:'} {formatUSD(currentBalanceUSD)}
                     </div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
                       ({formatLBP(currentBalanceLBP)})
