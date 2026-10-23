@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Modal } from '@/components/modal'
 import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
@@ -89,12 +90,31 @@ export function ShopListClient({ shops: initialShops, workspaceId, userRole }: S
                 <th>Address</th>
                 <th>Outstanding Balance</th>
                 <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {shops.map(shop => (
                 <tr key={shop.id}>
-                  <td><strong>{shop.name}</strong></td>
+                  <td>
+                    <Link
+                      href={`/shops/${shop.id}`}
+                      style={{
+                        fontWeight: 700,
+                        color: 'var(--brand)',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                      title="View Shop Profile & Statement"
+                    >
+                      <span>{shop.name}</span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </Link>
+                  </td>
                   <td>
                     {shop.phone ? (
                       <a
@@ -117,6 +137,15 @@ export function ShopListClient({ shops: initialShops, workspaceId, userRole }: S
                     <span className={`badge ${shop.active ? 'badge-delivered' : 'badge-returned'}`}>
                       {shop.active ? 'Active' : 'Inactive'}
                     </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <Link
+                      href={`/shops/${shop.id}`}
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none' }}
+                    >
+                      View Profile
+                    </Link>
                   </td>
                 </tr>
               ))}
