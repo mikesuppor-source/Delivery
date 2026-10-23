@@ -122,10 +122,7 @@ export default function InvitePage() {
   return (
     <div className="welcome">
       <div className="brand-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/>
-          <rect x="9" y="11" width="14" height="10" rx="2"/>
-        </svg>
+        <img src="/logo.png" alt="Cedar Delivery Desk" />
       </div>
       <h1>Join Cedar</h1>
       <p>

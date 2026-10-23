@@ -55,10 +55,13 @@ export default async function PrintPage() {
 
       <div className="print-document">
         {/* Heading */}
-        <div className="print-heading">
-          <small>{workspace.name.toUpperCase()}</small>
-          <h1>Delivery statement</h1>
-          <p>All dates to today · All shops · All drivers</p>
+        <div className="print-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <small>{workspace.name.toUpperCase()}</small>
+            <h1>Delivery statement</h1>
+            <p>All dates to today · All shops · All drivers</p>
+          </div>
+          <img src="/logo.png" alt="Cedar Logo" style={{ width: 68, height: 68, objectFit: 'contain' }} />
         </div>
 
         {/* Summary stats */}

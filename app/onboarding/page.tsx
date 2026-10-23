@@ -49,12 +49,7 @@ export default function OnboardingPage() {
   return (
     <div className="welcome" style={{ maxWidth: 480 }}>
       <div className="brand-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/>
-          <rect x="9" y="11" width="14" height="10" rx="2"/>
-          <circle cx="12" cy="16" r="1"/>
-          <circle cx="20" cy="16" r="1"/>
-        </svg>
+        <img src="/logo.png" alt="Cedar Delivery Desk" />
       </div>
       <h1>Create your Workspace</h1>
       <p>Set up your delivery company desk. You will be registered as the Owner.</p>
