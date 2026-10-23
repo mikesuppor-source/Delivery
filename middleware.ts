@@ -31,7 +31,9 @@ export async function middleware(request: NextRequest) {
                    path.startsWith('/invite') ||
                    path.startsWith('/_next') ||
                    path.startsWith('/api/invite') ||
-                   path === '/favicon.ico'
+                   path === '/favicon.ico' ||
+                   path === '/logo.png' ||
+                   /\.(png|jpg|jpeg|svg|ico|webp)$/.test(path)
 
   // Redirect unauthenticated users to login
   if (!user && !isPublic) {
