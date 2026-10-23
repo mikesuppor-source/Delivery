@@ -51,7 +51,9 @@ export function StatementClient({
   const [shops, setShops] = useState<Shop[]>(initialShops)
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [settlementType, setSettlementType] = useState<'driver_cash_remittance' | 'shop_payment' | 'driver_pay'>('driver_cash_remittance')
+  const [settlementType, setSettlementType] = useState<
+    'driver_cash_remittance' | 'shop_payment' | 'shop_collection' | 'driver_pay'
+  >('driver_cash_remittance')
   const [selectedDriverId, setSelectedDriverId] = useState(drivers[0]?.id || '')
   const [selectedShopId, setSelectedShopId] = useState(shops[0]?.id || '')
   const [amountUsd, setAmountUsd] = useState('')
@@ -78,9 +80,10 @@ export function StatementClient({
   }
 
   function openSettleForShop(shopId: string, maxAmount: number) {
-    setSettlementType('shop_payment')
+    const isDebt = maxAmount < 0
+    setSettlementType(isDebt ? 'shop_collection' : 'shop_payment')
     setSelectedShopId(shopId)
-    setAmountUsd(String(maxAmount))
+    setAmountUsd(String(Math.abs(maxAmount)))
     setIsModalOpen(true)
   }
 
@@ -90,15 +93,20 @@ export function StatementClient({
     setError('')
 
     try {
+      const isShop = settlementType === 'shop_payment' || settlementType === 'shop_collection'
+      const direction = settlementType === 'shop_collection' ? 'collection_from_shop' : 'payout_to_shop'
+      const apiType = isShop ? 'shop_payment' : settlementType
+
       const res = await fetch('/api/settle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          type: settlementType,
+          type: apiType,
+          direction: isShop ? direction : undefined,
           amountUsd: Number(amountUsd),
-          shopId: settlementType === 'shop_payment' ? selectedShopId : null,
-          driverId: settlementType !== 'shop_payment' ? selectedDriverId : null,
+          shopId: isShop ? selectedShopId : null,
+          driverId: !isShop ? selectedDriverId : null,
           note,
         }),
       })
@@ -122,6 +130,11 @@ export function StatementClient({
           prev.map(s => (s.id === selectedShopId ? { ...s, balance_usd: s.balance_usd - amt } : s))
         )
         showToast(`Shop payout of $${amt} recorded!`)
+      } else if (settlementType === 'shop_collection') {
+        setShops(prev =>
+          prev.map(s => (s.id === selectedShopId ? { ...s, balance_usd: s.balance_usd + amt } : s))
+        )
+        showToast(`Collected $${amt} from merchant!`)
       }
 
       setIsModalOpen(false)
@@ -270,13 +283,14 @@ export function StatementClient({
                 value={settlementType}
                 onChange={e => setSettlementType(e.target.value as any)}
               >
-                <option value="driver_cash_remittance">Driver Cash Remittance (Driver hands over cash)</option>
-                <option value="shop_payment">Shop Payout (Paying the merchant)</option>
+                <option value="driver_cash_remittance">Driver Cash Remittance (Driver hands over cash to Desk)</option>
+                <option value="shop_payment">Shop Payout (Desk pays cash to merchant)</option>
+                <option value="shop_collection">Collect from Shop (Merchant pays debt/fees to Desk)</option>
                 <option value="driver_pay">Driver Salary / Commission Payout</option>
               </select>
             </div>
 
-            {settlementType !== 'shop_payment' ? (
+            {settlementType !== 'shop_payment' && settlementType !== 'shop_collection' ? (
               <div className="field full">
                 <label>Select Driver</label>
                 <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)} required>

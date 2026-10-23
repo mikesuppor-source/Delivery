@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
   const {
     workspaceId,
     type, // 'driver_cash_remittance' | 'shop_payment' | 'driver_pay'
+    direction, // 'payout_to_shop' | 'collection_from_shop'
     amountUsd,
     shopId,
     driverId,
@@ -36,7 +37,10 @@ export async function POST(req: NextRequest) {
 
   const usdToLbp = ws?.usd_to_lbp || 89500
   const serviceClient = createServiceClient()
-  const amount = Number(amountUsd) || 0
+  const rawAmount = Math.abs(Number(amountUsd) || 0)
+  // If company is collecting cash from the merchant (merchant paying debt to company),
+  // settlement amount is negative so balance_usd increases towards 0: balance - (-rawAmount) = balance + rawAmount
+  const amount = type === 'shop_payment' && direction === 'collection_from_shop' ? -rawAmount : rawAmount
 
   // Insert settlement record
   const { data: settlement, error } = await serviceClient

@@ -95,6 +95,7 @@ export function ShopProfileClient({
 
   // Modals state
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false)
+  const [settlementDirection, setSettlementDirection] = useState<'payout_to_shop' | 'collection_from_shop'>('payout_to_shop')
   const [payoutAmount, setPayoutAmount] = useState('')
   const [payoutNote, setPayoutNote] = useState('')
   const [paying, setPaying] = useState(false)
@@ -208,7 +209,7 @@ export function ShopProfileClient({
     [filteredOrders]
   )
 
-  // Handle Recording Shop Payout
+  // Handle Recording Shop Payout or Collection
   async function handleRecordPayout(e: React.FormEvent) {
     e.preventDefault()
     setPaying(true)
@@ -216,7 +217,7 @@ export function ShopProfileClient({
 
     const amount = parseFloat(payoutAmount)
     if (isNaN(amount) || amount <= 0) {
-      setPayoutError('Please enter a valid payout amount')
+      setPayoutError('Please enter a valid payment amount')
       setPaying(false)
       return
     }
@@ -228,6 +229,7 @@ export function ShopProfileClient({
         body: JSON.stringify({
           workspaceId: workspace.id,
           type: 'shop_payment',
+          direction: settlementDirection,
           amountUsd: amount,
           shopId: shop.id,
           note: payoutNote || null,
@@ -235,12 +237,15 @@ export function ShopProfileClient({
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to record shop payout')
+      if (!res.ok) throw new Error(data.error || 'Failed to record shop settlement')
 
-      // Deduct paid amount from shop balance in state
+      // Update shop balance in local state:
+      // Payout (Desk -> Shop): decreases balance
+      // Collection (Shop -> Desk): increases balance
+      const delta = settlementDirection === 'collection_from_shop' ? amount : -amount
       setShop(prev => ({
         ...prev,
-        balance_usd: Number(prev.balance_usd) - amount,
+        balance_usd: Number(prev.balance_usd) + delta,
       }))
 
       setSettlements(prev => [data.settlement, ...prev])
@@ -248,7 +253,7 @@ export function ShopProfileClient({
       setPayoutAmount('')
       setPayoutNote('')
     } catch (err: unknown) {
-      setPayoutError(err instanceof Error ? err.message : 'Error recording payout')
+      setPayoutError(err instanceof Error ? err.message : 'Error recording settlement')
     } finally {
       setPaying(false)
     }
@@ -291,9 +296,15 @@ export function ShopProfileClient({
     }
   }
 
-  function openPayoutModal() {
-    setPayoutAmount(currentBalanceUSD > 0 ? currentBalanceUSD.toString() : '')
-    setPayoutNote(`Delivery proceeds payout to ${shop.name}`)
+  function openPayoutModal(dir?: 'payout_to_shop' | 'collection_from_shop') {
+    const chosenDir = dir || (currentBalanceUSD < 0 ? 'collection_from_shop' : 'payout_to_shop')
+    setSettlementDirection(chosenDir)
+    setPayoutAmount(Math.abs(currentBalanceUSD) > 0 ? Math.abs(currentBalanceUSD).toString() : '')
+    setPayoutNote(
+      chosenDir === 'collection_from_shop'
+        ? `Delivery fee / debt collection from ${shop.name}`
+        : `Delivery proceeds payout to ${shop.name}`
+    )
     setPayoutError('')
     setIsPayoutModalOpen(true)
   }
@@ -420,20 +431,37 @@ export function ShopProfileClient({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {canManage && (
               <>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={openPayoutModal}
-                  title="Record cash payout to merchant"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <rect x="2" y="4" width="20" height="16" rx="2" />
-                    <line x1="12" y1="8" x2="12" y2="16" />
-                    <line x1="8" y1="12" x2="16" y2="12" />
-                  </svg>
-                  Pay Merchant ({formatUSD(currentBalanceUSD)})
-                </button>
+                {currentBalanceUSD >= 0 ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => openPayoutModal('payout_to_shop')}
+                    title="Pay cash to merchant (company owes shop)"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <line x1="12" y1="8" x2="12" y2="16" />
+                      <line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                    Pay Merchant ({formatUSD(currentBalanceUSD)})
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => openPayoutModal('collection_from_shop')}
+                    title="Collect cash debt from merchant (shop owes company)"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#0284c7', borderColor: '#0284c7' }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                      <rect x="2" y="19" width="20" height="2" rx="1" />
+                    </svg>
+                    Collect from Shop ({formatUSD(Math.abs(currentBalanceUSD))})
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -599,11 +627,15 @@ export function ShopProfileClient({
           marginBottom: 24,
         }}
       >
-        {/* Metric 1: Net Balance Owed to Merchant */}
+        {/* Metric 1: Net Account Position (Payable vs Receivable) */}
         <div
           style={{
             background: 'var(--surface)',
-            border: currentBalanceUSD > 0 ? '2px solid rgba(20, 83, 45, 0.4)' : '1.5px solid var(--line)',
+            border: currentBalanceUSD > 0
+              ? '2px solid rgba(20, 83, 45, 0.4)'
+              : currentBalanceUSD < 0
+              ? '2px solid rgba(2, 132, 199, 0.4)'
+              : '1.5px solid var(--line)',
             borderRadius: 'var(--radius)',
             padding: '20px 22px',
             boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
@@ -611,10 +643,31 @@ export function ShopProfileClient({
             overflow: 'hidden',
           }}
         >
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: currentBalanceUSD > 0 ? 'var(--brand)' : '#9ca3af' }} />
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 4,
+              background: currentBalanceUSD > 0 ? 'var(--brand)' : currentBalanceUSD < 0 ? '#0284c7' : '#9ca3af',
+            }}
+          />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--brand)' }}>
-              Outstanding Balance Owed
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.6px',
+                color: currentBalanceUSD > 0 ? 'var(--brand)' : currentBalanceUSD < 0 ? '#0284c7' : 'var(--muted)',
+              }}
+            >
+              {currentBalanceUSD > 0
+                ? 'We Owe Merchant (Desk → Shop)'
+                : currentBalanceUSD < 0
+                ? 'Merchant Owes Desk (Shop → Desk)'
+                : 'Account Balance Settled'}
             </span>
             <span
               style={{
@@ -622,11 +675,11 @@ export function ShopProfileClient({
                 fontWeight: 700,
                 padding: '2px 8px',
                 borderRadius: 99,
-                background: currentBalanceUSD > 0 ? 'var(--brand-light)' : 'var(--bg)',
-                color: currentBalanceUSD > 0 ? 'var(--brand)' : 'var(--muted)',
+                background: currentBalanceUSD > 0 ? 'var(--brand-light)' : currentBalanceUSD < 0 ? '#e0f2fe' : 'var(--bg)',
+                color: currentBalanceUSD > 0 ? 'var(--brand)' : currentBalanceUSD < 0 ? '#0369a1' : 'var(--muted)',
               }}
             >
-              {currentBalanceUSD > 0 ? 'Payout Pending' : 'Settled'}
+              {currentBalanceUSD > 0 ? 'Payout Pending' : currentBalanceUSD < 0 ? 'Collection Due' : 'All Settled'}
             </span>
           </div>
 
@@ -636,7 +689,7 @@ export function ShopProfileClient({
               fontWeight: 800,
               display: 'block',
               letterSpacing: '-0.5px',
-              color: currentBalanceUSD > 0 ? 'var(--brand)' : 'var(--text)',
+              color: currentBalanceUSD > 0 ? 'var(--brand)' : currentBalanceUSD < 0 ? '#0284c7' : 'var(--text)',
             }}
           >
             {formatUSD(currentBalanceUSD)}
@@ -647,7 +700,13 @@ export function ShopProfileClient({
           </div>
 
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line)' }}>
-            Net cash to hand over to <strong>{shop.name}</strong>
+            {currentBalanceUSD > 0 ? (
+              <>The shop wants cash from company (accumulated COD)</>
+            ) : currentBalanceUSD < 0 ? (
+              <span style={{ color: '#0369a1', fontWeight: 600 }}>The company needs cash from shop (delivery fees / debt)</span>
+            ) : (
+              <>No outstanding balance between company and store.</>
+            )}
           </div>
         </div>
 
@@ -1199,15 +1258,23 @@ export function ShopProfileClient({
                       <strong>{formatDate(item.created_at)}</strong>
                     </td>
                     <td>
-                      <span className="badge badge-delivered">
-                        Cash Payout to Merchant (Desk → {shop.name})
-                      </span>
+                      {Number(item.amount_usd) < 0 ? (
+                        <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>
+                          📥 Cash Received from Merchant (Shop → Desk)
+                        </span>
+                      ) : (
+                        <span className="badge badge-delivered">
+                          💸 Cash Payout to Merchant (Desk → {shop.name})
+                        </span>
+                      )}
                     </td>
                     <td>
-                      <strong style={{ fontSize: 14 }}>{formatUSD(Number(item.amount_usd))}</strong>
+                      <strong style={{ fontSize: 14, color: Number(item.amount_usd) < 0 ? '#0284c7' : 'var(--brand)' }}>
+                        {Number(item.amount_usd) < 0 ? `+ ${formatUSD(Math.abs(Number(item.amount_usd)))}` : formatUSD(Number(item.amount_usd))}
+                      </strong>
                     </td>
                     <td>
-                      <span>{formatLBP(usdToLbp(Number(item.amount_usd), item.usd_to_lbp || workspace.usd_to_lbp))}</span>
+                      <span>{formatLBP(usdToLbp(Math.abs(Number(item.amount_usd)), item.usd_to_lbp || workspace.usd_to_lbp))}</span>
                     </td>
                     <td>
                       <span style={{ color: 'var(--muted)', fontSize: 13 }}>
@@ -1420,21 +1487,74 @@ export function ShopProfileClient({
         )}
       </div>
 
-      {/* ─── MODAL: RECORD SHOP PAYOUT ─── */}
+      {/* ─── MODAL: RECORD TWO-WAY SHOP SETTLEMENT ─── */}
       <Modal
         isOpen={isPayoutModalOpen}
         onClose={() => setIsPayoutModalOpen(false)}
-        title={`Record Payout to ${shop.name}`}
+        title={settlementDirection === 'collection_from_shop' ? `Collect Cash from ${shop.name}` : `Record Payout to ${shop.name}`}
       >
         <form onSubmit={handleRecordPayout}>
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px' }}>
-              Record cash payment handed over to <strong>{shop.name}</strong> from their delivery proceeds.
-            </p>
+            {/* Direction Selector */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettlementDirection('payout_to_shop')
+                  setPayoutNote(`Delivery proceeds payout to ${shop.name}`)
+                }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1.5px solid',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  background: settlementDirection === 'payout_to_shop' ? 'rgba(20, 83, 45, 0.08)' : 'var(--bg)',
+                  borderColor: settlementDirection === 'payout_to_shop' ? 'var(--brand)' : 'var(--line)',
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700, color: settlementDirection === 'payout_to_shop' ? 'var(--brand)' : 'var(--text)' }}>
+                  💸 Pay Merchant (Desk → Shop)
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  We give cash to store (clears positive balance)
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSettlementDirection('collection_from_shop')
+                  setPayoutNote(`Delivery fee / debt collection from ${shop.name}`)
+                }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1.5px solid',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  background: settlementDirection === 'collection_from_shop' ? 'rgba(2, 132, 199, 0.08)' : 'var(--bg)',
+                  borderColor: settlementDirection === 'collection_from_shop' ? '#0284c7' : 'var(--line)',
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700, color: settlementDirection === 'collection_from_shop' ? '#0284c7' : 'var(--text)' }}>
+                  📥 Collect from Merchant (Shop → Desk)
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  Store pays cash to company (settles negative debt)
+                </div>
+              </button>
+            </div>
 
             <div style={{ padding: 12, background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Current Outstanding Balance Due</span>
-              <strong style={{ display: 'block', fontSize: 20, marginTop: 4, color: 'var(--brand)' }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                {currentBalanceUSD > 0
+                  ? 'Current Amount We Owe Shop'
+                  : currentBalanceUSD < 0
+                  ? 'Current Amount Shop Owes Us'
+                  : 'Current Ledger Balance'}
+              </span>
+              <strong style={{ display: 'block', fontSize: 20, marginTop: 4, color: currentBalanceUSD >= 0 ? 'var(--brand)' : '#0284c7' }}>
                 {formatUSD(currentBalanceUSD)}
               </strong>
               <small style={{ color: 'var(--muted)', fontSize: 11 }}>
@@ -1445,7 +1565,9 @@ export function ShopProfileClient({
 
           <div className="form-grid">
             <div className="field full">
-              <label>Payout Amount (USD)</label>
+              <label>
+                {settlementDirection === 'collection_from_shop' ? 'Collection Amount (USD)' : 'Payout Amount (USD)'}
+              </label>
               <input
                 type="number"
                 step="0.01"
@@ -1457,17 +1579,31 @@ export function ShopProfileClient({
                 autoFocus
               />
               {payoutAmount && !isNaN(parseFloat(payoutAmount)) && (
-                <small style={{ color: 'var(--muted)', marginTop: 4, display: 'block' }}>
-                  ≈ {formatLBP(usdToLbp(parseFloat(payoutAmount), workspace.usd_to_lbp))}
-                </small>
+                <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <small style={{ color: 'var(--muted)' }}>
+                    ≈ {formatLBP(usdToLbp(parseFloat(payoutAmount), workspace.usd_to_lbp))}
+                  </small>
+                  <small style={{ fontWeight: 600, color: 'var(--brand)' }}>
+                    Projected Balance After:{' '}
+                    {formatUSD(
+                      settlementDirection === 'collection_from_shop'
+                        ? currentBalanceUSD + parseFloat(payoutAmount)
+                        : currentBalanceUSD - parseFloat(payoutAmount)
+                    )}
+                  </small>
+                </div>
               )}
             </div>
 
             <div className="field full">
-              <label>Reference / Note (Optional)</label>
+              <label>Reference Note (Optional)</label>
               <input
                 type="text"
-                placeholder="e.g. Weekly cash handover, receipt #104"
+                placeholder={
+                  settlementDirection === 'collection_from_shop'
+                    ? 'e.g. Received cash for weekly delivery fees, receipt #104'
+                    : 'e.g. Cash batch handed to store owner, receipt #104'
+                }
                 value={payoutNote}
                 onChange={e => setPayoutNote(e.target.value)}
               />
@@ -1480,8 +1616,20 @@ export function ShopProfileClient({
             <button type="button" className="btn btn-ghost" onClick={() => setIsPayoutModalOpen(false)}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={paying}>
-              {paying ? 'Recording…' : 'Confirm Payout'}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={paying}
+              style={{
+                background: settlementDirection === 'collection_from_shop' ? '#0284c7' : 'var(--brand)',
+                borderColor: settlementDirection === 'collection_from_shop' ? '#0284c7' : 'var(--brand)',
+              }}
+            >
+              {paying
+                ? 'Recording…'
+                : settlementDirection === 'collection_from_shop'
+                ? 'Confirm Cash Collection'
+                : 'Confirm Cash Payout'}
             </button>
           </div>
         </form>
