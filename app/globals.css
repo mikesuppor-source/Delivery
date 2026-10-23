@@ -579,3 +579,59 @@ tr:hover td { background: var(--bg); }
   .badge, .stats article.accent { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { size: auto; margin: 12mm; }
 }
+
+/* ─── WhatsApp Quick Actions ────────────────────────────────────────── */
+.whatsapp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #128c7e;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all .15s ease;
+}
+.whatsapp-badge:hover {
+  color: #25d366;
+  text-decoration: underline;
+}
+.whatsapp-badge svg {
+  color: #25d366;
+}
+.whatsapp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(37, 211, 102, 0.12);
+  color: #25d366;
+  text-decoration: none;
+  transition: all .15s ease;
+  vertical-align: middle;
+}
+.whatsapp-icon-btn:hover {
+  background: #25d366;
+  color: #ffffff;
+  transform: scale(1.08);
+}
+.whatsapp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: #25d366;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all .15s ease;
+  box-shadow: 0 1px 4px rgba(37,211,102,.25);
+}
+.whatsapp-btn:hover {
+  background: #1ebc59;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(37,211,102,.35);
+}
+

@@ -32,8 +32,8 @@ export default async function OrdersPage() {
         id, code, status, collection_usd, delivery_fee_usd, driver_pay_usd,
         shop_balance_usd, usd_to_lbp_rate, created_at, recipient_name,
         recipient_phone, recipient_address,
-        shop:shop_id(id, name),
-        driver:driver_id(id, name),
+        shop:shop_id(id, name, phone),
+        driver:driver_id(id, name, phone),
         area:area_id(id, name)
       `)
       .eq('workspace_id', workspace.id)
@@ -41,14 +41,14 @@ export default async function OrdersPage() {
 
     supabase
       .from('shops')
-      .select('id, name')
+      .select('id, name, phone')
       .eq('workspace_id', workspace.id)
       .eq('active', true)
       .order('name'),
 
     supabase
       .from('drivers')
-      .select('id, name')
+      .select('id, name, phone')
       .eq('workspace_id', workspace.id)
       .eq('active', true)
       .order('name'),

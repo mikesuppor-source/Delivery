@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Modal } from '@/components/modal'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import type { UserRole, OrderStatus } from '@/lib/roles'
+import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { getWhatsAppUrl, buildCustomerOrderMessage, buildDriverDispatchMessage } from '@/lib/whatsapp'
 
 interface Order {
   id: string
@@ -18,8 +20,8 @@ interface Order {
   recipient_phone: string | null
   recipient_address: string | null
   created_at: string
-  shop: { id: string; name: string } | null
-  driver: { id: string; name: string } | null
+  shop: { id: string; name: string; phone?: string | null } | null
+  driver: { id: string; name: string; phone?: string | null } | null
   area: { id: string; name: string } | null
 }
 
@@ -227,6 +229,7 @@ export function OrderListClient({
                 <th>Collection</th>
                 <th>Fee</th>
                 <th>Status</th>
+                <th>WhatsApp</th>
                 <th>Date</th>
               </tr>
             </thead>
@@ -237,11 +240,49 @@ export function OrderListClient({
                   <tr key={order.id}>
                     <td>
                       <strong>{order.code}</strong>
-                      {order.recipient_name && <small>{order.recipient_name} · {order.recipient_phone}</small>}
+                      {order.recipient_name && (
+                        <small>
+                          {order.recipient_name}
+                          {order.recipient_phone && (
+                            <>
+                              {' · '}
+                              <a
+                                href={getWhatsAppUrl(order.recipient_phone, buildCustomerOrderMessage(order))}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="whatsapp-badge"
+                                title="Chat on WhatsApp"
+                              >
+                                <WhatsAppIcon size={12} />
+                                <span>{order.recipient_phone}</span>
+                              </a>
+                            </>
+                          )}
+                        </small>
+                      )}
                       {order.recipient_address && <small style={{ color: 'var(--muted)' }}>{order.recipient_address}</small>}
                     </td>
                     <td>{order.shop?.name || '—'}</td>
-                    <td>{order.driver?.name || <span style={{ color: 'var(--muted)' }}>Unassigned</span>}</td>
+                    <td>
+                      {order.driver ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span>{order.driver.name}</span>
+                          {order.driver.phone && (
+                            <a
+                              href={getWhatsAppUrl(order.driver.phone, buildDriverDispatchMessage(order))}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="whatsapp-icon-btn"
+                              title={`Dispatch to ${order.driver.name} on WhatsApp`}
+                            >
+                              <WhatsAppIcon size={13} />
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--muted)' }}>Unassigned</span>
+                      )}
+                    </td>
                     <td>{order.area?.name || '—'}</td>
                     <td>
                       <strong>{formatUSD(Number(order.collection_usd))}</strong>
@@ -263,6 +304,35 @@ export function OrderListClient({
                         <option value="failed">Failed</option>
                         <option value="returned">Returned</option>
                       </select>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {order.recipient_phone ? (
+                          <a
+                            href={getWhatsAppUrl(order.recipient_phone, buildCustomerOrderMessage(order))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="whatsapp-btn"
+                            title="Send status update to Customer on WhatsApp"
+                          >
+                            <WhatsAppIcon size={13} color="#fff" />
+                            <span>Customer</span>
+                          </a>
+                        ) : (
+                          <span style={{ color: 'var(--muted)', fontSize: 11 }}>—</span>
+                        )}
+                        {order.driver?.phone && (
+                          <a
+                            href={getWhatsAppUrl(order.driver.phone, buildDriverDispatchMessage(order))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="whatsapp-icon-btn"
+                            title="Dispatch job details to Driver on WhatsApp"
+                          >
+                            <WhatsAppIcon size={13} />
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <small>{new Date(order.created_at).toLocaleDateString('en-GB')}</small>

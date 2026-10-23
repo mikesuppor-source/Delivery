@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Modal } from '@/components/modal'
 import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
+import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { getWhatsAppUrl } from '@/lib/whatsapp'
 
 interface Driver {
   id: string
@@ -109,7 +111,20 @@ export function DriverListClient({
               {drivers.map(driver => (
                 <tr key={driver.id}>
                   <td><strong>{driver.name}</strong></td>
-                  <td>{driver.phone || '—'}</td>
+                  <td>
+                    {driver.phone ? (
+                      <a
+                        href={getWhatsAppUrl(driver.phone, `Hello ${driver.name}, Cedar Delivery dispatch here.`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="whatsapp-badge"
+                        title="Message courier on WhatsApp"
+                      >
+                        <WhatsAppIcon size={13} />
+                        <span>{driver.phone}</span>
+                      </a>
+                    ) : '—'}
+                  </td>
                   <td>
                     <strong>{formatUSD(Number(driver.cash_held_usd))}</strong>
                     <small>Unremitted COD</small>

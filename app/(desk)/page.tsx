@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getMember } from '@/lib/auth'
 import { formatUSD, formatLBP, usdToLbp, formatDateOnly } from '@/lib/utils'
 import Link from 'next/link'
+import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { getWhatsAppUrl, buildCustomerOrderMessage } from '@/lib/whatsapp'
 
 export default async function OverviewPage() {
   const supabase = await createClient()
@@ -42,7 +44,7 @@ export default async function OverviewPage() {
   // Recent orders
   const { data: rawRecentOrders } = await supabase
     .from('orders')
-    .select('id, code, status, collection_usd, usd_to_lbp_rate, created_at, shop:shop_id(name), driver:driver_id(name)')
+    .select('id, code, status, collection_usd, usd_to_lbp_rate, created_at, recipient_name, recipient_phone, recipient_address, shop:shop_id(name), driver:driver_id(name)')
     .eq('workspace_id', workspace.id)
     .order('created_at', { ascending: false })
     .limit(8)
@@ -117,6 +119,7 @@ export default async function OverviewPage() {
                   <th>Driver</th>
                   <th>Collected</th>
                   <th>Status</th>
+                  <th>WhatsApp</th>
                 </tr>
               </thead>
               <tbody>
@@ -127,7 +130,11 @@ export default async function OverviewPage() {
                     <tr key={order.id}>
                       <td>
                         <strong>{order.code}</strong>
-                        <small>{new Date(order.created_at).toLocaleDateString('en-GB')}</small>
+                        {order.recipient_name ? (
+                          <small>{order.recipient_name}</small>
+                        ) : (
+                          <small>{new Date(order.created_at).toLocaleDateString('en-GB')}</small>
+                        )}
                       </td>
                       <td>{shop?.name ?? '—'}</td>
                       <td>{driver?.name ?? <span style={{ color: 'var(--muted)' }}>Unassigned</span>}</td>
@@ -139,6 +146,22 @@ export default async function OverviewPage() {
                         <span className={`badge badge-${order.status}`}>
                           {order.status.replace('_', ' ')}
                         </span>
+                      </td>
+                      <td>
+                        {order.recipient_phone ? (
+                          <a
+                            href={getWhatsAppUrl(order.recipient_phone, buildCustomerOrderMessage(order))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="whatsapp-badge"
+                            title="Chat with Customer on WhatsApp"
+                          >
+                            <WhatsAppIcon size={14} />
+                            <span>{order.recipient_phone}</span>
+                          </a>
+                        ) : (
+                          <span style={{ color: 'var(--muted)', fontSize: 11 }}>—</span>
+                        )}
                       </td>
                     </tr>
                   )

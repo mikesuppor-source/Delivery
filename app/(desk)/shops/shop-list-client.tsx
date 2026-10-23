@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Modal } from '@/components/modal'
 import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
+import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { getWhatsAppUrl } from '@/lib/whatsapp'
 
 interface Shop {
   id: string
@@ -93,7 +95,20 @@ export function ShopListClient({ shops: initialShops, workspaceId, userRole }: S
               {shops.map(shop => (
                 <tr key={shop.id}>
                   <td><strong>{shop.name}</strong></td>
-                  <td>{shop.phone || '—'}</td>
+                  <td>
+                    {shop.phone ? (
+                      <a
+                        href={getWhatsAppUrl(shop.phone, `Hello ${shop.name}, Cedar Delivery Desk here regarding your store deliveries and balance.`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="whatsapp-badge"
+                        title="Chat with Shop on WhatsApp"
+                      >
+                        <WhatsAppIcon size={13} />
+                        <span>{shop.phone}</span>
+                      </a>
+                    ) : '—'}
+                  </td>
                   <td>{shop.address || '—'}</td>
                   <td style={{ color: Number(shop.balance_usd) < 0 ? 'var(--danger)' : 'inherit', fontWeight: 600 }}>
                     {formatUSD(Number(shop.balance_usd))}
