@@ -970,7 +970,10 @@ tr:hover td { background: var(--bg); }
 /* ─── Print Media Styles ─────────────────────────────────────────────── */
 @media print {
   aside, .topbar, .print-controls, nav, .page-heading, .stats, .panel-title,
-  .btn, .toolbar, .back-link, header {
+  .btn, .toolbar, .back-link, header, .no-print {
+    display: none !important;
+  }
+  .no-print {
     display: none !important;
   }
   main {
@@ -996,6 +999,13 @@ tr:hover td { background: var(--bg); }
     padding: 0 !important;
     max-width: 100% !important;
     margin: 0 !important;
+  }
+  .printable-receipt-area {
+    box-shadow: none !important;
+    border: 1.5px solid #111827 !important;
+    padding: 16px !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
   }
 }
 

@@ -7,6 +7,7 @@ import { formatUSD, formatLBP, usdToLbp, isDateInPreset, getDateRangeLabel, type
 import type { UserRole, OrderStatus } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, buildCustomerOrderMessage, buildDriverDispatchMessage } from '@/lib/whatsapp'
+import { OrderReceiptSlip } from '@/components/order-receipt-slip'
 
 interface Order {
   id: string
@@ -72,6 +73,7 @@ export function OrderListClient({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null)
 
   // New Order Form state
   const [customCode, setCustomCode] = useState('')
@@ -770,9 +772,23 @@ export function OrderListClient({
                       <small>{new Date(order.created_at).toLocaleDateString('en-GB')}</small>
                     </td>
 
-                    {/* Actions: Edit & Track */}
+                    {/* Actions: Slip, Edit & Track */}
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setReceiptOrder(order)}
+                          style={{ fontSize: 11, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          title="View / Print Barcode & QR Code Waybill Receipt"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <polyline points="6 9 6 2 18 2 18 9" />
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                            <rect x="6" y="14" width="12" height="8" />
+                          </svg>
+                          Slip
+                        </button>
                         {canManage && (
                           <button
                             type="button"
@@ -1316,6 +1332,23 @@ export function OrderListClient({
           </div>
         </form>
       </Modal>
+
+      {/* ─── MODAL: ORDER WAYBILL RECEIPT SLIP (BARCODE & QR CODE) ─── */}
+      {receiptOrder && (
+        <Modal
+          isOpen={!!receiptOrder}
+          onClose={() => setReceiptOrder(null)}
+          title={`Waybill Receipt #${receiptOrder.code}`}
+        >
+          <div style={{ maxHeight: '82vh', overflowY: 'auto', padding: '6px 2px' }}>
+            <OrderReceiptSlip
+              order={receiptOrder}
+              workspaceRate={rate}
+              workspaceName="Cedar Delivery Desk"
+            />
+          </div>
+        </Modal>
+      )}
     </>
   )
 }

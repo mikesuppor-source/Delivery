@@ -152,7 +152,22 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             <span className="track-code-label">Tracking Number</span>
             <h1 className="track-code-value">{order.code}</h1>
           </div>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Link
+              href={`/print/order/${order.code}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: 11, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="View & Print Official Waybill Receipt Slip with Barcode & QR Code"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              <span>Receipt Slip</span>
+            </Link>
             <span className={`badge badge-${order.status} track-status-badge`}>
               {order.status === 'picked_up'
                 ? 'Out for Delivery'
