@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { UserRole } from '@/lib/auth'
+import type { UserRole } from '@/lib/roles'
 import { ROLE_LABELS } from '@/lib/utils'
 
 interface Member {

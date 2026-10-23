@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { UserRole } from '@/lib/auth'
-import { hasMinRole } from '@/lib/auth'
+import type { UserRole } from '@/lib/roles'
+import { hasMinRole } from '@/lib/roles'
 
 interface SidebarProps {
   workspaceId: string

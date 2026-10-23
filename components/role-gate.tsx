@@ -1,7 +1,7 @@
 'use client'
 
-import type { UserRole } from '@/lib/auth'
-import { hasMinRole } from '@/lib/auth'
+import type { UserRole } from '@/lib/roles'
+import { hasMinRole } from '@/lib/roles'
 
 interface RoleGateProps {
   userRole: UserRole

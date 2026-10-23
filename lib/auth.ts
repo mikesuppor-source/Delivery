@@ -1,21 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from './supabase/server'
-import type { UserRole } from './supabase/database.types'
+import { UserRole, hasMinRole } from './roles'
 
-export type { UserRole }
-
-const ROLE_HIERARCHY: UserRole[] = ['readonly', 'driver', 'manager', 'owner']
-
-export function roleLevel(role: UserRole): number {
-  return ROLE_HIERARCHY.indexOf(role)
-}
-
-export function hasMinRole(userRole: UserRole, minRole: UserRole | UserRole[]): boolean {
-  const allowed = Array.isArray(minRole) ? minRole : [minRole]
-  const userLevel = roleLevel(userRole)
-  const minLevel = Math.min(...allowed.map(r => roleLevel(r)))
-  return userLevel >= minLevel
-}
+export * from './roles'
 
 /** Get the currently authenticated user */
 export async function getUser() {

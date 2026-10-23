@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Modal } from '@/components/modal'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
-import type { UserRole, OrderStatus } from '@/lib/auth'
+import type { UserRole, OrderStatus } from '@/lib/roles'
 
 interface Order {
   id: string
