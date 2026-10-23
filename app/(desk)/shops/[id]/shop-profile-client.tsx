@@ -4,7 +4,16 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Modal } from '@/components/modal'
-import { formatUSD, formatLBP, usdToLbp, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
+import {
+  formatUSD,
+  formatLBP,
+  usdToLbp,
+  formatDate,
+  ORDER_STATUS_LABELS,
+  DateRangePreset,
+  isDateInPreset,
+  getDateRangeLabel,
+} from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, getCustomerOrderWhatsAppUrl } from '@/lib/whatsapp'
@@ -78,6 +87,12 @@ export function ShopProfileClient({
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'delivered' | 'active' | 'returned'>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Date filtering & Sorting presets
+  const [datePreset, setDatePreset] = useState<DateRangePreset>('all')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'collection_high' | 'net_high' | 'fee_high'>('newest')
+
   // Modals state
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false)
   const [payoutAmount, setPayoutAmount] = useState('')
@@ -95,38 +110,43 @@ export function ShopProfileClient({
 
   const canManage = userRole === 'owner' || userRole === 'manager'
 
-  // Performance & P&L calculations
-  const deliveredOrders = useMemo(() => orders.filter(o => o.status === 'delivered'), [orders])
+  // Orders scoped to the selected timeframe (this month, last month, this year, etc.)
+  const dateScopedOrders = useMemo(() => {
+    return orders.filter(o => isDateInPreset(o.created_at, datePreset, customStart, customEnd))
+  }, [orders, datePreset, customStart, customEnd])
+
+  // Performance & P&L calculations (scoped to selected date timeframe)
+  const deliveredOrders = useMemo(() => dateScopedOrders.filter(o => o.status === 'delivered'), [dateScopedOrders])
   const activeOrders = useMemo(
-    () => orders.filter(o => ['pending', 'assigned', 'picked_up'].includes(o.status)),
-    [orders]
+    () => dateScopedOrders.filter(o => ['pending', 'assigned', 'picked_up'].includes(o.status)),
+    [dateScopedOrders]
   )
   const returnedOrders = useMemo(
-    () => orders.filter(o => ['returned', 'failed'].includes(o.status)),
-    [orders]
+    () => dateScopedOrders.filter(o => ['returned', 'failed'].includes(o.status)),
+    [dateScopedOrders]
   )
 
-  const totalOrdersCount = orders.length
+  const totalOrdersCount = dateScopedOrders.length
   const deliveredCount = deliveredOrders.length
   const activeCount = activeOrders.length
   const returnedCount = returnedOrders.length
   const completionRate = totalOrdersCount > 0 ? (deliveredCount / totalOrdersCount) * 100 : 0
 
-  // Total COD collected on behalf of merchant
+  // Total COD collected on behalf of merchant in this timeframe
   const totalCodCollectedUSD = useMemo(
     () => deliveredOrders.reduce((sum, o) => sum + (Number(o.collection_usd) || 0), 0),
     [deliveredOrders]
   )
   const totalCodCollectedLBP = usdToLbp(totalCodCollectedUSD, workspace.usd_to_lbp)
 
-  // Total Delivery fees charged to merchant
+  // Total Delivery fees charged to merchant in this timeframe
   const totalDeliveryFeesUSD = useMemo(
     () => deliveredOrders.reduce((sum, o) => sum + (Number(o.delivery_fee_usd) || 0), 0),
     [deliveredOrders]
   )
   const totalDeliveryFeesLBP = usdToLbp(totalDeliveryFeesUSD, workspace.usd_to_lbp)
 
-  // Net Balance credited to shop from deliveries
+  // Net Balance credited to shop from deliveries in this timeframe
   const totalNetShopCreditedUSD = totalCodCollectedUSD - totalDeliveryFeesUSD
 
   // Total Lifetime Payouts made to shop
@@ -140,9 +160,9 @@ export function ShopProfileClient({
   const currentBalanceUSD = Number(shop.balance_usd) || 0
   const currentBalanceLBP = usdToLbp(currentBalanceUSD, workspace.usd_to_lbp)
 
-  // Filtered orders list
+  // Filtered and Sorted orders list
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    const list = dateScopedOrders.filter(order => {
       // Status filter
       if (orderStatusFilter === 'delivered' && order.status !== 'delivered') return false
       if (orderStatusFilter === 'active' && !['pending', 'assigned', 'picked_up'].includes(order.status)) return false
@@ -158,7 +178,21 @@ export function ShopProfileClient({
       const areaMatch = order.area?.name?.toLowerCase().includes(q)
       return codeMatch || recipientMatch || phoneMatch || driverMatch || areaMatch
     })
-  }, [orders, orderStatusFilter, searchQuery])
+
+    // Sorting
+    return list.sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (sortBy === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      if (sortBy === 'collection_high') return (Number(b.collection_usd) || 0) - (Number(a.collection_usd) || 0)
+      if (sortBy === 'net_high') {
+        const netB = (Number(b.collection_usd) || 0) - (Number(b.delivery_fee_usd) || 0)
+        const netA = (Number(a.collection_usd) || 0) - (Number(a.delivery_fee_usd) || 0)
+        return netB - netA
+      }
+      if (sortBy === 'fee_high') return (Number(b.delivery_fee_usd) || 0) - (Number(a.delivery_fee_usd) || 0)
+      return 0
+    })
+  }, [dateScopedOrders, orderStatusFilter, searchQuery, sortBy])
 
   // Filtered sums
   const filteredCodTotal = useMemo(
@@ -439,6 +473,121 @@ export function ShopProfileClient({
             )}
           </div>
         </div>
+      </div>
+
+      {/* ─── Date Range & Timeframe Filter Toolbar (This Month, Last Month, Last Year, etc.) ─── */}
+      <div
+        className="panel"
+        style={{
+          padding: '14px 20px',
+          marginBottom: 20,
+          background: 'var(--surface)',
+          border: '1.5px solid var(--line)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          {/* Preset Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginRight: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              📅 Timeframe:
+            </span>
+            {[
+              { id: 'all', label: 'All Time' },
+              { id: 'today', label: 'Today' },
+              { id: 'this_month', label: 'This Month' },
+              { id: 'last_month', label: 'Last Month' },
+              { id: 'this_year', label: 'This Year' },
+              { id: 'last_year', label: 'Last Year' },
+              { id: 'custom', label: 'Custom Range ⚙️' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setDatePreset(tab.id as DateRangePreset)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 99,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: '1px solid',
+                  cursor: 'pointer',
+                  background: datePreset === tab.id ? 'var(--brand)' : 'var(--bg)',
+                  color: datePreset === tab.id ? '#fff' : 'var(--muted)',
+                  borderColor: datePreset === tab.id ? 'var(--brand)' : 'var(--line)',
+                  transition: 'all .12s',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              style={{
+                fontSize: 12,
+                padding: '5px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--line)',
+                background: 'var(--bg)',
+                color: 'var(--text)',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="newest">🕒 Newest Orders First</option>
+              <option value="oldest">⏳ Oldest Orders First</option>
+              <option value="collection_high">💵 Highest COD Collection ($)</option>
+              <option value="net_high">🏷️ Highest Net Store Credit ($)</option>
+              <option value="fee_high">⚡ Highest Delivery Fee ($)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Custom Date Pickers if 'custom' is active */}
+        {datePreset === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <label style={{ fontWeight: 600, color: 'var(--muted)' }}>From:</label>
+              <input
+                type="date"
+                value={customStart}
+                onChange={e => setCustomStart(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--line)', background: 'var(--bg)' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <label style={{ fontWeight: 600, color: 'var(--muted)' }}>To:</label>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={e => setCustomEnd(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--line)', background: 'var(--bg)' }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Period Active Helper Banner */}
+        {datePreset !== 'all' && (
+          <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--brand)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>Showing stats and orders for:</span>
+            <span style={{ background: 'var(--brand-light)', padding: '2px 8px', borderRadius: 4 }}>
+              {getDateRangeLabel(datePreset, customStart, customEnd)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDatePreset('all')}
+              style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 11, textDecoration: 'underline' }}
+            >
+              Reset to All Time
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ─── Executive KPI Cards (Balance Owed, COD Collected, Delivery Fees, Orders) ─── */}
@@ -1141,7 +1290,10 @@ export function ShopProfileClient({
                     Ref: STM-{shop.id.slice(0, 8).toUpperCase()}-{Date.now().toString().slice(-4)}
                   </small>
                   <div style={{ fontSize: 11, color: '#374151', marginTop: 4 }}>
-                    Date: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    Period: <strong>{getDateRangeLabel(datePreset, customStart, customEnd)}</strong>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                    Issued: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </div>
                 </div>
               </div>
@@ -1170,7 +1322,7 @@ export function ShopProfileClient({
 
               {/* Itemized Deliveries Table */}
               <h4 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: '#374151', margin: '24px 0 8px' }}>
-                Delivered Orders Breakdown ({deliveredCount} Deliveries)
+                Delivered Orders Breakdown ({deliveredCount} Deliveries · {getDateRangeLabel(datePreset, customStart, customEnd)})
               </h4>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>

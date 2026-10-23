@@ -3,7 +3,16 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Modal } from '@/components/modal'
-import { formatUSD, formatLBP, usdToLbp, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
+import {
+  formatUSD,
+  formatLBP,
+  usdToLbp,
+  formatDate,
+  ORDER_STATUS_LABELS,
+  DateRangePreset,
+  isDateInPreset,
+  getDateRangeLabel,
+} from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, getCustomerOrderWhatsAppUrl } from '@/lib/whatsapp'
@@ -78,6 +87,12 @@ export function DriverProfileClient({
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'delivered' | 'active' | 'returned'>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Date filtering & Sorting presets
+  const [datePreset, setDatePreset] = useState<DateRangePreset>('all')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'pay_high' | 'profit_high' | 'collection_high'>('newest')
+
   // Modals state
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false)
   const [settlementType, setSettlementType] = useState<'driver_cash_remittance' | 'driver_pay'>('driver_cash_remittance')
@@ -95,24 +110,29 @@ export function DriverProfileClient({
 
   const canManage = userRole === 'owner' || userRole === 'manager'
 
-  // Calculations for Driver Performance & Financials
-  const deliveredOrders = useMemo(() => orders.filter(o => o.status === 'delivered'), [orders])
+  // Orders scoped to the selected timeframe (this month, last month, this year, etc.)
+  const dateScopedOrders = useMemo(() => {
+    return orders.filter(o => isDateInPreset(o.created_at, datePreset, customStart, customEnd))
+  }, [orders, datePreset, customStart, customEnd])
+
+  // Calculations for Driver Performance & Financials (scoped to the chosen timeframe!)
+  const deliveredOrders = useMemo(() => dateScopedOrders.filter(o => o.status === 'delivered'), [dateScopedOrders])
   const activeOrders = useMemo(
-    () => orders.filter(o => ['pending', 'assigned', 'picked_up'].includes(o.status)),
-    [orders]
+    () => dateScopedOrders.filter(o => ['pending', 'assigned', 'picked_up'].includes(o.status)),
+    [dateScopedOrders]
   )
   const returnedOrders = useMemo(
-    () => orders.filter(o => ['returned', 'failed'].includes(o.status)),
-    [orders]
+    () => dateScopedOrders.filter(o => ['returned', 'failed'].includes(o.status)),
+    [dateScopedOrders]
   )
 
-  const totalOrdersCount = orders.length
+  const totalOrdersCount = dateScopedOrders.length
   const deliveredCount = deliveredOrders.length
   const activeCount = activeOrders.length
   const returnedCount = returnedOrders.length
   const completionRate = totalOrdersCount > 0 ? (deliveredCount / totalOrdersCount) * 100 : 0
 
-  // 1. Total Net How Much Driver Made
+  // 1. Total Net How Much Driver Made in the selected timeframe
   const totalDriverEarningsUSD = useMemo(
     () => deliveredOrders.reduce((sum, o) => sum + (Number(o.driver_pay_usd) || 0), 0),
     [deliveredOrders]
@@ -120,7 +140,7 @@ export function DriverProfileClient({
   const totalDriverEarningsLBP = usdToLbp(totalDriverEarningsUSD, workspace.usd_to_lbp)
   const avgDriverPay = deliveredCount > 0 ? totalDriverEarningsUSD / deliveredCount : 0
 
-  // 2. Total Company Gross Fees and Net Profit Driver Made for Company
+  // 2. Total Company Gross Fees and Net Profit Driver Made for Company in the selected timeframe
   const totalGrossDeliveryFeesUSD = useMemo(
     () => deliveredOrders.reduce((sum, o) => sum + (Number(o.delivery_fee_usd) || 0), 0),
     [deliveredOrders]
@@ -138,16 +158,16 @@ export function DriverProfileClient({
     totalGrossDeliveryFeesUSD > 0 ? (totalCompanyProfitUSD / totalGrossDeliveryFeesUSD) * 100 : 0
   const avgCompanyProfit = deliveredCount > 0 ? totalCompanyProfitUSD / deliveredCount : 0
 
-  // Total COD Collected on delivered packages
+  // Total COD Collected on delivered packages in this timeframe
   const totalCodCollectedUSD = useMemo(
     () => deliveredOrders.reduce((sum, o) => sum + (Number(o.collection_usd) || 0), 0),
     [deliveredOrders]
   )
   const totalCodCollectedLBP = usdToLbp(totalCodCollectedUSD, workspace.usd_to_lbp)
 
-  // Filtered orders list
+  // Filtered and Sorted orders list
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    const list = dateScopedOrders.filter(order => {
       // Status filter
       if (orderStatusFilter === 'delivered' && order.status !== 'delivered') return false
       if (orderStatusFilter === 'active' && !['pending', 'assigned', 'picked_up'].includes(order.status)) return false
@@ -163,7 +183,21 @@ export function DriverProfileClient({
       const areaMatch = order.area?.name?.toLowerCase().includes(q)
       return codeMatch || recipientMatch || phoneMatch || shopMatch || areaMatch
     })
-  }, [orders, orderStatusFilter, searchQuery])
+
+    // Sorting
+    return list.sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (sortBy === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      if (sortBy === 'pay_high') return (Number(b.driver_pay_usd) || 0) - (Number(a.driver_pay_usd) || 0)
+      if (sortBy === 'profit_high') {
+        const profitB = (Number(b.delivery_fee_usd) || 0) - (Number(b.driver_pay_usd) || 0)
+        const profitA = (Number(a.delivery_fee_usd) || 0) - (Number(a.driver_pay_usd) || 0)
+        return profitB - profitA
+      }
+      if (sortBy === 'collection_high') return (Number(b.collection_usd) || 0) - (Number(a.collection_usd) || 0)
+      return 0
+    })
+  }, [dateScopedOrders, orderStatusFilter, searchQuery, sortBy])
 
   // Filtered sums for current view
   const filteredCodTotal = useMemo(
@@ -467,6 +501,121 @@ export function DriverProfileClient({
             )}
           </div>
         </div>
+      </div>
+
+      {/* ─── Date Range & Timeframe Filter Toolbar (This Month, Last Month, Last Year, etc.) ─── */}
+      <div
+        className="panel"
+        style={{
+          padding: '14px 20px',
+          marginBottom: 20,
+          background: 'var(--surface)',
+          border: '1.5px solid var(--line)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          {/* Preset Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginRight: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              📅 Timeframe:
+            </span>
+            {[
+              { id: 'all', label: 'All Time' },
+              { id: 'today', label: 'Today' },
+              { id: 'this_month', label: 'This Month' },
+              { id: 'last_month', label: 'Last Month' },
+              { id: 'this_year', label: 'This Year' },
+              { id: 'last_year', label: 'Last Year' },
+              { id: 'custom', label: 'Custom Range ⚙️' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setDatePreset(tab.id as DateRangePreset)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 99,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: '1px solid',
+                  cursor: 'pointer',
+                  background: datePreset === tab.id ? 'var(--brand)' : 'var(--bg)',
+                  color: datePreset === tab.id ? '#fff' : 'var(--muted)',
+                  borderColor: datePreset === tab.id ? 'var(--brand)' : 'var(--line)',
+                  transition: 'all .12s',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              style={{
+                fontSize: 12,
+                padding: '5px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--line)',
+                background: 'var(--bg)',
+                color: 'var(--text)',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="newest">🕒 Newest Orders First</option>
+              <option value="oldest">⏳ Oldest Orders First</option>
+              <option value="pay_high">💰 Highest Courier Pay ($)</option>
+              <option value="profit_high">📈 Highest Company Profit ($)</option>
+              <option value="collection_high">💵 Highest COD Collection ($)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Custom Date Pickers if 'custom' is active */}
+        {datePreset === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <label style={{ fontWeight: 600, color: 'var(--muted)' }}>From:</label>
+              <input
+                type="date"
+                value={customStart}
+                onChange={e => setCustomStart(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--line)', background: 'var(--bg)' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <label style={{ fontWeight: 600, color: 'var(--muted)' }}>To:</label>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={e => setCustomEnd(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--line)', background: 'var(--bg)' }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Period Active Helper Banner */}
+        {datePreset !== 'all' && (
+          <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--brand)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>Showing stats and orders for:</span>
+            <span style={{ background: 'var(--brand-light)', padding: '2px 8px', borderRadius: 4 }}>
+              {getDateRangeLabel(datePreset, customStart, customEnd)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDatePreset('all')}
+              style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 11, textDecoration: 'underline' }}
+            >
+              Reset to All Time
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ─── Executive KPI Cards (Total Orders, Driver Net, Company Profit, Balances) ─── */}

@@ -73,3 +73,70 @@ export const ROLE_LABELS: Record<string, string> = {
   driver: 'Driver',
   readonly: 'Read-only',
 }
+
+/** Date filtering presets */
+export type DateRangePreset = 'all' | 'today' | 'this_month' | 'last_month' | 'this_year' | 'last_year' | 'custom'
+
+export function isDateInPreset(
+  dateStr: string,
+  preset: DateRangePreset,
+  customStart?: string,
+  customEnd?: string
+): boolean {
+  if (preset === 'all') return true
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return false
+
+  const now = new Date()
+
+  if (preset === 'today') {
+    return d.toDateString() === now.toDateString()
+  }
+
+  if (preset === 'this_month') {
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  }
+
+  if (preset === 'last_month') {
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return d.getFullYear() === prevMonth.getFullYear() && d.getMonth() === prevMonth.getMonth()
+  }
+
+  if (preset === 'this_year') {
+    return d.getFullYear() === now.getFullYear()
+  }
+
+  if (preset === 'last_year') {
+    return d.getFullYear() === now.getFullYear() - 1
+  }
+
+  if (preset === 'custom') {
+    if (customStart && new Date(dateStr) < new Date(customStart)) return false
+    if (customEnd) {
+      const end = new Date(customEnd)
+      end.setHours(23, 59, 59, 999)
+      if (new Date(dateStr) > end) return false
+    }
+    return true
+  }
+
+  return true
+}
+
+export function getDateRangeLabel(preset: DateRangePreset, customStart?: string, customEnd?: string): string {
+  const now = new Date()
+  if (preset === 'today') return 'Today (' + now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ')'
+  if (preset === 'this_month') return 'This Month (' + now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) + ')'
+  if (preset === 'last_month') {
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return 'Last Month (' + prevMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) + ')'
+  }
+  if (preset === 'this_year') return 'This Year (' + now.getFullYear() + ')'
+  if (preset === 'last_year') return 'Last Year (' + (now.getFullYear() - 1) + ')'
+  if (preset === 'custom') {
+    if (customStart && customEnd) return `${customStart} to ${customEnd}`
+    return 'Custom Range'
+  }
+  return 'All Time'
+}
+

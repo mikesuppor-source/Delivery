@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Modal } from '@/components/modal'
-import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
+import { formatUSD, formatLBP, usdToLbp, isDateInPreset, getDateRangeLabel, type DateRangePreset } from '@/lib/utils'
 import type { UserRole, OrderStatus } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, buildCustomerOrderMessage, buildDriverDispatchMessage } from '@/lib/whatsapp'
@@ -65,6 +65,10 @@ export function OrderListClient({
 }: OrderListClientProps) {
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [filter, setFilter] = useState<string>('all')
+  const [datePreset, setDatePreset] = useState<DateRangePreset>('all')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'collection_high' | 'fee_high'>('newest')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -340,17 +344,35 @@ export function OrderListClient({
     }
   }
 
-  const filteredOrders = orders.filter(o => {
-    if (filter === 'all') return true
-    return o.status === filter
-  })
+  const filteredOrders = useMemo(() => {
+    return orders
+      .filter(o => {
+        if (filter !== 'all' && o.status !== filter) return false
+        if (!isDateInPreset(o.created_at, datePreset, customStart, customEnd)) return false
+        return true
+      })
+      .sort((a, b) => {
+        if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        if (sortBy === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        if (sortBy === 'collection_high') return (Number(b.collection_usd) || 0) - (Number(a.collection_usd) || 0)
+        if (sortBy === 'fee_high') return (Number(b.delivery_fee_usd) || 0) - (Number(a.delivery_fee_usd) || 0)
+        return 0
+      })
+  }, [orders, filter, datePreset, customStart, customEnd, sortBy])
 
   return (
     <>
       <div className="page-heading">
         <div>
           <h1>Orders</h1>
-          <p>{orders.length} orders total · {filteredOrders.length} displayed</p>
+          <p>
+            {orders.length} orders total · {filteredOrders.length} displayed
+            {datePreset !== 'all' && (
+              <span style={{ color: 'var(--brand)', fontWeight: 600, marginLeft: 6 }}>
+                ({getDateRangeLabel(datePreset, customStart, customEnd)})
+              </span>
+            )}
+          </p>
         </div>
         {canManage && (
           <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
@@ -363,7 +385,8 @@ export function OrderListClient({
         )}
       </div>
 
-      <div className="toolbar">
+      {/* ─── Status Tabs ─── */}
+      <div className="toolbar" style={{ marginBottom: 12 }}>
         <button
           className={`tab-btn ${filter === 'all' ? 'active' : ''}`}
           onClick={() => setFilter('all')}
@@ -394,6 +417,120 @@ export function OrderListClient({
         >
           Failed / Returned
         </button>
+      </div>
+
+      {/* ─── Date Range & Timeframe Filter Toolbar (This Month, Last Month, Last Year, etc.) ─── */}
+      <div
+        className="panel"
+        style={{
+          padding: '12px 18px',
+          marginBottom: 20,
+          background: 'var(--surface)',
+          border: '1.5px solid var(--line)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          {/* Preset Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginRight: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              📅 Timeframe:
+            </span>
+            {[
+              { id: 'all', label: 'All Time' },
+              { id: 'today', label: 'Today' },
+              { id: 'this_month', label: 'This Month' },
+              { id: 'last_month', label: 'Last Month' },
+              { id: 'this_year', label: 'This Year' },
+              { id: 'last_year', label: 'Last Year' },
+              { id: 'custom', label: 'Custom Range ⚙️' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setDatePreset(tab.id as DateRangePreset)}
+                style={{
+                  padding: '4px 11px',
+                  borderRadius: 99,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: '1px solid',
+                  cursor: 'pointer',
+                  background: datePreset === tab.id ? 'var(--brand)' : 'var(--bg)',
+                  color: datePreset === tab.id ? '#fff' : 'var(--muted)',
+                  borderColor: datePreset === tab.id ? 'var(--brand)' : 'var(--line)',
+                  transition: 'all .12s',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              style={{
+                fontSize: 12,
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--line)',
+                background: 'var(--bg)',
+                color: 'var(--text)',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="newest">🕒 Newest Orders First</option>
+              <option value="oldest">⏳ Oldest Orders First</option>
+              <option value="collection_high">💵 Highest COD Collection ($)</option>
+              <option value="fee_high">⚡ Highest Delivery Fee ($)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Custom Date Pickers if 'custom' is active */}
+        {datePreset === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <label style={{ fontWeight: 600, color: 'var(--muted)' }}>From:</label>
+              <input
+                type="date"
+                value={customStart}
+                onChange={e => setCustomStart(e.target.value)}
+                style={{ fontSize: 12, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--line)', background: 'var(--bg)' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <label style={{ fontWeight: 600, color: 'var(--muted)' }}>To:</label>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={e => setCustomEnd(e.target.value)}
+                style={{ fontSize: 12, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--line)', background: 'var(--bg)' }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Period Active Helper Banner */}
+        {datePreset !== 'all' && (
+          <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--brand)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>Filtering orders for:</span>
+            <span style={{ background: 'var(--brand-light)', padding: '2px 8px', borderRadius: 4 }}>
+              {getDateRangeLabel(datePreset, customStart, customEnd)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDatePreset('all')}
+              style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 11, textDecoration: 'underline' }}
+            >
+              Reset to All Time
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="panel">
