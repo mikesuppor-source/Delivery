@@ -69,6 +69,8 @@ export function buildCustomerOrderMessage(order: {
     msg += `📍 *Delivery Address:* ${order.recipient_address}\n`
   }
 
+  msg += `📦 *Track Package:* https://delivery-five-roan.vercel.app/track/${order.code}\n`
+
   msg += `\nPlease reply with your live location pin 📍 or let us know if you are available to receive your order today.\n\nThank you! 🌲`
   return msg
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Modal } from '@/components/modal'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import type { UserRole, OrderStatus } from '@/lib/roles'
@@ -239,7 +240,15 @@ export function OrderListClient({
                 return (
                   <tr key={order.id}>
                     <td>
-                      <strong>{order.code}</strong>
+                      <Link
+                        href={`/track/${order.code}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontWeight: 700, color: 'var(--brand)', textDecoration: 'none' }}
+                        title="Open live customer tracking page"
+                      >
+                        {order.code} ↗
+                      </Link>
                       {order.recipient_name && (
                         <small>
                           {order.recipient_name}
