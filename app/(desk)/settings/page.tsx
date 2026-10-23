@@ -6,20 +6,33 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: membership } = await supabase
+  const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role, workspace:workspace_id(id, name, slug, usd_to_lbp, currency)')
+    .select('*')
     .eq('user_id', user?.id ?? '')
     .single()
 
-  if (!membership) return null
-  await requireRole(membership.workspace_id, 'manager')
+  const member = memberData as { workspace_id: string; role: any } | null
+  if (!member) return null
+  await requireRole(member.workspace_id, 'manager')
 
-  const workspace = membership.workspace as {
-    id: string; name: string; slug: string; usd_to_lbp: number; currency: string
-  }
+  const { data: wsData } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('id', member.workspace_id)
+    .single()
 
-  const isOwner = membership.role === 'owner'
+  const workspace = wsData as {
+    id: string
+    name: string
+    slug: string
+    usd_to_lbp: number
+    currency: string
+  } | null
+
+  if (!workspace) return null
+
+  const isOwner = member.role === 'owner'
 
   return (
     <div className="content">

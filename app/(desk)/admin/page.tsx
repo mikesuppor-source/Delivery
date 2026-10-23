@@ -9,14 +9,23 @@ export default async function AdminPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: membership } = await supabase
+  const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role, workspace:workspace_id(id, name)')
+    .select('*')
     .eq('user_id', user?.id ?? '')
     .single()
 
-  if (!membership) return null
-  const workspace = membership.workspace as { id: string; name: string }
+  const member = memberData as { workspace_id: string; role: string } | null
+  if (!member) return null
+
+  const { data: wsData } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('id', member.workspace_id)
+    .single()
+
+  const workspace = wsData as { id: string; name: string } | null
+  if (!workspace) return null
 
   // Owner-only page
   await requireRole(workspace.id, 'owner')
@@ -69,7 +78,7 @@ export default async function AdminPage() {
 
       {/* Staff management */}
       <MemberList
-        members={membersResult.data ?? []}
+        members={(membersResult.data as any) ?? []}
         currentUserId={user?.id ?? ''}
         workspaceId={workspace.id}
       />
@@ -77,11 +86,11 @@ export default async function AdminPage() {
       {/* Invite new staff */}
       <InviteForm
         workspaceId={workspace.id}
-        pendingInvites={invitesResult.data ?? []}
+        pendingInvites={(invitesResult.data as any) ?? []}
       />
 
       {/* Audit log */}
-      <AuditLogTable entries={auditResult.data ?? []} />
+      <AuditLogTable entries={(auditResult.data as any) ?? []} />
     </div>
   )
 }

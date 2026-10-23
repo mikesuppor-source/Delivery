@@ -14,32 +14,42 @@ export default async function DeskLayout({
   if (!user) redirect('/login')
 
   // Get user's workspace membership
-  const { data: membership } = await supabase
+  const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role, display_name, workspace:workspace_id(id, name, usd_to_lbp)')
+    .select('*')
     .eq('user_id', user.id)
     .order('created_at')
     .limit(1)
     .single()
 
-  if (!membership) {
+  const member = memberData as { workspace_id: string; role: any; display_name: string | null } | null
+  if (!member) {
     redirect('/onboarding')
   }
 
-  const workspace = membership.workspace as { id: string; name: string; usd_to_lbp: number }
+  const { data: wsData } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('id', member.workspace_id)
+    .single()
+
+  const workspace = wsData as { id: string; name: string; usd_to_lbp: number } | null
+  if (!workspace) {
+    redirect('/onboarding')
+  }
 
   return (
     <div className="shell">
       <Sidebar
         workspaceId={workspace.id}
         workspaceName={workspace.name}
-        userRole={membership.role}
+        userRole={member.role}
         userEmail={user.email ?? ''}
-        displayName={membership.display_name ?? user.email ?? ''}
+        displayName={member.display_name ?? user.email ?? ''}
       />
       <main>
         <Topbar
-          usdToLbp={workspace.usd_to_lbp}
+          usdToLbp={Number(workspace.usd_to_lbp)}
           workspaceId={workspace.id}
         />
         {children}

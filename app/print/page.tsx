@@ -7,14 +7,23 @@ export default async function PrintPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: membership } = await supabase
+  const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id, workspace:workspace_id(id, name, usd_to_lbp)')
+    .select('*')
     .eq('user_id', user?.id ?? '')
     .single()
 
-  if (!membership) return null
-  const workspace = membership.workspace as { id: string; name: string; usd_to_lbp: number }
+  const member = memberData as { workspace_id: string } | null
+  if (!member) return null
+
+  const { data: wsData } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('id', member.workspace_id)
+    .single()
+
+  const workspace = wsData as { id: string; name: string; usd_to_lbp: number } | null
+  if (!workspace) return null
 
   const { data: orders } = await supabase
     .from('orders')
@@ -94,9 +103,9 @@ export default async function PrintPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders?.map(order => {
-                  const shop   = order.shop   as { name: string } | null
-                  const driver = order.driver as { name: string } | null
+                {orders?.map((order: any) => {
+                  const shop = (Array.isArray(order.shop) ? order.shop[0] : order.shop) as { name: string } | null
+                  const driver = (Array.isArray(order.driver) ? order.driver[0] : order.driver) as { name: string } | null
                   const r = Number(order.usd_to_lbp_rate)
                   return (
                     <tr key={order.id}>

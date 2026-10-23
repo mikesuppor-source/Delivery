@@ -6,36 +6,48 @@ import Link from 'next/link'
 export default async function OverviewPage() {
   const supabase = await createClient()
 
-  // Get workspace
-  const { data: membership } = await supabase
+  // Get workspace member
+  const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role, workspace:workspace_id(id, name, usd_to_lbp)')
+    .select('*')
     .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
     .single()
 
-  if (!membership) return null
-  const workspace = membership.workspace as { id: string; name: string; usd_to_lbp: number }
+  const member = memberData as { workspace_id: string; role: any } | null
+  if (!member) return null
+
+  const { data: wsData } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('id', member.workspace_id)
+    .single()
+
+  const workspace = wsData as { id: string; name: string; usd_to_lbp: number } | null
+  if (!workspace) return null
 
   // Stats
-  const { data: orders } = await supabase
+  const { data: rawOrders } = await supabase
     .from('orders')
     .select('status, collection_usd, delivery_fee_usd, driver_pay_usd')
     .eq('workspace_id', workspace.id)
 
-  const delivered = orders?.filter(o => o.status === 'delivered') ?? []
-  const pending   = orders?.filter(o => ['pending', 'assigned', 'picked_up'].includes(o.status)) ?? []
+  const orders = (rawOrders as any[]) || []
+  const delivered = orders.filter(o => o.status === 'delivered')
+  const pending   = orders.filter(o => ['pending', 'assigned', 'picked_up'].includes(o.status))
 
   const totalCollected  = delivered.reduce((s, o) => s + Number(o.collection_usd), 0)
   const totalDeliveries = delivered.reduce((s, o) => s + Number(o.delivery_fee_usd), 0)
   const totalDriverPay  = delivered.reduce((s, o) => s + Number(o.driver_pay_usd), 0)
 
   // Recent orders
-  const { data: recentOrders } = await supabase
+  const { data: rawRecentOrders } = await supabase
     .from('orders')
     .select('id, code, status, collection_usd, usd_to_lbp_rate, created_at, shop:shop_id(name), driver:driver_id(name)')
     .eq('workspace_id', workspace.id)
     .order('created_at', { ascending: false })
     .limit(8)
+
+  const recentOrders = (rawRecentOrders as any[]) || []
 
   return (
     <div className="content">
@@ -45,7 +57,7 @@ export default async function OverviewPage() {
           <h1>{workspace.name}</h1>
           <p>Your delivery operation, connected.</p>
         </div>
-        {(membership.role === 'owner' || membership.role === 'manager') && (
+        {(member.role === 'owner' || member.role === 'manager') && (
           <Link href="/orders?new=1" className="btn btn-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -68,7 +80,7 @@ export default async function OverviewPage() {
           <small>{delivered.length} delivered · {pending.length} active</small>
         </article>
 
-        {(membership.role === 'owner' || membership.role === 'manager') && (
+        {(member.role === 'owner' || member.role === 'manager') && (
           <>
             <article>
               <span>Collected</span>

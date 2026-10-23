@@ -27,14 +27,22 @@ export default function InvitePage() {
         .eq('token', token)
         .single()
 
-      if (!data) {
+      const inv = data as {
+        email: string
+        role: string
+        workspace_id: string
+        expires_at: string
+        accepted_at: string | null
+      } | null
+
+      if (!inv) {
         setError('This invitation link is invalid or has expired.')
-      } else if (data.accepted_at) {
+      } else if (inv.accepted_at) {
         setError('This invitation has already been accepted.')
-      } else if (new Date(data.expires_at) < new Date()) {
+      } else if (new Date(inv.expires_at) < new Date()) {
         setError('This invitation link has expired. Please ask your owner to send a new one.')
       } else {
-        setInvitation(data)
+        setInvitation(inv)
       }
       setFetching(false)
     }

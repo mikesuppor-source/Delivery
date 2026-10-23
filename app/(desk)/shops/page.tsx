@@ -6,26 +6,27 @@ export default async function ShopsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: membership } = await supabase
+  const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role')
+    .select('*')
     .eq('user_id', user?.id ?? '')
     .single()
 
-  if (!membership) return null
+  const member = memberData as { workspace_id: string; role: any } | null
+  if (!member) return null
 
   const { data: shops } = await supabase
     .from('shops')
     .select('id, name, phone, address, active, balance_usd, created_at')
-    .eq('workspace_id', membership.workspace_id)
+    .eq('workspace_id', member.workspace_id)
     .order('name')
 
   return (
     <div className="content">
       <ShopListClient
         shops={(shops as any) || []}
-        workspaceId={membership.workspace_id}
-        userRole={membership.role as UserRole}
+        workspaceId={member.workspace_id}
+        userRole={member.role as UserRole}
       />
     </div>
   )

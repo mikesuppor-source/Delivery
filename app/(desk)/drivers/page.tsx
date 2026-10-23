@@ -6,29 +6,30 @@ export default async function DriversPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: membership } = await supabase
+  const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role')
+    .select('*')
     .eq('user_id', user?.id ?? '')
     .single()
 
-  if (!membership) return null
+  const member = memberData as { workspace_id: string; role: any } | null
+  if (!member) return null
 
   const [driversRes, staffRes] = await Promise.all([
     supabase
       .from('drivers')
       .select('id, name, phone, active, cash_held_usd, pay_owed_usd')
-      .eq('workspace_id', membership.workspace_id)
+      .eq('workspace_id', member.workspace_id)
       .order('name'),
 
     supabase
       .from('workspace_members')
       .select('user_id, display_name')
-      .eq('workspace_id', membership.workspace_id)
+      .eq('workspace_id', member.workspace_id)
       .eq('role', 'driver'),
   ])
 
-  const staffMembers = (staffRes.data || []).map(s => ({
+  const staffMembers = ((staffRes.data as any[]) || []).map(s => ({
     id: s.user_id,
     display_name: s.display_name,
   }))
@@ -38,8 +39,8 @@ export default async function DriversPage() {
       <DriverListClient
         drivers={(driversRes.data as any) || []}
         staffMembers={staffMembers}
-        workspaceId={membership.workspace_id}
-        userRole={membership.role as UserRole}
+        workspaceId={member.workspace_id}
+        userRole={member.role as UserRole}
       />
     </div>
   )

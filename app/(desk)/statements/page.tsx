@@ -6,14 +6,23 @@ export default async function StatementsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: membership } = await supabase
+  const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role, workspace:workspace_id(id, usd_to_lbp)')
+    .select('*')
     .eq('user_id', user?.id ?? '')
     .single()
 
-  if (!membership) return null
-  const workspace = membership.workspace as { id: string; usd_to_lbp: number }
+  const member = memberData as { workspace_id: string; role: any } | null
+  if (!member) return null
+
+  const { data: wsData } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('id', member.workspace_id)
+    .single()
+
+  const workspace = wsData as { id: string; usd_to_lbp: number } | null
+  if (!workspace) return null
   await requireRole(workspace.id, 'manager')
 
   const [ordersRes, shopsRes, driversRes] = await Promise.all([
