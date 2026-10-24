@@ -17,16 +17,26 @@ export default async function AreasPage() {
   if (!member) return null
   await requireRole(member.workspace_id, 'manager')
 
-  const { data: areas } = await supabase
-    .from('delivery_areas')
-    .select('id, name, fee_usd, active')
-    .eq('workspace_id', member.workspace_id)
-    .order('name')
+  const [areasRes, driversRes] = await Promise.all([
+    supabase
+      .from('delivery_areas')
+      .select('id, name, fee_usd, active, default_driver_id, default_driver:default_driver_id(id, name, phone)')
+      .eq('workspace_id', member.workspace_id)
+      .order('name'),
+
+    supabase
+      .from('drivers')
+      .select('id, name, phone, active')
+      .eq('workspace_id', member.workspace_id)
+      .eq('active', true)
+      .order('name'),
+  ])
 
   return (
     <div className="content">
       <AreaListClient
-        areas={(areas as any) || []}
+        areas={(areasRes.data as any) || []}
+        drivers={(driversRes.data as any) || []}
         workspaceId={member.workspace_id}
         userRole={member.role as UserRole}
       />

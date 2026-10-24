@@ -225,6 +225,30 @@ export function OrderListClient({
     }
   }
 
+  const [autoAssigning, setAutoAssigning] = useState(false)
+
+  async function handleAutoAssign() {
+    setAutoAssigning(true)
+    try {
+      const res = await fetch('/api/orders/auto-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Auto-assign failed')
+      alert(data.message)
+      if (data.count > 0) {
+        window.location.reload()
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error running auto-dispatch')
+    } finally {
+      setAutoAssigning(false)
+    }
+  }
+
+
   // When area changes, update suggested delivery fee
   function handleAreaChange(newAreaId: string) {
     setAreaId(newAreaId)
@@ -494,7 +518,21 @@ export function OrderListClient({
             )}
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {canManage && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={autoAssigning}
+              onClick={handleAutoAssign}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="Automatically assign unassigned pending orders to their designated area courier"
+            >
+              <span>⚡</span>
+              <span>{autoAssigning ? 'Auto-Dispatching…' : 'Auto-Assign by Area'}</span>
+            </button>
+          )}
+
           {canManage && (
             <button
               className="btn btn-secondary"

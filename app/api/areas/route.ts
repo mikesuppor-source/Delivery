@@ -106,3 +106,48 @@ export async function DELETE(req: NextRequest) {
 
   return NextResponse.json({ success: true, message: 'Delivery area deleted successfully.' })
 }
+
+export async function PATCH(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json()
+  const { workspaceId, areaId, id, name, feeUsd, defaultDriverId, active } = body
+  const targetId = areaId || id
+
+  if (!workspaceId || !targetId) {
+    return NextResponse.json({ error: 'workspaceId and areaId are required' }, { status: 400 })
+  }
+
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!member || (member.role !== 'owner' && member.role !== 'manager')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const serviceClient = createServiceClient()
+  const updates: Record<string, unknown> = {}
+  if (name !== undefined) updates.name = String(name).trim()
+  if (feeUsd !== undefined) updates.fee_usd = Number(feeUsd) || 0
+  if (defaultDriverId !== undefined) updates.default_driver_id = defaultDriverId || null
+  if (active !== undefined) updates.active = Boolean(active)
+
+  const { data: updatedArea, error } = await serviceClient
+    .from('delivery_areas')
+    .update(updates)
+    .eq('id', targetId)
+    .eq('workspace_id', workspaceId)
+    .select('id, name, fee_usd, active, default_driver_id, default_driver:default_driver_id(id, name, phone)')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ success: true, area: updatedArea })
+}
+

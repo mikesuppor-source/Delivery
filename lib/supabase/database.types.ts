@@ -62,6 +62,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          default_driver_id: string | null
           fee_usd: number
           id: string
           name: string
@@ -70,6 +71,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          default_driver_id?: string | null
           fee_usd?: number
           id?: string
           name: string
@@ -78,12 +80,20 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          default_driver_id?: string | null
           fee_usd?: number
           id?: string
           name?: string
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "delivery_areas_default_driver_id_fkey"
+            columns: ["default_driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "delivery_areas_workspace_id_fkey"
             columns: ["workspace_id"]

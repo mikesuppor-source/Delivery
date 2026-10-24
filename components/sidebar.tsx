@@ -63,6 +63,15 @@ export function Sidebar({ workspaceId, workspaceName, userRole, userEmail, displ
           <b>Orders</b>
         </Link>
 
+        {/* Scan Barcodes / QR — all roles */}
+        <Link href="/scan" className={isActive('/scan')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+            <line x1="7" y1="12" x2="17" y2="12"/>
+          </svg>
+          <b>Scan</b>
+        </Link>
+
         {/* Shops — not driver */}
         {hasMinRole(userRole, 'readonly') && userRole !== 'driver' && (
           <Link href="/shops" className={isActive('/shops')}>

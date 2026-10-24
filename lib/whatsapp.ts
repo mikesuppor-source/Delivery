@@ -39,6 +39,16 @@ export function getWhatsAppUrl(phone: string, message: string): string {
 }
 
 /**
+ * Resolves current tracking base URL dynamically from window or env
+ */
+export function getBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin.replace(/\/$/, '')
+  }
+  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://delivery-five-roan.vercel.app').replace(/\/$/, '')
+}
+
+/**
  * Builds direct customer WhatsApp URL from order parameters
  */
 export function getCustomerOrderWhatsAppUrl(order: {
@@ -49,10 +59,11 @@ export function getCustomerOrderWhatsAppUrl(order: {
   collectionUsd: number
   collectionLbp?: number
   driverName?: string | null
+  driverPhone?: string | null
   status?: string | null
 }): string {
   if (!order.customerPhone) return '#'
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://delivery-five-roan.vercel.app').replace(/\/$/, '')
+  const baseUrl = getBaseUrl()
   const customer = order.customerName?.trim() || 'Customer'
   let msg = `Hello ${customer} 👋\n\nThis is Cedar Delivery Desk regarding your order *#${order.orderCode}*`
   if (order.shopName) msg += ` from *${order.shopName}*`
@@ -77,13 +88,44 @@ export function buildCustomerOrderMessage(order: {
   delivery_fee_usd?: number
   usd_to_lbp_rate: number
   shop?: { name: string } | null
+  driver?: { name: string; phone?: string | null } | null
+  status?: string | null
 }): string {
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://delivery-five-roan.vercel.app').replace(/\/$/, '')
+  const baseUrl = getBaseUrl()
   const customer = order.recipient_name?.trim() || 'Customer'
   const shopName = order.shop?.name || 'our partner store'
   const rate = Number(order.usd_to_lbp_rate) || 89500
   const colUSD = Number(order.collection_usd) || 0
   const colLBP = usdToLbp(colUSD, rate)
+
+  // Out for delivery specific template
+  if (order.status === 'picked_up' && order.driver?.name) {
+    let msg = `Marhaba ${customer} 👋\n\n`
+    msg += `🚚 Your order *${order.code}* from *${shopName}* is *OUT FOR DELIVERY* today with courier *${order.driver.name}*`
+    if (order.driver.phone) msg += ` (${order.driver.phone})`
+    msg += `.\n\n`
+    if (colUSD > 0) {
+      msg += `💵 *COD to Pay:* ${formatUSD(colUSD)} (~ ${formatLBP(colLBP)})\n`
+    }
+    if (order.recipient_address) {
+      msg += `📍 *Destination:* ${order.recipient_address}\n`
+    }
+    msg += `📦 *Live Tracking:* ${baseUrl}/track/${order.code}\n\n`
+    msg += `The courier will contact you shortly before arrival. Thank you! 🌲`
+    return msg
+  }
+
+  // Delivered notification template
+  if (order.status === 'delivered') {
+    let msg = `Hello ${customer} 👋\n\n`
+    msg += `✅ Your package *${order.code}* from *${shopName}* has been *DELIVERED* successfully.\n\n`
+    if (colUSD > 0) {
+      msg += `💵 *Amount Collected:* ${formatUSD(colUSD)}\n`
+    }
+    msg += `📦 *Delivery Receipt:* ${baseUrl}/track/${order.code}\n\n`
+    msg += `Thank you for trusting Cedar Delivery! 🌲`
+    return msg
+  }
 
   let msg = `Hello ${customer} 👋\n\n`
   msg += `This is *Cedar Delivery Desk* regarding your delivery order *${order.code}* from *${shopName}*.\n\n`

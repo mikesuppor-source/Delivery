@@ -18,6 +18,7 @@ import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, getCustomerOrderWhatsAppUrl } from '@/lib/whatsapp'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
+import { PrinterIcon } from '@/components/icons'
 
 interface Driver {
   id: string
@@ -1367,6 +1368,7 @@ export function DriverProfileClient({
                   <th>Amount (USD)</th>
                   <th>Amount (LBP)</th>
                   <th>Notes</th>
+                  <th>Voucher</th>
                 </tr>
               </thead>
               <tbody>
@@ -1396,6 +1398,18 @@ export function DriverProfileClient({
                       <span style={{ color: 'var(--muted)', fontSize: 13 }}>
                         {item.note || '—'}
                       </span>
+                    </td>
+                    <td>
+                      <Link
+                        href={`/print/settlement/${item.id}?print=1`}
+                        target="_blank"
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        title="Print Cashier Handover Voucher"
+                      >
+                        <PrinterIcon size={13} />
+                        Slip
+                      </Link>
                     </td>
                   </tr>
                 ))}
