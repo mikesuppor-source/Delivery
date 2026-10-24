@@ -92,13 +92,13 @@ export default function PortalLoginPage() {
               marginBottom: 4,
             }}
           >
-            Store & Merchant Partner Portal
+            Store & Client Partner Portal
           </span>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', marginBottom: 6 }}>
-            Merchant Sign In
+            Merchant & Client Sign In
           </h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-            Place customer orders, print barcode waybills, and track cash-on-delivery payouts.
+            Place orders, schedule courier pickups, print barcode waybills, and track deliveries.
           </p>
         </div>
 
@@ -157,14 +157,14 @@ export default function PortalLoginPage() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label htmlFor="portal-email" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
-              Store Email Address
+              Email Address
             </label>
             <input
               id="portal-email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="store@example.com"
+              placeholder="you@example.com"
               required
               autoFocus
               style={{
@@ -211,21 +211,27 @@ export default function PortalLoginPage() {
               borderRadius: 8,
             }}
           >
-            {loading ? 'Signing in…' : 'Sign in to Merchant Portfolio'}
+            {loading ? 'Signing in…' : 'Sign in to Delivery Portfolio'}
           </button>
         </form>
 
         <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--line)', textAlign: 'center', fontSize: 13 }}>
           <p style={{ color: 'var(--muted)', marginBottom: 12 }}>
-            Don&apos;t have a merchant account yet?{' '}
+            Don&apos;t have an account yet?{' '}
             <Link href="/portal/signup" style={{ color: 'var(--brand)', fontWeight: 700 }}>
-              Register Your Store →
+              Register Store or Client Account →
             </Link>
           </p>
 
-          <Link href="/login" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'underline' }}>
-            Switch to Cedar Desk Dispatcher Login
-          </Link>
+          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', fontSize: 12, flexWrap: 'wrap' }}>
+            <Link href="/track" style={{ color: 'var(--muted)' }}>
+              Looking to track a package?
+            </Link>
+            <span style={{ color: 'var(--line)' }}>•</span>
+            <Link href="/login" style={{ color: 'var(--muted)' }}>
+              Switch to Cedar Desk Dispatcher Login
+            </Link>
+          </div>
         </div>
       </div>
     </div>

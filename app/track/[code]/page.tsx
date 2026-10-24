@@ -307,6 +307,65 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           </div>
         </div>
 
+        {/* Recipient Delivery Assistance Actions */}
+        <div
+          style={{
+            marginTop: 20,
+            background: 'var(--bg)',
+            border: '1.5px solid var(--line)',
+            borderRadius: 12,
+            padding: '16px 18px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              📍 Delivery Assistance & Pin Location
+            </span>
+            {order.recipient_phone && (
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+                Tel: {order.recipient_phone}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+            {/* Share Pin Location via WhatsApp */}
+            <a
+              href={`https://wa.me/${(order.driver?.phone ? order.driver.phone.replace(/\D/g, '') : '96170000000')}?text=${encodeURIComponent(
+                `Hello, I am tracking my delivery for order ${order.code} (Recipient: ${order.recipient_name || 'Customer'}). My delivery address is: ${order.recipient_address || ''}. Here is my live pin location:`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
+            >
+              <WhatsAppIcon size={14} color="#25D366" />
+              <span>Send Pin Location on WhatsApp</span>
+            </a>
+
+            {/* Call or WhatsApp Courier Driver */}
+            {order.driver?.phone ? (
+              <a
+                href={`tel:${order.driver.phone}`}
+                className="btn btn-secondary btn-sm"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
+              >
+                <span>📞 Call Courier ({order.driver.name})</span>
+              </a>
+            ) : (
+              <a
+                href="https://wa.me/96170000000?text=Hello%20Cedar%20Delivery,%20I%20need%20assistance%20with%20my%20delivery."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-sm"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
+              >
+                <span>💬 Contact Dispatch Office</span>
+              </a>
+            )}
+          </div>
+        </div>
+
         {/* Courier Dispatch & Check-In Action Hub */}
         <CourierTrackActions
           orderId={order.id}

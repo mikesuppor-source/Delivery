@@ -57,7 +57,7 @@ export function PortalHeader({ shopName, shopPrefix, userEmail }: PortalHeaderPr
           <div>
             <b style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'block', lineHeight: 1.1 }}>cedar</b>
             <small style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--brand)' }}>
-              MERCHANT PORTAL
+              DELIVERY PORTAL
             </small>
           </div>
         </Link>

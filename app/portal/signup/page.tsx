@@ -8,6 +8,7 @@ import { isValidLebanesePhone } from '@/lib/phone'
 
 export default function PortalSignupPage() {
   const router = useRouter()
+  const [accountType, setAccountType] = useState<'merchant' | 'client'>('merchant')
   const [shopName, setShopName] = useState('')
   const [prefix, setPrefix] = useState('')
   const [phone, setPhone] = useState('')
@@ -35,6 +36,7 @@ export default function PortalSignupPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountType,
           shopName,
           prefix: prefix || null,
           phone,
@@ -46,7 +48,7 @@ export default function PortalSignupPage() {
 
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to register store.')
+        throw new Error(data.error || 'Failed to register account.')
       }
 
       // Auto sign-in with credentials
@@ -85,7 +87,7 @@ export default function PortalSignupPage() {
       <div
         style={{
           width: '100%',
-          maxWidth: 520,
+          maxWidth: 540,
           background: 'var(--surface)',
           border: '1.5px solid var(--line)',
           borderRadius: 16,
@@ -93,7 +95,7 @@ export default function PortalSignupPage() {
           boxShadow: 'var(--shadow-lg)',
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: 26 }}>
+        <div style={{ textAlign: 'center', marginBottom: 22 }}>
           <div
             style={{
               width: 56,
@@ -111,7 +113,7 @@ export default function PortalSignupPage() {
           </div>
           <span
             style={{
-              fontSize: 10,
+              fontSize: 10.5,
               fontWeight: 800,
               letterSpacing: '1.5px',
               color: 'var(--brand)',
@@ -120,14 +122,77 @@ export default function PortalSignupPage() {
               marginBottom: 4,
             }}
           >
-            Merchant & Store Registration
+            {accountType === 'merchant' ? 'Store & Business Registration' : 'Personal Client Registration'}
           </span>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', marginBottom: 6 }}>
-            Register Your Store
+            {accountType === 'merchant' ? 'Register Your Store' : 'Create Delivery Account'}
           </h1>
-          <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-            Start creating delivery orders, printing scannable barcode waybills, and tracking your client payouts.
+          <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 420, margin: '0 auto' }}>
+            {accountType === 'merchant'
+              ? 'Start creating delivery orders, printing scannable barcode waybills, and tracking your store payouts.'
+              : 'Easily schedule personal courier pickups, track parcel deliveries, and manage your shipments.'}
           </p>
+        </div>
+
+        {/* Account Type Selector Pills */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 8,
+            background: 'var(--bg)',
+            padding: 4,
+            borderRadius: 10,
+            border: '1px solid var(--line)',
+            marginBottom: 20,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setAccountType('merchant')}
+            style={{
+              padding: '9px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: accountType === 'merchant' ? 'var(--surface)' : 'transparent',
+              color: accountType === 'merchant' ? 'var(--text)' : 'var(--muted)',
+              fontWeight: 700,
+              fontSize: 12.5,
+              cursor: 'pointer',
+              boxShadow: accountType === 'merchant' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>🏢</span>
+            <span>Store / Business</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAccountType('client')}
+            style={{
+              padding: '9px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: accountType === 'client' ? 'var(--surface)' : 'transparent',
+              color: accountType === 'client' ? 'var(--text)' : 'var(--muted)',
+              fontWeight: 700,
+              fontSize: 12.5,
+              cursor: 'pointer',
+              boxShadow: accountType === 'client' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>👤</span>
+            <span>Personal Client</span>
+          </button>
         </div>
 
         {error && (
@@ -149,14 +214,14 @@ export default function PortalSignupPage() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label htmlFor="shop-name" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
-              Store or Business Name *
+              {accountType === 'merchant' ? 'Store or Business Name *' : 'Your Full Name *'}
             </label>
             <input
               id="shop-name"
               type="text"
               value={shopName}
               onChange={e => setShopName(e.target.value)}
-              placeholder="e.g. Bella Boutique, TechStore Beirut"
+              placeholder={accountType === 'merchant' ? 'e.g. Bella Boutique, TechStore Beirut' : 'e.g. Karim Haddad'}
               required
               style={{
                 width: '100%',
@@ -171,14 +236,14 @@ export default function PortalSignupPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label htmlFor="shop-prefix" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-                Barcode Prefix (Optional)
+                Custom Prefix (Optional)
               </label>
               <input
                 id="shop-prefix"
                 type="text"
                 value={prefix}
                 onChange={e => setPrefix(e.target.value.toUpperCase().slice(0, 5))}
-                placeholder="e.g. BLL, ZARA"
+                placeholder={accountType === 'merchant' ? 'e.g. BLL, ZARA' : 'e.g. KH'}
                 maxLength={5}
                 style={{
                   width: '100%',
@@ -191,14 +256,14 @@ export default function PortalSignupPage() {
                 }}
               />
               <small style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 4 }}>
-                Waybill ID: <code>{prefix || 'CD'}-XXXXXX</code>
+                Waybill: <code>{prefix || (accountType === 'merchant' ? 'CD' : 'CL')}-XXXXXX</code>
               </small>
             </div>
 
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <label htmlFor="shop-phone" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block' }}>
-                  Store WhatsApp / Phone
+                  WhatsApp / Phone
                 </label>
                 {isPhoneValid !== null && (
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: isPhoneValid ? '#059669' : '#dc2626' }}>
@@ -225,14 +290,14 @@ export default function PortalSignupPage() {
 
           <div>
             <label htmlFor="shop-address" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
-              Store Pickup Address / Location
+              {accountType === 'merchant' ? 'Store Pickup Address / Location' : 'Default Home or Office Address'}
             </label>
             <input
               id="shop-address"
               type="text"
               value={address}
               onChange={e => setAddress(e.target.value)}
-              placeholder="e.g. Mar Mikhael, Main St., Bldg 4, 1st floor"
+              placeholder={accountType === 'merchant' ? 'e.g. Mar Mikhael, Main St., Bldg 4, 1st floor' : 'e.g. Achrafieh, Sassine Square, Floor 3'}
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -253,7 +318,7 @@ export default function PortalSignupPage() {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="owner@boutique.com"
+                placeholder={accountType === 'merchant' ? 'owner@boutique.com' : 'karim@example.com'}
                 required
                 style={{
                   width: '100%',
@@ -301,7 +366,11 @@ export default function PortalSignupPage() {
               borderRadius: 8,
             }}
           >
-            {loading ? 'Creating Store Profile…' : 'Register Store & Access Portal →'}
+            {loading
+              ? 'Creating Profile…'
+              : accountType === 'merchant'
+              ? 'Register Store & Access Portal →'
+              : 'Create Account & Place Orders →'}
           </button>
         </form>
 
@@ -309,9 +378,14 @@ export default function PortalSignupPage() {
           <p style={{ color: 'var(--muted)', marginBottom: 8 }}>
             Already registered?{' '}
             <Link href="/portal/login" style={{ color: 'var(--brand)', fontWeight: 700 }}>
-              Sign In to Merchant Portal
+              Sign In to Portal
             </Link>
           </p>
+          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', fontSize: 12 }}>
+            <Link href="/track" style={{ color: 'var(--muted)' }}>
+              Looking to track a package?
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -6,10 +6,10 @@ import { formatOrderCode } from '@/lib/order-codes'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { email, password, shopName, prefix, phone, address } = body
+    const { email, password, shopName, prefix, phone, address, accountType } = body
 
     if (!email || !password || !shopName) {
-      return NextResponse.json({ error: 'Email, password, and shop name are required.' }, { status: 400 })
+      return NextResponse.json({ error: 'Email, password, and name are required.' }, { status: 400 })
     }
 
     if (password.length < 6) {
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       user_metadata: {
         shop_name: shopName.trim(),
         role: 'merchant',
+        account_type: accountType || 'merchant',
       },
     })
 
