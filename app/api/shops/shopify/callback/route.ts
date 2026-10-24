@@ -15,12 +15,12 @@ export async function GET(req: NextRequest) {
     let cleanShop = rawShop.trim().toLowerCase()
     cleanShop = cleanShop.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
 
-    const clientId = process.env.SHOPIFY_CLIENT_ID || process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || ''
+    const clientId = process.env.SHOPIFY_CLIENT_ID || process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || 'cf8028e469ae3e06ebefe5fec8fd96d3'
     const clientSecret = process.env.SHOPIFY_CLIENT_SECRET || ''
 
-    if (!clientId || !clientSecret) {
+    if (!clientSecret) {
       return NextResponse.json({
-        error: 'Shopify Client ID or Secret not configured in environment variables.',
+        error: 'SHOPIFY_CLIENT_SECRET is not configured in Vercel environment variables.',
       }, { status: 500 })
     }
 

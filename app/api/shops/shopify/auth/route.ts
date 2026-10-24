@@ -16,12 +16,7 @@ export async function GET(req: NextRequest) {
       cleanShop = `${cleanShop}.myshopify.com`
     }
 
-    const clientId = process.env.SHOPIFY_CLIENT_ID || process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || ''
-    if (!clientId) {
-      return NextResponse.json({
-        error: 'SHOPIFY_CLIENT_ID environment variable is not configured yet on server.',
-      }, { status: 500 })
-    }
+    const clientId = process.env.SHOPIFY_CLIENT_ID || process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || 'cf8028e469ae3e06ebefe5fec8fd96d3'
 
     const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000'
     const proto = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https')
