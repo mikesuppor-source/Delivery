@@ -8,6 +8,9 @@ import type { UserRole, OrderStatus } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, buildCustomerOrderMessage, buildDriverDispatchMessage } from '@/lib/whatsapp'
 import { OrderReceiptSlip } from '@/components/order-receipt-slip'
+import { BarcodeScannerModal } from '@/components/barcode-scanner-modal'
+import { GoogleMapsIcon } from '@/components/google-maps-icon'
+import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
 
 interface Order {
   id: string
@@ -113,6 +116,75 @@ export function OrderListClient({
   const [editError, setEditError] = useState('')
 
   const canManage = userRole === 'owner' || userRole === 'manager'
+
+  // Bulk Selection & Batch Actions
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
+  const [bulkDriverId, setBulkDriverId] = useState('')
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkMessage, setBulkMessage] = useState('')
+
+  // Warehouse Barcode Scanner Modal
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+
+  function handleToggleSelectAll() {
+    if (selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0) {
+      setSelectedOrderIds([])
+    } else {
+      setSelectedOrderIds(filteredOrders.map(o => o.id))
+    }
+  }
+
+  function handleToggleSelectOrder(id: string) {
+    setSelectedOrderIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  async function handleBulkExecute(action: 'assign_driver' | 'update_status', payload: { driverId?: string; status?: OrderStatus }) {
+    if (selectedOrderIds.length === 0) return
+    setBulkLoading(true)
+    setBulkMessage('')
+    try {
+      const res = await fetch('/api/orders/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId,
+          orderIds: selectedOrderIds,
+          action,
+          driverId: payload.driverId,
+          status: payload.status,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to execute bulk operation')
+
+      const updatedMap = new Map((data.orders as any[]).map(o => [o.id, o]))
+      setOrders(prev =>
+        prev.map(o => {
+          const upd = updatedMap.get(o.id)
+          if (!upd) return o
+          return {
+            ...o,
+            ...upd,
+            driver: payload.driverId
+              ? drivers.find(d => d.id === payload.driverId) || o.driver
+              : o.driver,
+          }
+        })
+      )
+
+      setBulkMessage(`Updated ${data.count} orders successfully!`)
+      setSelectedOrderIds([])
+      setBulkDriverId('')
+      setTimeout(() => setBulkMessage(''), 4000)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Bulk update failed')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
 
   // When area changes, update suggested delivery fee
   function handleAreaChange(newAreaId: string) {
@@ -383,15 +455,28 @@ export function OrderListClient({
             )}
           </p>
         </div>
-        {canManage && (
-          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            New order
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {canManage && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setIsScannerOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="Open Barcode & QR Code Warehouse Scanner"
+            >
+              <span>⚡</span>
+              <span>Scan Barcode / QR</span>
+            </button>
+          )}
+          {canManage && (
+            <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              New order
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ─── Status Tabs ─── */}
@@ -547,6 +632,16 @@ export function OrderListClient({
           <table>
             <thead>
               <tr>
+                {canManage && (
+                  <th style={{ width: 36, textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={filteredOrders.length > 0 && selectedOrderIds.length === filteredOrders.length}
+                      onChange={handleToggleSelectAll}
+                      title="Select all orders in current filter"
+                    />
+                  </th>
+                )}
                 <th>Code & Customer</th>
                 <th>Shop</th>
                 <th>Driver</th>
@@ -564,6 +659,15 @@ export function OrderListClient({
                 const r = Number(order.usd_to_lbp_rate) || rate
                 return (
                   <tr key={order.id}>
+                    {canManage && (
+                      <td style={{ width: 36, textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedOrderIds.includes(order.id)}
+                          onChange={() => handleToggleSelectOrder(order.id)}
+                        />
+                      </td>
+                    )}
                     <td>
                       <Link
                         href={`/track/${order.code}`}
@@ -594,7 +698,32 @@ export function OrderListClient({
                           )}
                         </small>
                       )}
-                      {order.recipient_address && <small style={{ color: 'var(--muted)' }}>{order.recipient_address}</small>}
+                      {order.recipient_address && (
+                        <div style={{ marginTop: 3 }}>
+                          <a
+                            href={getGoogleMapsDirectionsUrl(order.recipient_address)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              color: '#2563eb',
+                              textDecoration: 'none',
+                              background: '#eff6ff',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              border: '1px solid #bfdbfe',
+                              fontSize: 10.5,
+                              fontWeight: 600,
+                            }}
+                            title="Open 1-Tap Google Maps Turn-by-Turn Navigation"
+                          >
+                            <GoogleMapsIcon size={11} />
+                            <span>{order.recipient_address}</span>
+                          </a>
+                        </div>
+                      )}
                     </td>
 
                     {/* Shop */}
@@ -829,6 +958,175 @@ export function OrderListClient({
           )}
         </div>
       </div>
+
+      {/* ─── FLOATING BATCH ACTIONS TOOLBAR (WHEN ORDERS SELECTED) ─── */}
+      {selectedOrderIds.length > 0 && canManage && (
+        <div
+          style={{
+            position: 'sticky',
+            bottom: 24,
+            zIndex: 40,
+            background: '#111827',
+            color: '#ffffff',
+            padding: '12px 20px',
+            borderRadius: 10,
+            boxShadow: '0 12px 36px rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+            margin: '0 0 20px',
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span
+              style={{
+                fontWeight: 800,
+                fontSize: 12.5,
+                background: 'var(--brand)',
+                color: '#fff',
+                padding: '3px 10px',
+                borderRadius: 99,
+              }}
+            >
+              {selectedOrderIds.length} Orders Selected
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedOrderIds([])}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#9ca3af',
+                fontSize: 12,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              Deselect All
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Bulk Assign Driver */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <select
+                value={bulkDriverId}
+                onChange={e => setBulkDriverId(e.target.value)}
+                style={{
+                  fontSize: 12,
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #374151',
+                  background: '#1f2937',
+                  color: '#fff',
+                }}
+              >
+                <option value="">Assign Courier…</option>
+                {drivers.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!bulkDriverId || bulkLoading}
+                onClick={() => handleBulkExecute('assign_driver', { driverId: bulkDriverId })}
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 12 }}
+              >
+                Assign
+              </button>
+            </div>
+
+            {/* Bulk Status Updates */}
+            <button
+              type="button"
+              disabled={bulkLoading}
+              onClick={() => handleBulkExecute('update_status', { status: 'picked_up' })}
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: 12 }}
+            >
+              Mark Picked Up
+            </button>
+
+            <button
+              type="button"
+              disabled={bulkLoading}
+              onClick={() => handleBulkExecute('update_status', { status: 'delivered' })}
+              className="btn btn-primary btn-sm"
+              style={{ fontSize: 12 }}
+            >
+              Mark Delivered
+            </button>
+
+            <button
+              type="button"
+              disabled={bulkLoading}
+              onClick={() => handleBulkExecute('update_status', { status: 'returned' })}
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 12, color: '#f87171' }}
+            >
+              Mark Returned
+            </button>
+
+            {/* Batch Waybills Print */}
+            <Link
+              href={`/print/bulk?ids=${selectedOrderIds.join(',')}`}
+              target="_blank"
+              className="btn btn-secondary btn-sm"
+              style={{
+                fontSize: 12,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                textDecoration: 'none',
+                color: '#fff',
+                background: '#374151',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              Print All ({selectedOrderIds.length}) Waybills
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {bulkMessage && (
+        <div
+          style={{
+            background: '#ecfdf5',
+            color: '#065f46',
+            border: '1px solid #86efac',
+            padding: '10px 16px',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            marginBottom: 20,
+          }}
+        >
+          {bulkMessage}
+        </div>
+      )}
+
+      {/* ─── MODAL: WAREHOUSE BARCODE & QR SCANNER ─── */}
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        orders={orders}
+        drivers={drivers}
+        workspaceId={workspaceId}
+        onOrderUpdated={updated => {
+          setOrders(prev => prev.map(o => (o.id === updated.id ? { ...o, ...updated } : o)))
+        }}
+      />
 
       {/* ─── MODAL: WARNING DRIVER REQUIRED ─── */}
       <Modal

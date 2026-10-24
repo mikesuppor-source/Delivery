@@ -30,6 +30,7 @@ export async function middleware(request: NextRequest) {
   const isPublic = path.startsWith('/login') ||
                    path.startsWith('/invite') ||
                    path.startsWith('/track') ||
+                   path.startsWith('/print') ||
                    path.startsWith('/_next') ||
                    path.startsWith('/api/invite') ||
                    path === '/favicon.ico' ||

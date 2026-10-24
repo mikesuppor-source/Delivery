@@ -16,6 +16,8 @@ import {
 import type { UserRole } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, getCustomerOrderWhatsAppUrl } from '@/lib/whatsapp'
+import { GoogleMapsIcon } from '@/components/google-maps-icon'
+import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
 
 interface Driver {
   id: string
@@ -1185,6 +1187,32 @@ export function DriverProfileClient({
                               </span>
                             )}
                           </div>
+                          {order.recipient_address && (
+                            <div style={{ marginTop: 4 }}>
+                              <a
+                                href={getGoogleMapsDirectionsUrl(order.recipient_address)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: '#2563eb',
+                                  background: '#eff6ff',
+                                  padding: '2px 8px',
+                                  borderRadius: 4,
+                                  textDecoration: 'none',
+                                  border: '1px solid #bfdbfe',
+                                }}
+                                title="Open 1-Tap Google Maps Turn-by-Turn Navigation"
+                              >
+                                <GoogleMapsIcon size={11} />
+                                <span>{order.recipient_address}</span>
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </td>
 

@@ -52,6 +52,7 @@ export function getCustomerOrderWhatsAppUrl(order: {
   status?: string | null
 }): string {
   if (!order.customerPhone) return '#'
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://delivery-five-roan.vercel.app').replace(/\/$/, '')
   const customer = order.customerName?.trim() || 'Customer'
   let msg = `Hello ${customer} 👋\n\nThis is Cedar Delivery Desk regarding your order *#${order.orderCode}*`
   if (order.shopName) msg += ` from *${order.shopName}*`
@@ -60,7 +61,7 @@ export function getCustomerOrderWhatsAppUrl(order: {
   if (order.collectionUsd > 0) {
     msg += `💵 *COD to Collect:* ${formatUSD(order.collectionUsd)}\n`
   }
-  msg += `📦 *Live Tracking:* https://delivery-five-roan.vercel.app/track/${order.orderCode}\n\n`
+  msg += `📦 *Live Tracking:* ${baseUrl}/track/${order.orderCode}\n\n`
   msg += `Please reply with your delivery instructions or live location pin 📍. Thank you! 🌲`
   return getWhatsAppUrl(order.customerPhone, msg)
 }
@@ -77,6 +78,7 @@ export function buildCustomerOrderMessage(order: {
   usd_to_lbp_rate: number
   shop?: { name: string } | null
 }): string {
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://delivery-five-roan.vercel.app').replace(/\/$/, '')
   const customer = order.recipient_name?.trim() || 'Customer'
   const shopName = order.shop?.name || 'our partner store'
   const rate = Number(order.usd_to_lbp_rate) || 89500
@@ -96,7 +98,7 @@ export function buildCustomerOrderMessage(order: {
     msg += `📍 *Delivery Address:* ${order.recipient_address}\n`
   }
 
-  msg += `📦 *Track Package:* https://delivery-five-roan.vercel.app/track/${order.code}\n`
+  msg += `📦 *Track Package:* ${baseUrl}/track/${order.code}\n`
 
   msg += `\nPlease reply with your live location pin 📍 or let us know if you are available to receive your order today.\n\nThank you! 🌲`
   return msg
