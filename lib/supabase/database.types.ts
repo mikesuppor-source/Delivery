@@ -212,6 +212,8 @@ export type Database = {
           recipient_phone: string | null
           shop_balance_usd: number
           shop_id: string | null
+          shopify_order_id: string | null
+          shopify_order_number: string | null
           status: Database["public"]["Enums"]["order_status"]
           updated_at: string
           usd_to_lbp_rate: number
@@ -237,6 +239,8 @@ export type Database = {
           recipient_phone?: string | null
           shop_balance_usd?: number
           shop_id?: string | null
+          shopify_order_id?: string | null
+          shopify_order_number?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           updated_at?: string
           usd_to_lbp_rate: number
@@ -262,6 +266,8 @@ export type Database = {
           recipient_phone?: string | null
           shop_balance_usd?: number
           shop_id?: string | null
+          shopify_order_id?: string | null
+          shopify_order_number?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           updated_at?: string
           usd_to_lbp_rate?: number
@@ -373,36 +379,45 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          api_key: string | null
           balance_usd: number
           created_at: string
           id: string
           name: string
           phone: string | null
           prefix: string | null
+          shopify_access_token: string | null
+          shopify_domain: string | null
           user_id: string | null
           workspace_id: string
         }
         Insert: {
           active?: boolean
           address?: string | null
+          api_key?: string | null
           balance_usd?: number
           created_at?: string
           id?: string
           name: string
           phone?: string | null
           prefix?: string | null
+          shopify_access_token?: string | null
+          shopify_domain?: string | null
           user_id?: string | null
           workspace_id: string
         }
         Update: {
           active?: boolean
           address?: string | null
+          api_key?: string | null
           balance_usd?: number
           created_at?: string
           id?: string
           name?: string
           phone?: string | null
           prefix?: string | null
+          shopify_access_token?: string | null
+          shopify_domain?: string | null
           user_id?: string | null
           workspace_id?: string
         }

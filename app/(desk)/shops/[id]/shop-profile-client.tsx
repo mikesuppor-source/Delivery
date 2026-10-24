@@ -17,6 +17,8 @@ import {
 import type { UserRole } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, getCustomerOrderWhatsAppUrl } from '@/lib/whatsapp'
+import { ShopifyIcon } from '@/components/shopify-icon'
+import { ShopifyIntegrationModal } from '@/components/shopify-integration-modal'
 
 interface Shop {
   id: string
@@ -27,6 +29,8 @@ interface Shop {
   active: boolean
   balance_usd: number
   created_at?: string
+  api_key?: string | null
+  shopify_domain?: string | null
 }
 
 interface OrderItem {
@@ -45,6 +49,8 @@ interface OrderItem {
   notes: string | null
   driver?: { id: string; name: string; phone: string | null } | null
   area?: { id: string; name: string } | null
+  shopify_order_id?: string | null
+  shopify_order_number?: string | null
 }
 
 interface SettlementItem {
@@ -102,6 +108,7 @@ export function ShopProfileClient({
   const [payoutError, setPayoutError] = useState('')
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isShopifyModalOpen, setIsShopifyModalOpen] = useState(false)
   const [editName, setEditName] = useState(shop.name)
   const [editPhone, setEditPhone] = useState(shop.phone || '')
   const [editAddress, setEditAddress] = useState(shop.address || '')
@@ -482,6 +489,17 @@ export function ShopProfileClient({
                     <rect x="6" y="14" width="12" height="8" />
                   </svg>
                   Print Statement
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsShopifyModalOpen(true)}
+                  title="Configure Shopify webhooks & automated order ingestion"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1.5px solid #95BF47' }}
+                >
+                  <ShopifyIcon size={15} />
+                  <span>Shopify Store</span>
                 </button>
 
                 <button
@@ -1720,6 +1738,16 @@ export function ShopProfileClient({
           </div>
         </form>
       </Modal>
+
+      {/* ─── SHOPIFY INTEGRATION MODAL ─── */}
+      <ShopifyIntegrationModal
+        isOpen={isShopifyModalOpen}
+        onClose={() => setIsShopifyModalOpen(false)}
+        shop={shop}
+        onOrderCreated={() => {
+          window.location.reload()
+        }}
+      />
     </>
   )
 }

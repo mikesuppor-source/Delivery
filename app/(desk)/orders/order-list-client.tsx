@@ -13,6 +13,8 @@ import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, formatDisplayAddress } from '@/lib/maps'
 import { LocationHelper } from '@/components/location-helper'
 import { TrashIcon, ScanIcon } from '@/components/icons'
+import { ShopifyIcon } from '@/components/shopify-icon'
+import { BulkOrderImportModal } from '@/components/bulk-order-import-modal'
 
 interface Order {
   id: string
@@ -27,6 +29,8 @@ interface Order {
   recipient_phone: string | null
   recipient_address: string | null
   notes?: string | null
+  shopify_order_id?: string | null
+  shopify_order_number?: string | null
   created_at: string
   shop: { id: string; name: string; phone?: string | null } | null
   driver: { id: string; name: string; phone?: string | null } | null
@@ -79,6 +83,7 @@ export function OrderListClient({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null)
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
 
   // New Order Form state
   const [customCode, setCustomCode] = useState('')
@@ -614,6 +619,19 @@ export function OrderListClient({
           )}
 
           {canManage && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsBulkImportOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="Bulk Import Orders from CSV or Shopify Export"
+            >
+              <ShopifyIcon size={14} />
+              <span>Import CSV / Shopify</span>
+            </button>
+          )}
+
+          {canManage && (
             <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"/>
@@ -815,15 +833,37 @@ export function OrderListClient({
                       </td>
                     )}
                     <td>
-                      <Link
-                        href={`/track/${order.code}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontWeight: 700, color: 'var(--brand)', textDecoration: 'none' }}
-                        title="Open live customer tracking page"
-                      >
-                        {order.code} ↗
-                      </Link>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Link
+                          href={`/track/${order.code}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontWeight: 700, color: 'var(--brand)', textDecoration: 'none' }}
+                          title="Open live customer tracking page"
+                        >
+                          {order.code} ↗
+                        </Link>
+                        {order.shopify_order_number && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              background: 'rgba(150, 191, 54, 0.15)',
+                              color: '#5e8e3e',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              border: '1px solid rgba(150, 191, 54, 0.3)',
+                            }}
+                            title={`Shopify Order #${order.shopify_order_number}`}
+                          >
+                            <ShopifyIcon size={10} />
+                            <span>#{order.shopify_order_number}</span>
+                          </span>
+                        )}
+                      </div>
                       {order.recipient_name && (
                         <small>
                           {order.recipient_name}
@@ -1877,6 +1917,15 @@ export function OrderListClient({
           </div>
         </Modal>
       )}
+
+      {/* ─── MODAL: BULK CSV / SHOPIFY ORDER IMPORT ─── */}
+      <BulkOrderImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        workspaceId={workspaceId}
+        shops={shops}
+        onImportComplete={() => window.location.reload()}
+      />
     </>
   )
 }

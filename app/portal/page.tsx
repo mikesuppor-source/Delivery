@@ -55,6 +55,7 @@ export default async function MerchantPortalPage() {
       id, code, status, collection_usd, delivery_fee_usd, shop_balance_usd,
       usd_to_lbp_rate, created_at, delivered_at, notes,
       recipient_name, recipient_phone, recipient_address,
+      shopify_order_id, shopify_order_number,
       area:area_id(id, name, fee_usd),
       driver:driver_id(id, name, phone)
     `)

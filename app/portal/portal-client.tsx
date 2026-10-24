@@ -10,6 +10,9 @@ import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl } from '@/lib/maps'
 import { LocationHelper } from '@/components/location-helper'
 import { Modal } from '@/components/modal'
 import { TrashIcon, PrinterIcon, MapPinIcon } from '@/components/icons'
+import { ShopifyIcon } from '@/components/shopify-icon'
+import { ShopifyIntegrationModal } from '@/components/shopify-integration-modal'
+import { BulkOrderImportModal } from '@/components/bulk-order-import-modal'
 
 interface Shop {
   id: string
@@ -18,6 +21,9 @@ interface Shop {
   address: string | null
   balance_usd: number
   prefix: string | null
+  api_key?: string | null
+  shopify_domain?: string | null
+  workspace_id?: string | null
 }
 
 interface DeliveryArea {
@@ -42,6 +48,8 @@ interface PortalOrder {
   recipient_address: string | null
   area: { id: string; name: string; fee_usd: number } | null
   driver: { id: string; name: string; phone?: string | null } | null
+  shopify_order_id?: string | null
+  shopify_order_number?: string | null
 }
 
 interface PortalClientProps {
@@ -63,6 +71,8 @@ export function PortalClient({
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isShopifyModalOpen, setIsShopifyModalOpen] = useState(false)
+  const [isBulkImportModalOpen, setIsBulkImportModalOpen] = useState(false)
 
   // Order creation form state
   const [recipientName, setRecipientName] = useState('')
@@ -382,27 +392,68 @@ export function PortalClient({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setFormError('')
-            setIsModalOpen(true)
-          }}
-          className="btn btn-primary"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '12px 22px',
-            fontSize: 14,
-            fontWeight: 700,
-            borderRadius: 8,
-            boxShadow: '0 2px 8px rgba(36,99,79,0.25)',
-          }}
-        >
-          <span style={{ fontSize: 16 }}>＋</span>
-          <span>Make New Delivery Order</span>
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setIsShopifyModalOpen(true)}
+            className="btn btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '11px 16px',
+              fontSize: 13,
+              fontWeight: 700,
+              borderRadius: 8,
+              border: '1.5px solid #95BF47',
+              color: 'var(--text)',
+            }}
+            title="Automate order sync from your Shopify store"
+          >
+            <ShopifyIcon size={18} />
+            <span>Connect Shopify</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsBulkImportModalOpen(true)}
+            className="btn btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '11px 16px',
+              fontSize: 13,
+              fontWeight: 700,
+              borderRadius: 8,
+            }}
+            title="Import orders from Shopify CSV or Excel export"
+          >
+            <span>📥 Bulk Import CSV</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFormError('')
+              setIsModalOpen(true)
+            }}
+            className="btn btn-primary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '11px 20px',
+              fontSize: 13.5,
+              fontWeight: 700,
+              borderRadius: 8,
+              boxShadow: '0 2px 8px rgba(36,99,79,0.25)',
+            }}
+          >
+            <span style={{ fontSize: 16 }}>＋</span>
+            <span>Make New Delivery Order</span>
+          </button>
+        </div>
       </div>
 
       {/* Portfolio Financial & Operational Metric Cards */}
@@ -652,6 +703,14 @@ export function PortalClient({
                         >
                           #{order.code}
                         </button>
+                        {order.shopify_order_number && (
+                          <div style={{ marginTop: 2 }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, color: '#3f6212', background: '#ecfccb', padding: '1px 6px', borderRadius: 4, border: '1px solid #bef264' }}>
+                              <ShopifyIcon size={11} />
+                              <span>Shopify {order.shopify_order_number}</span>
+                            </span>
+                          </div>
+                        )}
                         <small style={{ display: 'block', fontSize: 11, color: 'var(--muted)' }}>
                           {formatDate(order.created_at)}
                         </small>
@@ -1487,6 +1546,28 @@ export function PortalClient({
           </div>
         </Modal>
       )}
+
+      {/* ─── SHOPIFY INTEGRATION MODAL ─── */}
+      <ShopifyIntegrationModal
+        isOpen={isShopifyModalOpen}
+        onClose={() => setIsShopifyModalOpen(false)}
+        shop={shop}
+        onOrderCreated={newOrder => {
+          setOrders(prev => [newOrder, ...prev])
+        }}
+      />
+
+      {/* ─── BULK ORDER IMPORT MODAL (SHOPIFY / EXCEL CSV) ─── */}
+      <BulkOrderImportModal
+        isOpen={isBulkImportModalOpen}
+        onClose={() => setIsBulkImportModalOpen(false)}
+        workspaceId={shop.workspace_id || ''}
+        shopId={shop.id}
+        shopName={shop.name}
+        onImportComplete={() => {
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }
