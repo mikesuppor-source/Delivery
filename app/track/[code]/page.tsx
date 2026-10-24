@@ -150,9 +150,14 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             <small>DELIVERY DESK</small>
           </div>
         </Link>
-        <Link href="/track" className="btn btn-secondary btn-sm">
-          Track another
-        </Link>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link href="/portal/login" className="btn btn-secondary btn-sm">
+            Merchant Portal
+          </Link>
+          <Link href="/track" className="btn btn-ghost btn-sm">
+            Track another
+          </Link>
+        </div>
       </header>
 
       {/* Main Tracking Card */}

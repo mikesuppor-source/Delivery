@@ -38,9 +38,14 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
             <small>DELIVERY DESK</small>
           </div>
         </Link>
-        <Link href="/login" className="btn btn-secondary btn-sm">
-          Desk Login
-        </Link>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link href="/portal/login" className="btn btn-secondary btn-sm">
+            Merchant Portal
+          </Link>
+          <Link href="/login" className="btn btn-ghost btn-sm">
+            Desk Login
+          </Link>
+        </div>
       </header>
 
       {/* Hero Tracking Box */}

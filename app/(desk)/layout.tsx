@@ -27,6 +27,17 @@ export default async function DeskLayout({
     redirect('/onboarding')
   }
 
+  // If user is a merchant store partner, direct them directly to their Merchant Portal
+  const { data: shop } = await supabase
+    .from('shops')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (shop && member.role === 'readonly') {
+    redirect('/portal')
+  }
+
   const { data: wsData } = await supabase
     .from('workspaces')
     .select('*')

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+import Link from 'next/link'
+
 export default function LoginPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -17,13 +19,18 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/')
+      // If user is a merchant, route straight to /portal
+      if (data?.user?.user_metadata?.role === 'merchant') {
+        router.push('/portal')
+      } else {
+        router.push('/')
+      }
       router.refresh()
     }
   }
@@ -34,7 +41,7 @@ export default function LoginPage() {
         <img src="/logo.png" alt="Cedar Delivery Desk" />
       </div>
       <h1>Cedar Delivery</h1>
-      <p>Sign in to your delivery desk.</p>
+      <p>Sign in to your delivery desk or store account.</p>
 
       <form onSubmit={handleSubmit}>
         <div className="field">
@@ -68,6 +75,36 @@ export default function LoginPage() {
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
+
+      {/* Store & Merchant Quick Switcher Box */}
+      <div
+        style={{
+          marginTop: 24,
+          paddingTop: 18,
+          borderTop: '1px solid var(--line)',
+          textAlign: 'center',
+          fontSize: 12.5,
+        }}
+      >
+        <p style={{ color: 'var(--muted)', marginBottom: 8 }}>
+          <strong>Are you a Store or Online Merchant?</strong>
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+          <Link
+            href="/portal/login"
+            style={{ color: 'var(--brand)', fontWeight: 700 }}
+          >
+            Merchant Sign In
+          </Link>
+          <span style={{ color: 'var(--line)' }}>•</span>
+          <Link
+            href="/portal/signup"
+            style={{ color: 'var(--brand)', fontWeight: 700 }}
+          >
+            Register Your Store →
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
