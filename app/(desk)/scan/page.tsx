@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+// Interactive barcode & QR code camera scanner client
 import { ScanClient } from './scan-client'
 import type { Metadata } from 'next'
 

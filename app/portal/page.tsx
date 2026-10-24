@@ -1,5 +1,6 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+// Merchant self-service dashboard client
 import { PortalClient } from './portal-client'
 import { PortalHeader } from '@/components/portal-header'
 import { getShopForUser } from '@/lib/shop-auth'
