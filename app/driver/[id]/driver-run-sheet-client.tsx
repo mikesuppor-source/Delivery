@@ -21,6 +21,9 @@ import {
   SearchIcon,
   PhoneIcon,
 } from '@/components/icons'
+import { DeliveryPodModal } from './delivery-pod-modal'
+import { DeliveryFailModal } from './delivery-fail-modal'
+import { DeliveryPodViewModal } from './delivery-pod-view-modal'
 
 export interface DriverRunSheetOrder {
   id: string
@@ -39,6 +42,9 @@ export interface DriverRunSheetOrder {
   recipient_address: string | null
   shop?: { id: string; name: string; phone?: string | null } | null
   area?: { id: string; name: string } | null
+  pod_signature?: string | null
+  pod_photo?: string | null
+  pod_collected_lbp?: number | null
 }
 
 export interface DriverInfo {
@@ -68,6 +74,11 @@ export function DriverRunSheetClient({
   const [search, setSearch] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // POD & Failure modals
+  const [podModalOrder, setPodModalOrder] = useState<DriverRunSheetOrder | null>(null)
+  const [failModalOrder, setFailModalOrder] = useState<DriverRunSheetOrder | null>(null)
+  const [viewPodOrder, setViewPodOrder] = useState<DriverRunSheetOrder | null>(null)
 
   function showNotification(type: 'success' | 'error', message: string) {
     setNotification({ type, message })
@@ -135,7 +146,17 @@ export function DriverRunSheetClient({
   }, [orders])
 
   // Handle status transitions
-  async function handleUpdateStatus(orderId: string, newStatus: DriverRunSheetOrder['status']) {
+  async function handleUpdateStatus(
+    orderId: string,
+    newStatus: DriverRunSheetOrder['status'],
+    extraData?: {
+      notes?: string
+      podSignature?: string | null
+      podPhoto?: string | null
+      podCollectedLbp?: number | null
+      failureReason?: string
+    }
+  ) {
     setUpdatingId(orderId)
     try {
       const res = await fetch('/api/driver/orders', {
@@ -145,6 +166,7 @@ export function DriverRunSheetClient({
           orderId,
           driverId: driver.id,
           status: newStatus,
+          ...extraData,
         }),
       })
 
@@ -161,6 +183,7 @@ export function DriverRunSheetClient({
       showNotification('success', `Order #${data.order.code} updated to ${ORDER_STATUS_LABELS[newStatus] || newStatus}!`)
     } catch (err: unknown) {
       showNotification('error', err instanceof Error ? err.message : 'Error updating status')
+      throw err
     } finally {
       setUpdatingId(null)
     }
@@ -840,7 +863,7 @@ export function DriverRunSheetClient({
                         <button
                           type="button"
                           disabled={isUpdating}
-                          onClick={() => handleUpdateStatus(order.id, 'delivered')}
+                          onClick={() => setPodModalOrder(order)}
                           style={{
                             flex: 2,
                             background: '#059669',
@@ -858,13 +881,13 @@ export function DriverRunSheetClient({
                           }}
                         >
                           <CheckIcon size={14} color="#fff" />
-                          <span>{isUpdating ? 'Saving…' : `Delivered & Collect $${Number(order.collection_usd).toFixed(2)}`}</span>
+                          <span>{isUpdating ? 'Saving…' : `Delivered & POD ($${Number(order.collection_usd).toFixed(2)})`}</span>
                         </button>
 
                         <button
                           type="button"
                           disabled={isUpdating}
-                          onClick={() => handleUpdateStatus(order.id, 'failed')}
+                          onClick={() => setFailModalOrder(order)}
                           style={{
                             flex: 1,
                             background: '#334155',
@@ -882,12 +905,33 @@ export function DriverRunSheetClient({
                       </>
                     )}
 
-                    {/* Step 3: Already Delivered (Allow Revert if clicked by accident) */}
+                    {/* Step 3: Already Delivered (Allow Revert if clicked by accident & View POD) */}
                     {isDelivered && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span style={{ fontSize: 12, color: '#6ee7b7', fontWeight: 700 }}>
-                          ✓ Delivered on {order.delivered_at ? formatDate(order.delivered_at) : 'Today'}
-                        </span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 12, color: '#6ee7b7', fontWeight: 700 }}>
+                            ✓ Delivered on {order.delivered_at ? formatDate(order.delivered_at) : 'Today'}
+                          </span>
+                          {(order.pod_signature || order.pod_photo) && (
+                            <button
+                              type="button"
+                              onClick={() => setViewPodOrder(order)}
+                              style={{
+                                background: '#064e3b',
+                                color: '#6ee7b7',
+                                border: '1px solid #059669',
+                                padding: '2px 8px',
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✍️ View POD
+                            </button>
+                          )}
+                        </div>
+
                         <button
                           type="button"
                           disabled={isUpdating}
@@ -938,6 +982,40 @@ export function DriverRunSheetClient({
           )}
         </div>
       </main>
+
+      {/* ─── PROOF OF DELIVERY MODAL ─── */}
+      {podModalOrder && (
+        <DeliveryPodModal
+          order={podModalOrder}
+          rate={rate}
+          onClose={() => setPodModalOrder(null)}
+          onConfirm={async podData => {
+            await handleUpdateStatus(podModalOrder.id, 'delivered', podData)
+          }}
+        />
+      )}
+
+      {/* ─── DELIVERY FAILURE / POSTPONE MODAL ─── */}
+      {failModalOrder && (
+        <DeliveryFailModal
+          order={failModalOrder}
+          onClose={() => setFailModalOrder(null)}
+          onConfirm={async failData => {
+            await handleUpdateStatus(failModalOrder.id, failData.status, {
+              failureReason: failData.failureReason,
+              notes: failData.notes,
+            })
+          }}
+        />
+      )}
+
+      {/* ─── DIGITAL POD VIEWER MODAL ─── */}
+      {viewPodOrder && (
+        <DeliveryPodViewModal
+          order={viewPodOrder}
+          onClose={() => setViewPodOrder(null)}
+        />
+      )}
     </div>
   )
 }

@@ -5,7 +5,7 @@ import type { OrderStatus } from '@/lib/roles'
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { orderId, driverId, status, notes } = body
+    const { orderId, driverId, status, notes, podSignature, podPhoto, podCollectedLbp, failureReason } = body
 
     if (!orderId || !driverId) {
       return NextResponse.json({ error: 'orderId and driverId are required' }, { status: 400 })
@@ -54,8 +54,23 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    if (notes !== undefined) {
+    // Handle failure reasons
+    if (failureReason) {
+      const reasonTag = `[Failed: ${failureReason}]`
+      updates.notes = notes ? `${reasonTag} ${notes}` : reasonTag
+    } else if (notes !== undefined) {
       updates.notes = notes ? String(notes).trim() : null
+    }
+
+    // POD updates
+    if (podSignature !== undefined) {
+      updates.pod_signature = podSignature
+    }
+    if (podPhoto !== undefined) {
+      updates.pod_photo = podPhoto
+    }
+    if (podCollectedLbp !== undefined) {
+      updates.pod_collected_lbp = Number(podCollectedLbp) || null
     }
 
     // 4. Update the order
@@ -67,6 +82,7 @@ export async function PATCH(req: NextRequest) {
         id, code, status, collection_usd, delivery_fee_usd, driver_pay_usd,
         shop_balance_usd, usd_to_lbp_rate, created_at, delivered_at,
         recipient_name, recipient_phone, recipient_address, notes,
+        pod_signature, pod_photo, pod_collected_lbp,
         shop:shop_id(id, name, phone),
         area:area_id(id, name)
       `)

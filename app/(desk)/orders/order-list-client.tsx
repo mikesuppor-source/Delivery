@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Modal } from '@/components/modal'
-import { formatUSD, formatLBP, usdToLbp, isDateInPreset, getDateRangeLabel, type DateRangePreset } from '@/lib/utils'
+import { formatUSD, formatLBP, usdToLbp, isDateInPreset, getDateRangeLabel, type DateRangePreset, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { UserRole, OrderStatus } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, buildCustomerOrderMessage, buildDriverDispatchMessage } from '@/lib/whatsapp'
@@ -247,6 +247,58 @@ export function OrderListClient({
       setAutoAssigning(false)
     }
   }
+
+  function handleExportCsv() {
+    if (filteredOrders.length === 0) {
+      alert('No orders to export with current filters.')
+      return
+    }
+
+    const headers = [
+      'Order Code',
+      'Date',
+      'Status',
+      'Shop',
+      'Recipient Name',
+      'Recipient Phone',
+      'Recipient Address',
+      'Destination Zone',
+      'COD Collection USD',
+      'Delivery Fee USD',
+      'Courier Pay USD',
+      'Company Margin USD',
+      'Assigned Courier',
+      'Notes',
+    ]
+
+    const rows = filteredOrders.map(o => [
+      `"${o.code}"`,
+      `"${new Date(o.created_at).toLocaleDateString('en-GB')}"`,
+      `"${ORDER_STATUS_LABELS[o.status] || o.status}"`,
+      `"${(o.shop?.name || '').replace(/"/g, '""')}"`,
+      `"${(o.recipient_name || '').replace(/"/g, '""')}"`,
+      `"${(o.recipient_phone || '').replace(/"/g, '""')}"`,
+      `"${(o.recipient_address || '').replace(/"/g, '""')}"`,
+      `"${(o.area?.name || '').replace(/"/g, '""')}"`,
+      Number(o.collection_usd) || 0,
+      Number(o.delivery_fee_usd) || 0,
+      Number(o.driver_pay_usd) || 0,
+      (Number(o.delivery_fee_usd) || 0) - (Number(o.driver_pay_usd) || 0),
+      `"${(o.driver?.name || 'Unassigned').replace(/"/g, '""')}"`,
+      `"${(o.notes || '').replace(/"/g, '""')}"`,
+    ])
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `cedar_orders_export_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
 
 
   // When area changes, update suggested delivery fee
@@ -544,6 +596,23 @@ export function OrderListClient({
               <span>Scan Barcode / QR</span>
             </button>
           )}
+          {canManage && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleExportCsv}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="Download current filtered orders as CSV for Excel"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Export CSV</span>
+            </button>
+          )}
+
           {canManage && (
             <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

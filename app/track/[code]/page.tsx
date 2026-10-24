@@ -5,6 +5,7 @@ import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, formatDisplayAddress } from '@/lib/maps'
 import { CourierTrackActions } from '@/components/courier-track-actions'
+import { CustomerGpsShare } from '@/components/customer-gps-share'
 import type { Metadata } from 'next'
 
 interface TrackPageProps {
@@ -340,6 +341,15 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             </div>
           )}
         </div>
+
+        {/* Live GPS Pin Sharing for Lebanese Customer Addresses */}
+        {order.status !== 'delivered' && (
+          <CustomerGpsShare
+            orderId={order.id}
+            orderCode={order.code}
+            currentAddress={order.recipient_address}
+          />
+        )}
 
         {/* Recipient Delivery Assistance Actions */}
         <div

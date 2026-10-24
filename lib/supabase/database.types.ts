@@ -204,6 +204,9 @@ export type Database = {
           driver_pay_usd: number
           id: string
           notes: string | null
+          pod_collected_lbp: number | null
+          pod_photo: string | null
+          pod_signature: string | null
           recipient_address: string | null
           recipient_name: string | null
           recipient_phone: string | null
@@ -226,6 +229,9 @@ export type Database = {
           driver_pay_usd?: number
           id?: string
           notes?: string | null
+          pod_collected_lbp?: number | null
+          pod_photo?: string | null
+          pod_signature?: string | null
           recipient_address?: string | null
           recipient_name?: string | null
           recipient_phone?: string | null
@@ -248,6 +254,9 @@ export type Database = {
           driver_pay_usd?: number
           id?: string
           notes?: string | null
+          pod_collected_lbp?: number | null
+          pod_photo?: string | null
+          pod_signature?: string | null
           recipient_address?: string | null
           recipient_name?: string | null
           recipient_phone?: string | null
