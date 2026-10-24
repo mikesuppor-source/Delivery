@@ -6,7 +6,8 @@ import { formatUSD, formatLBP, usdToLbp, formatDate, ORDER_STATUS_LABELS } from 
 import { isValidLebanesePhone, formatLebanesePhone } from '@/lib/phone'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
-import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
+import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl } from '@/lib/maps'
+import { LocationHelper } from '@/components/location-helper'
 import { Modal } from '@/components/modal'
 import { TrashIcon, PrinterIcon, MapPinIcon } from '@/components/icons'
 
@@ -861,34 +862,15 @@ export function PortalClient({
             </small>
           </div>
 
-          {/* Recipient Full Address */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <label htmlFor="modal-rec-addr" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
-                Detailed Delivery Address *
-              </label>
-              {recipientAddress && (
-                <a
-                  href={getGoogleMapsDirectionsUrl(recipientAddress)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 11, color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                >
-                  <GoogleMapsIcon size={11} />
-                  <span>Preview on Maps</span>
-                </a>
-              )}
-            </div>
-            <input
-              id="modal-rec-addr"
-              type="text"
-              value={recipientAddress}
-              onChange={e => setRecipientAddress(e.target.value)}
-              placeholder="e.g. Achrafieh, Sassine Square, Bldg 12, 3rd floor"
-              required
-              style={{ fontSize: 13.5 }}
-            />
-          </div>
+          {/* Recipient Full Address with GPS Detection & Verification */}
+          <LocationHelper
+            id="modal-rec-addr"
+            address={recipientAddress}
+            onAddressChange={setRecipientAddress}
+            label="Detailed Delivery Address / Google Maps Pin"
+            placeholder="e.g. Achrafieh, Sassine Square, Bldg 12 or paste Google Maps link"
+            required
+          />
 
           {/* Destination Delivery Area Selection (Shows exact fee) */}
           <div>
@@ -1381,15 +1363,27 @@ export function PortalClient({
                     Delivery Destination
                   </span>
                   {inspectingOrder.recipient_address && (
-                    <a
-                      href={getGoogleMapsDirectionsUrl(inspectingOrder.recipient_address)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
-                    >
-                      <GoogleMapsIcon size={11} />
-                      <span>Maps</span>
-                    </a>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <a
+                        href={getGoogleMapsDirectionsUrl(inspectingOrder.recipient_address)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--brand)', fontWeight: 600, textDecoration: 'none' }}
+                        title="Open Google Maps Directions"
+                      >
+                        <GoogleMapsIcon size={11} />
+                        <span>Maps</span>
+                      </a>
+                      <a
+                        href={getWazeDirectionsUrl(inspectingOrder.recipient_address)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#0284c7', fontWeight: 600, textDecoration: 'none' }}
+                        title="Open in Waze Navigation"
+                      >
+                        <span>Waze</span>
+                      </a>
+                    </div>
                   )}
                 </div>
                 <strong style={{ fontSize: 13, color: 'var(--text)', display: 'block', marginTop: 2 }}>

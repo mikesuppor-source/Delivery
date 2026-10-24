@@ -8,7 +8,7 @@ import { formatUSD, formatLBP, usdToLbp, formatDate, ORDER_STATUS_LABELS } from 
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getCustomerOrderWhatsAppUrl } from '@/lib/whatsapp'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
-import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
+import { getGoogleMapsDirectionsUrl, formatDisplayAddress, parseLocation } from '@/lib/maps'
 
 export interface ReceiptOrder {
   id: string
@@ -407,9 +407,14 @@ export function OrderReceiptSlip({
                 {order.recipient_phone}
               </div>
             )}
-            <div style={{ fontSize: 11.5, color: '#374151', marginTop: 3, lineHeight: 1.4 }}>
-              {order.recipient_address || 'Address provided on file'}
+            <div style={{ fontSize: 11.5, color: '#374151', marginTop: 3, lineHeight: 1.4, wordBreak: 'break-word' }}>
+              {formatDisplayAddress(order.recipient_address)}
             </div>
+            {order.recipient_address && parseLocation(order.recipient_address).isCoords && (
+              <div style={{ fontSize: 9.5, fontWeight: 700, color: '#059669', marginTop: 2 }}>
+                GPS Pin: {parseLocation(order.recipient_address).lat}, {parseLocation(order.recipient_address).lng}
+              </div>
+            )}
             {order.area && (
               <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', marginTop: 3 }}>
                 Area: {order.area.name}

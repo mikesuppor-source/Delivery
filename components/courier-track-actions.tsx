@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { PackageIcon, CheckIcon, RefreshIcon, TruckIcon } from '@/components/icons'
+import { PackageIcon, CheckIcon, RefreshIcon, TruckIcon, MapPinIcon } from '@/components/icons'
+import { GoogleMapsIcon } from '@/components/google-maps-icon'
+import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, parseLocation, formatDisplayAddress } from '@/lib/maps'
 
 interface Driver {
   id: string
@@ -16,6 +19,9 @@ interface CourierTrackActionsProps {
   currentStatus: string
   currentDriverName?: string | null
   currentDriverId?: string | null
+  recipientAddress?: string | null
+  recipientPhone?: string | null
+  recipientName?: string | null
   drivers: Driver[]
 }
 
@@ -25,6 +31,9 @@ export function CourierTrackActions({
   currentStatus,
   currentDriverName,
   currentDriverId,
+  recipientAddress,
+  recipientPhone,
+  recipientName,
   drivers,
 }: CourierTrackActionsProps) {
   const router = useRouter()
@@ -32,6 +41,8 @@ export function CourierTrackActions({
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+
+  const parsedLoc = parseLocation(recipientAddress)
 
   async function handleAction(actionStatus?: string, customDriverId?: string) {
     setLoading(true)
@@ -93,6 +104,102 @@ export function CourierTrackActions({
       {errorMsg && (
         <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '8px 12px', borderRadius: 6, fontSize: 12, marginBottom: 12 }}>
           {errorMsg}
+        </div>
+      )}
+
+      {/* 1-Tap Courier Navigation to Customer Address */}
+      {recipientAddress && (
+        <div
+          style={{
+            background: 'var(--bg)',
+            border: '1.5px solid var(--line)',
+            borderRadius: 8,
+            padding: '12px 14px',
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <MapPinIcon size={14} color="var(--brand)" />
+              <strong style={{ fontSize: 12, color: 'var(--text)' }}>
+                Customer Location Pin & Directions
+              </strong>
+            </div>
+            {parsedLoc.isCoords && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: '#059669', background: '#ecfdf5', padding: '2px 8px', borderRadius: 99, border: '1px solid #a7f3d0' }}>
+                GPS: {parsedLoc.lat}, {parsedLoc.lng}
+              </span>
+            )}
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10, wordBreak: 'break-word' }}>
+            {formatDisplayAddress(recipientAddress)}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* 1-Tap Google Maps */}
+            <a
+              href={getGoogleMapsDirectionsUrl(recipientAddress)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{
+                fontSize: 12,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontWeight: 700,
+                color: '#1d4ed8',
+                background: '#eff6ff',
+                borderColor: '#bfdbfe',
+              }}
+            >
+              <GoogleMapsIcon size={13} />
+              <span>Google Maps Navigation</span>
+            </a>
+
+            {/* 1-Tap Waze */}
+            <a
+              href={getWazeDirectionsUrl(recipientAddress)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{
+                fontSize: 12,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontWeight: 700,
+                color: '#0369a1',
+                background: '#f0f9ff',
+                borderColor: '#bae6fd',
+              }}
+            >
+              <span>Waze Navigation</span>
+            </a>
+
+            {/* WhatsApp Customer */}
+            {recipientPhone && (
+              <a
+                href={`https://wa.me/${recipientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                  `Hello ${recipientName || 'Customer'}, I am your Cedar courier with your delivery #${orderCode}. I am heading to your location.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-sm"
+                style={{
+                  fontSize: 12,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: '#047857',
+                }}
+              >
+                <WhatsAppIcon size={13} color="#047857" />
+                <span>WhatsApp Customer</span>
+              </a>
+            )}
+          </div>
         </div>
       )}
 

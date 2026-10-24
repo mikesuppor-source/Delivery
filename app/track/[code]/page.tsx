@@ -2,6 +2,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { GoogleMapsIcon } from '@/components/google-maps-icon'
+import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, formatDisplayAddress } from '@/lib/maps'
 import { CourierTrackActions } from '@/components/courier-track-actions'
 import type { Metadata } from 'next'
 
@@ -305,6 +307,38 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
               )}
             </strong>
           </div>
+
+          {order.recipient_address && (
+            <div className="track-grid-item" style={{ gridColumn: '1 / -1' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+                <span className="grid-label">Delivery Destination & Navigation</span>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <a
+                    href={getGoogleMapsDirectionsUrl(order.recipient_address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 11, color: '#1d4ed8', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    title="Open Google Maps Directions"
+                  >
+                    <GoogleMapsIcon size={12} />
+                    <span>Google Maps</span>
+                  </a>
+                  <a
+                    href={getWazeDirectionsUrl(order.recipient_address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 11, color: '#0284c7', fontWeight: 700, textDecoration: 'none' }}
+                    title="Open Waze Turn-by-Turn Navigation"
+                  >
+                    <span>Waze ↗</span>
+                  </a>
+                </div>
+              </div>
+              <strong className="grid-value" style={{ fontSize: 13, wordBreak: 'break-word', fontWeight: 600 }}>
+                {formatDisplayAddress(order.recipient_address)}
+              </strong>
+            </div>
+          )}
         </div>
 
         {/* Recipient Delivery Assistance Actions */}
@@ -373,6 +407,9 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           currentStatus={order.status}
           currentDriverName={order.driver?.name}
           currentDriverId={order.driver_id}
+          recipientAddress={order.recipient_address}
+          recipientPhone={order.recipient_phone}
+          recipientName={order.recipient_name}
           drivers={drivers || []}
         />
 

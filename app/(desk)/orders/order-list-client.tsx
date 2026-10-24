@@ -10,7 +10,8 @@ import { getWhatsAppUrl, buildCustomerOrderMessage, buildDriverDispatchMessage }
 import { OrderReceiptSlip } from '@/components/order-receipt-slip'
 import { BarcodeScannerModal } from '@/components/barcode-scanner-modal'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
-import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
+import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, formatDisplayAddress } from '@/lib/maps'
+import { LocationHelper } from '@/components/location-helper'
 import { TrashIcon, ScanIcon } from '@/components/icons'
 
 interface Order {
@@ -737,7 +738,7 @@ export function OrderListClient({
                         </small>
                       )}
                       {order.recipient_address && (
-                        <div style={{ marginTop: 3 }}>
+                        <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           <a
                             href={getGoogleMapsDirectionsUrl(order.recipient_address)}
                             target="_blank"
@@ -754,11 +755,36 @@ export function OrderListClient({
                               border: '1px solid #bfdbfe',
                               fontSize: 10.5,
                               fontWeight: 600,
+                              maxWidth: 220,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
                             }}
-                            title="Open 1-Tap Google Maps Turn-by-Turn Navigation"
+                            title="Open 1-Tap Google Maps Directions"
                           >
                             <GoogleMapsIcon size={11} />
-                            <span>{order.recipient_address}</span>
+                            <span>{formatDisplayAddress(order.recipient_address)}</span>
+                          </a>
+                          <a
+                            href={getWazeDirectionsUrl(order.recipient_address)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 2,
+                              color: '#0284c7',
+                              textDecoration: 'none',
+                              background: '#f0f9ff',
+                              padding: '1px 5px',
+                              borderRadius: 4,
+                              border: '1px solid #bae6fd',
+                              fontSize: 10,
+                              fontWeight: 700,
+                            }}
+                            title="Open Waze Turn-by-Turn Navigation"
+                          >
+                            Waze
                           </a>
                         </div>
                       )}
@@ -1453,12 +1479,13 @@ export function OrderListClient({
               />
             </div>
 
-            <div className="field">
-              <label>Delivery Address</label>
-              <input
-                type="text"
-                value={editRecipientAddress}
-                onChange={e => setEditRecipientAddress(e.target.value)}
+            <div className="field full">
+              <LocationHelper
+                id="edit-recipient-address"
+                address={editRecipientAddress}
+                onAddressChange={setEditRecipientAddress}
+                label="Delivery Address / Google Maps Pin"
+                placeholder="e.g. Achrafieh, Sassine Square, Bldg 12 or paste Google Maps link"
                 required
               />
             </div>
@@ -1692,13 +1719,13 @@ export function OrderListClient({
               />
             </div>
 
-            <div className="field">
-              <label>Delivery Address</label>
-              <input
-                type="text"
-                placeholder="Street, Building, Floor"
-                value={recipientAddress}
-                onChange={e => setRecipientAddress(e.target.value)}
+            <div className="field full">
+              <LocationHelper
+                id="new-recipient-address"
+                address={recipientAddress}
+                onAddressChange={setRecipientAddress}
+                label="Delivery Address / Google Maps Pin"
+                placeholder="e.g. Achrafieh, Sassine Square, Bldg 12 or paste Google Maps link"
                 required
               />
             </div>
