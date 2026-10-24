@@ -31,24 +31,38 @@ export async function middleware(request: NextRequest) {
                    path.startsWith('/invite') ||
                    path.startsWith('/track') ||
                    path.startsWith('/print') ||
+                   path.startsWith('/portal/login') ||
+                   path.startsWith('/portal/signup') ||
+                   path.startsWith('/api/portal/auth') ||
                    path.startsWith('/_next') ||
                    path.startsWith('/api/invite') ||
                    path === '/favicon.ico' ||
                    path === '/logo.png' ||
                    /\.(png|jpg|jpeg|svg|ico|webp)$/.test(path)
 
-  // Redirect unauthenticated users to login
+  // Redirect unauthenticated users
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    if (path.startsWith('/portal')) {
+      url.pathname = '/portal/login'
+    } else {
+      url.pathname = '/login'
+    }
     return NextResponse.redirect(url)
   }
 
-  // Redirect authenticated users away from login page
-  if (user && path === '/login') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
+  // Redirect authenticated users away from auth pages
+  if (user) {
+    if (path === '/login') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+    if (path === '/portal/login' || path === '/portal/signup') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/portal'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

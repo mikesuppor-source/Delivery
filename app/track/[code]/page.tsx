@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { CourierTrackActions } from '@/components/courier-track-actions'
 import type { Metadata } from 'next'
 
 interface TrackPageProps {
@@ -25,11 +26,19 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     .select(`
       id, code, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
       recipient_name, recipient_phone, recipient_address,
+      driver_id,
       shop:shop_id(name),
-      area:area_id(name)
+      area:area_id(name),
+      driver:driver_id(id, name, phone)
     `)
     .ilike('code', code.trim())
     .maybeSingle()
+
+  const { data: drivers } = await supabase
+    .from('drivers')
+    .select('id, name, phone')
+    .eq('active', true)
+    .order('name')
 
   const order = rawOrder as {
     id: string
@@ -42,8 +51,10 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     recipient_name: string | null
     recipient_phone: string | null
     recipient_address: string | null
+    driver_id: string | null
     shop: { name: string } | null
     area: { name: string } | null
+    driver: { id: string; name: string; phone?: string | null } | null
   } | null
 
   if (!order) {
@@ -290,6 +301,16 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             </strong>
           </div>
         </div>
+
+        {/* Courier Dispatch & Check-In Action Hub */}
+        <CourierTrackActions
+          orderId={order.id}
+          orderCode={order.code}
+          currentStatus={order.status}
+          currentDriverName={order.driver?.name}
+          currentDriverId={order.driver_id}
+          drivers={drivers || []}
+        />
 
         {/* WhatsApp Help Button */}
         <div className="track-footer">

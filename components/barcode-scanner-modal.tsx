@@ -81,7 +81,7 @@ export function BarcodeScannerModal({
 }: BarcodeScannerModalProps) {
   const [scanInput, setScanInput] = useState('')
   const [matchedOrder, setMatchedOrder] = useState<ScannedOrder | null>(null)
-  const [autoAction, setAutoAction] = useState<'none' | 'picked_up' | 'delivered'>('none')
+  const [autoAction, setAutoAction] = useState<'none' | 'picked_up' | 'delivered' | 'assign_driver'>('none')
   const [statusMessage, setStatusMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
@@ -194,7 +194,9 @@ export function BarcodeScannerModal({
     setScanInput('')
 
     // Check if auto action is configured
-    if (autoAction !== 'none') {
+    if (autoAction === 'assign_driver' && targetDriverId) {
+      await executeStatusChange(found, 'assigned', targetDriverId)
+    } else if (autoAction === 'picked_up' || autoAction === 'delivered') {
       await executeStatusChange(found, autoAction)
     } else {
       setStatusMessage(`Found order #${found.code}! Ready for check-in action.`)
@@ -344,9 +346,33 @@ export function BarcodeScannerModal({
               }}
             >
               <option value="none">Manual Action (Prompt below)</option>
+              <option value="assign_driver">🛵 Auto-Assign to Courier (Connect Driver)</option>
               <option value="picked_up">⚡ Auto Check-In (Mark Picked Up)</option>
               <option value="delivered">✅ Auto Mark Delivered</option>
             </select>
+
+            {autoAction === 'assign_driver' && (
+              <select
+                value={targetDriverId}
+                onChange={e => setTargetDriverId(e.target.value)}
+                style={{
+                  fontSize: 12,
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  border: '1.5px solid var(--brand)',
+                  background: 'var(--brand-light)',
+                  fontWeight: 700,
+                  color: 'var(--brand)',
+                }}
+              >
+                <option value="">Select courier to auto-assign…</option>
+                {drivers.map(d => (
+                  <option key={d.id} value={d.id}>
+                    🛵 {d.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 

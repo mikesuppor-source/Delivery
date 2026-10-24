@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import type { OrderStatus } from '@/lib/auth'
+import { generateUniqueOrderCode, formatOrderCode, isOrderCodeUnique } from '@/lib/order-codes'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -37,19 +38,18 @@ export async function POST(req: NextRequest) {
 
   const serviceClient = createServiceClient()
 
-  // Sanitize and validate custom tracking code if provided
-  const customCode = typeof rawCode === 'string' && rawCode.trim() ? rawCode.trim().toUpperCase() : null
-  if (customCode) {
-    const { data: existing } = await serviceClient
-      .from('orders')
-      .select('id')
-      .eq('workspace_id', workspaceId)
-      .ilike('code', customCode)
-      .maybeSingle()
-
-    if (existing) {
-      return NextResponse.json({ error: `Tracking code "${customCode}" is already in use in this workspace.` }, { status: 400 })
+  // Sanitize and validate custom tracking code if provided, or generate a guaranteed unique non-repeating code
+  let finalCode = ''
+  if (typeof rawCode === 'string' && rawCode.trim()) {
+    const candidate = formatOrderCode(rawCode)
+    const isUnique = await isOrderCodeUnique(serviceClient, candidate)
+    if (!isUnique) {
+      return NextResponse.json({ error: `Barcode tracking code "${candidate}" is already in use and cannot be repeated.` }, { status: 400 })
     }
+    finalCode = candidate
+  } else {
+    // Generate guaranteed unique non-colliding order code
+    finalCode = await generateUniqueOrderCode(serviceClient, 'CD')
   }
 
   // Get current workspace exchange rate
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     .from('orders')
     .insert({
       workspace_id: workspaceId,
-      code: customCode || '',
+      code: finalCode,
       shop_id: shopId || null,
       driver_id: driverId || null,
       area_id: areaId || null,
@@ -183,18 +183,11 @@ export async function PATCH(req: NextRequest) {
   // Manager / Owner editing fields
   if (member.role === 'owner' || member.role === 'manager') {
     if (rawCode !== undefined) {
-      const customCode = typeof rawCode === 'string' && rawCode.trim() ? rawCode.trim().toUpperCase() : null
+      const customCode = typeof rawCode === 'string' && rawCode.trim() ? formatOrderCode(rawCode) : null
       if (customCode && customCode !== order.code) {
-        const { data: existing } = await serviceClient
-          .from('orders')
-          .select('id')
-          .eq('workspace_id', workspaceId)
-          .ilike('code', customCode)
-          .neq('id', orderId)
-          .maybeSingle()
-
-        if (existing) {
-          return NextResponse.json({ error: `Tracking code "${customCode}" is already in use by another order.` }, { status: 400 })
+        const isUnique = await isOrderCodeUnique(serviceClient, customCode, orderId)
+        if (!isUnique) {
+          return NextResponse.json({ error: `Barcode tracking code "${customCode}" is already in use and cannot be repeated.` }, { status: 400 })
         }
         updates.code = customCode
       }
