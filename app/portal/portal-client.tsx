@@ -126,6 +126,95 @@ export function PortalClient({
     })
   }, [orders, statusFilter, search])
 
+  // Batch selection state for bulk actions
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
+
+  const isAllSelected = filteredOrders.length > 0 && filteredOrders.every(o => selectedOrderIds.includes(o.id))
+
+  function toggleSelectAll() {
+    if (isAllSelected) {
+      setSelectedOrderIds([])
+    } else {
+      setSelectedOrderIds(filteredOrders.map(o => o.id))
+    }
+  }
+
+  function toggleSelectOrder(id: string) {
+    setSelectedOrderIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  function handlePrintSelected() {
+    const selectedCodes = orders
+      .filter(o => selectedOrderIds.includes(o.id))
+      .map(o => o.code)
+    if (selectedCodes.length > 0) {
+      window.open(`/print/bulk?codes=${encodeURIComponent(selectedCodes.join(','))}&print=true`, '_blank')
+    }
+  }
+
+  function handleExportCSV() {
+    const exportList = selectedOrderIds.length > 0
+      ? orders.filter(o => selectedOrderIds.includes(o.id))
+      : filteredOrders
+
+    if (exportList.length === 0) return
+
+    const headers = [
+      'Tracking Code',
+      'Created Date',
+      'Status',
+      'Recipient Name',
+      'Recipient Phone',
+      'Recipient Address',
+      'Destination Area',
+      'COD Amount (USD)',
+      'COD Amount (LBP)',
+      'Delivery Fee (USD)',
+      'Net Store Balance (USD)',
+      'Assigned Courier',
+      'Notes',
+    ]
+
+    const rows = exportList.map(o => {
+      const codUSD = Number(o.collection_usd) || 0
+      const codLBP = usdToLbp(codUSD, o.usd_to_lbp_rate || rate)
+      const feeUSD = Number(o.delivery_fee_usd) || 0
+      const netUSD = Number(o.shop_balance_usd) || 0
+      return [
+        o.code,
+        formatDate(o.created_at),
+        ORDER_STATUS_LABELS[o.status] || o.status,
+        o.recipient_name || '',
+        o.recipient_phone || '',
+        o.recipient_address || '',
+        o.area?.name || '',
+        codUSD.toFixed(2),
+        codLBP.toString(),
+        feeUSD.toFixed(2),
+        netUSD.toFixed(2),
+        o.driver?.name || 'Unassigned',
+        (o.notes || '').replace(/"/g, '""'),
+      ]
+    })
+
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(','),
+      ...rows.map(row => row.map(col => `"${col}"`).join(',')),
+    ].join('\r\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    const dateStr = new Date().toISOString().split('T')[0]
+    link.setAttribute('download', `cedar-orders-${(shop.name || 'merchant').toLowerCase().replace(/[^a-z0-9]/g, '-')}-${dateStr}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   async function handleCreateOrder(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
@@ -331,17 +420,78 @@ export function PortalClient({
             ))}
           </div>
 
-          {/* Search Box */}
-          <div style={{ minWidth: 260, maxWidth: 360, width: '100%' }}>
-            <input
-              type="text"
-              placeholder="Search code, customer name, phone..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ fontSize: 12.5, padding: '8px 12px' }}
-            />
+          {/* Search Box & Quick Export */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: 12, padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="Download orders as CSV spreadsheet"
+            >
+              <span>📥 Export CSV</span>
+            </button>
+            <div style={{ minWidth: 220, maxWidth: 320, width: '100%' }}>
+              <input
+                type="text"
+                placeholder="Search code, customer name, phone..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ fontSize: 12.5, padding: '8px 12px' }}
+              />
+            </div>
           </div>
         </div>
+
+        {/* Batch Selection Action Bar */}
+        {selectedOrderIds.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'var(--brand-light)',
+              border: '1.5px solid var(--brand)',
+              borderRadius: 10,
+              padding: '10px 16px',
+              marginBottom: 16,
+              flexWrap: 'wrap',
+              gap: 10,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontWeight: 800, color: 'var(--brand)', fontSize: 13 }}>
+                ✓ {selectedOrderIds.length} {selectedOrderIds.length === 1 ? 'order' : 'orders'} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedOrderIds([])}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 11, padding: '3px 8px' }}
+              >
+                Clear
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+              >
+                📥 Export Selected ({selectedOrderIds.length})
+              </button>
+              <button
+                type="button"
+                onClick={handlePrintSelected}
+                className="btn btn-primary btn-sm"
+                style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                🖨️ Print {selectedOrderIds.length} Waybills Batch
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Orders Table */}
         {filteredOrders.length === 0 ? (
@@ -356,6 +506,15 @@ export function PortalClient({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '1.5px solid var(--line)', textAlign: 'left', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase' }}>
+                  <th style={{ width: 36, padding: '10px 12px' }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      title="Select / Deselect All Orders"
+                      style={{ cursor: 'pointer', width: 16, height: 16 }}
+                    />
+                  </th>
                   <th style={{ padding: '10px 12px' }}>Waybill Code</th>
                   <th style={{ padding: '10px 12px' }}>Recipient & Destination</th>
                   <th style={{ padding: '10px 12px' }}>Area & Fee</th>
@@ -370,9 +529,24 @@ export function PortalClient({
                   const trackingUrl = `${origin}/track/${order.code}`
                   const whatsappMsg = `Hello ${order.recipient_name || 'Customer'}, your order from ${shop.name} has been registered! Tracking code: #${order.code}. Live tracking: ${trackingUrl}. Amount on delivery: $${Number(order.collection_usd).toFixed(2)} (${usdToLbp(Number(order.collection_usd), order.usd_to_lbp_rate || rate).toLocaleString()} L.L.).`
                   const whatsappUrl = `https://wa.me/${order.recipient_phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`
+                  const isRowSelected = selectedOrderIds.includes(order.id)
 
                   return (
-                    <tr key={order.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <tr
+                      key={order.id}
+                      style={{
+                        borderBottom: '1px solid var(--line)',
+                        background: isRowSelected ? 'rgba(34, 197, 94, 0.05)' : undefined,
+                      }}
+                    >
+                      <td style={{ width: 36, padding: '12px' }}>
+                        <input
+                          type="checkbox"
+                          checked={isRowSelected}
+                          onChange={() => toggleSelectOrder(order.id)}
+                          style={{ cursor: 'pointer', width: 16, height: 16 }}
+                        />
+                      </td>
                       <td style={{ padding: '12px' }}>
                         <Link
                           href={`/track/${order.code}`}
