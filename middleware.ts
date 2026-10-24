@@ -51,18 +51,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect authenticated users away from auth pages
-  if (user) {
-    if (path === '/login') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/'
-      return NextResponse.redirect(url)
-    }
-    if (path === '/portal/login' || path === '/portal/signup') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/portal'
-      return NextResponse.redirect(url)
-    }
+  // Redirect authenticated users away from main desk login page
+  if (user && path === '/login') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

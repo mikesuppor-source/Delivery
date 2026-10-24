@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -11,6 +11,16 @@ export default function PortalLoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [activeUserEmail, setActiveUserEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setActiveUserEmail(data.user.email)
+      }
+    })
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -91,6 +101,42 @@ export default function PortalLoginPage() {
             Place customer orders, print barcode waybills, and track cash-on-delivery payouts.
           </p>
         </div>
+
+        {activeUserEmail && (
+          <div
+            style={{
+              background: 'var(--brand-light)',
+              border: '1.5px solid var(--brand)',
+              borderRadius: 8,
+              padding: '12px 14px',
+              fontSize: 12.5,
+              marginBottom: 18,
+              textAlign: 'center',
+            }}
+          >
+            <span style={{ color: 'var(--muted)', display: 'block' }}>Signed in as:</span>
+            <strong style={{ color: 'var(--brand)', display: 'block', fontSize: 13, marginBottom: 8 }}>
+              {activeUserEmail}
+            </strong>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <Link href="/portal" className="btn btn-primary btn-sm" style={{ fontSize: 11, padding: '4px 12px' }}>
+                Open Store Portfolio →
+              </Link>
+              <button
+                type="button"
+                onClick={async () => {
+                  const supabase = createClient()
+                  await supabase.auth.signOut()
+                  setActiveUserEmail(null)
+                }}
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 11, padding: '4px 8px' }}
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div

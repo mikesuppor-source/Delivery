@@ -1,6 +1,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PortalClient } from './portal-client'
+import { PortalHeader } from '@/components/portal-header'
 
 export const metadata = {
   title: 'Merchant Order Portfolio — Cedar Delivery',
@@ -73,12 +74,21 @@ export default async function MerchantPortalPage() {
   }))
 
   return (
-    <PortalClient
-      shop={shop}
-      initialOrders={mappedOrders}
-      areas={areas || []}
-      rate={Number(ws?.usd_to_lbp) || 89500}
-      workspaceName={ws?.name || 'Cedar Delivery'}
-    />
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      <PortalHeader
+        shopName={shop.name}
+        shopPrefix={shop.prefix || 'CD'}
+        userEmail={user.email || ''}
+      />
+      <main style={{ flex: 1, padding: '24px 20px', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
+        <PortalClient
+          shop={shop}
+          initialOrders={mappedOrders}
+          areas={areas || []}
+          rate={Number(ws?.usd_to_lbp) || 89500}
+          workspaceName={ws?.name || 'Cedar Delivery'}
+        />
+      </main>
+    </div>
   )
 }
