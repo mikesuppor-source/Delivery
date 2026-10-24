@@ -186,6 +186,43 @@ export function OrderListClient({
     }
   }
 
+  async function handleDeleteOrders(targetIds: string[], codesLabel?: string) {
+    if (targetIds.length === 0) return
+    const msg = targetIds.length === 1
+      ? `Are you sure you want to permanently delete order ${codesLabel || ''}? This action cannot be undone.`
+      : `Are you sure you want to permanently delete these ${targetIds.length} orders? This action cannot be undone.`
+
+    if (!window.confirm(msg)) {
+      return
+    }
+
+    setBulkLoading(true)
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, orderIds: targetIds }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete orders')
+      }
+
+      setOrders(prev => prev.filter(o => !targetIds.includes(o.id)))
+      setSelectedOrderIds(prev => prev.filter(id => !targetIds.includes(id)))
+      if (editingOrder && targetIds.includes(editingOrder.id)) {
+        setIsEditModalOpen(false)
+        setEditingOrder(null)
+      }
+      setBulkMessage(`Deleted ${data.count || targetIds.length} orders successfully.`)
+      setTimeout(() => setBulkMessage(''), 4000)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error deleting orders')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   // When area changes, update suggested delivery fee
   function handleAreaChange(newAreaId: string) {
     setAreaId(newAreaId)
@@ -939,6 +976,17 @@ export function OrderListClient({
                         >
                           Track
                         </Link>
+                        {canManage && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => handleDeleteOrders([order.id], '#' + order.code)}
+                            style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
+                            title="Delete order record"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1095,6 +1143,30 @@ export function OrderListClient({
               </svg>
               Print All ({selectedOrderIds.length}) Waybills
             </Link>
+
+            {/* Batch Delete Orders */}
+            <button
+              type="button"
+              disabled={bulkLoading}
+              onClick={() => handleDeleteOrders(selectedOrderIds)}
+              className="btn btn-ghost btn-sm"
+              style={{
+                fontSize: 12,
+                color: '#fca5a5',
+                background: 'rgba(239, 68, 68, 0.18)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+              title="Permanently delete selected orders"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              Delete ({selectedOrderIds.length})
+            </button>
           </div>
         </div>
       )}
@@ -1402,24 +1474,47 @@ export function OrderListClient({
 
           {editError && <p className="error-msg" style={{ marginTop: 12 }}>{editError}</p>}
 
-          <div className="form-actions">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => {
-                setIsEditModalOpen(false)
-                setEditingOrder(null)
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={editingSubmitting}
-            >
-              {editingSubmitting ? 'Saving changes…' : 'Save Changes'}
-            </button>
+          <div className="form-actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            {canManage && editingOrder && (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => handleDeleteOrders([editingOrder.id], '#' + editingOrder.code)}
+                style={{
+                  color: '#dc2626',
+                  fontSize: 12,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 10px',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                Delete Order Record
+              </button>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setIsEditModalOpen(false)
+                  setEditingOrder(null)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={editingSubmitting}
+              >
+                {editingSubmitting ? 'Saving changes…' : 'Save Changes'}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>

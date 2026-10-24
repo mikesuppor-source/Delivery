@@ -78,6 +78,24 @@ export function DriverListClient({
     }
   }
 
+  async function handleDeleteDriver(driverId: string, driverName: string) {
+    if (!window.confirm(`Are you sure you want to permanently delete driver "${driverName}"? This will unassign this courier from all assigned orders and settlements.`)) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/drivers/${driverId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete driver')
+
+      setDrivers(prev => prev.filter(d => d.id !== driverId))
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error deleting driver')
+    }
+  }
+
   return (
     <>
       <div className="page-heading">
@@ -159,13 +177,26 @@ export function DriverListClient({
                     </span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <Link
-                      href={`/drivers/${driver.id}`}
-                      className="btn btn-secondary"
-                      style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none' }}
-                    >
-                      View Profile
-                    </Link>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Link
+                        href={`/drivers/${driver.id}`}
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none' }}
+                      >
+                        View Profile
+                      </Link>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => handleDeleteDriver(driver.id, driver.name)}
+                          style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
+                          title="Delete driver record"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -39,6 +39,76 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: fetchErr?.message || 'Failed to fetch orders' }, { status: 500 })
   }
 
+  // ─── Bulk Deletion ────────────────────────────────────────────────────────
+  if (action === 'delete') {
+    const validIds = orders.map(o => o.id)
+
+    // Reverse financial balances for delivered/returned orders
+    for (const ord of orders) {
+      if (ord.shop_id && (ord.status === 'delivered' || ord.status === 'returned')) {
+        const net = Number(ord.shop_balance_usd) || 0
+        if (net !== 0) {
+          const { data: shp } = await serviceClient
+            .from('shops')
+            .select('balance_usd')
+            .eq('id', ord.shop_id)
+            .single()
+          if (shp) {
+            await serviceClient
+              .from('shops')
+              .update({ balance_usd: Number(shp.balance_usd) - net })
+              .eq('id', ord.shop_id)
+          }
+        }
+      }
+
+      if (ord.driver_id && ord.status === 'delivered') {
+        const { data: drv } = await serviceClient
+          .from('drivers')
+          .select('cash_held_usd, pay_owed_usd')
+          .eq('id', ord.driver_id)
+          .single()
+        if (drv) {
+          await serviceClient
+            .from('drivers')
+            .update({
+              cash_held_usd: Math.max(0, Number(drv.cash_held_usd) - (Number(ord.collection_usd) || 0)),
+              pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) - (Number(ord.driver_pay_usd) || 0)),
+            })
+            .eq('id', ord.driver_id)
+        }
+      }
+    }
+
+    // Unlink settlements
+    await serviceClient
+      .from('settlements')
+      .update({ order_id: null })
+      .in('order_id', validIds)
+
+    // Delete orders
+    const { error: deleteErr } = await serviceClient
+      .from('orders')
+      .delete()
+      .in('id', validIds)
+      .eq('workspace_id', workspaceId)
+
+    if (deleteErr) {
+      return NextResponse.json({ error: deleteErr.message }, { status: 500 })
+    }
+
+    await serviceClient.from('audit_log').insert({
+      workspace_id: workspaceId,
+      actor_id: user.id,
+      actor_email: user.email,
+      action: 'orders.bulk_deleted',
+      entity_type: 'orders',
+      diff: { count: validIds.length, codes: orders.map(o => o.code) },
+    })
+
+    return NextResponse.json({ success: true, count: validIds.length, deletedIds: validIds })
+  }
+
   const updatedOrders = []
 
   for (const order of orders) {

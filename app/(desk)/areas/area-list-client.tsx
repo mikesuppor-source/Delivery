@@ -58,6 +58,26 @@ export function AreaListClient({ areas: initialAreas, workspaceId, userRole }: A
     }
   }
 
+  async function handleDeleteArea(areaId: string, areaName: string) {
+    if (!window.confirm(`Are you sure you want to permanently delete area "${areaName}"? Existing orders will keep their records with area unlinked.`)) {
+      return
+    }
+
+    try {
+      const res = await fetch('/api/areas', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, areaId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete delivery area')
+
+      setAreas(prev => prev.filter(a => a.id !== areaId))
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error deleting delivery area')
+    }
+  }
+
   return (
     <>
       <div className="page-heading">
@@ -84,6 +104,7 @@ export function AreaListClient({ areas: initialAreas, workspaceId, userRole }: A
                 <th>Area Name / Zone</th>
                 <th>Standard Delivery Fee</th>
                 <th>Status</th>
+                {canEdit && <th style={{ textAlign: 'right' }}>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -96,6 +117,19 @@ export function AreaListClient({ areas: initialAreas, workspaceId, userRole }: A
                       {area.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
+                  {canEdit && (
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => handleDeleteArea(area.id, area.name)}
+                        style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
+                        title="Delete delivery area"
+                      >
+                        🗑️ Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

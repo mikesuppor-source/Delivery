@@ -284,3 +284,74 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 })
 }
+
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const serviceClient = createServiceClient()
+
+  // Find shop connected to this user
+  const shop = await getShopForUser(serviceClient, user)
+  if (!shop) {
+    return NextResponse.json({ error: 'No merchant shop associated with this login.' }, { status: 403 })
+  }
+
+  const body = await req.json()
+  const orderId = body.orderId as string | undefined
+  const orderIds = (body.orderIds as string[] | undefined) || (orderId ? [orderId] : [])
+
+  if (orderIds.length === 0) {
+    return NextResponse.json({ error: 'No order IDs provided for deletion.' }, { status: 400 })
+  }
+
+  // Find matching orders that strictly belong to this merchant shop
+  const { data: matchingOrders, error: findErr } = await serviceClient
+    .from('orders')
+    .select('id, code, status, shop_balance_usd')
+    .in('id', orderIds)
+    .eq('shop_id', shop.id)
+
+  if (findErr || !matchingOrders || matchingOrders.length === 0) {
+    return NextResponse.json({ error: 'No matching orders found for deletion.' }, { status: 404 })
+  }
+
+  const validIds = matchingOrders.map(o => o.id)
+
+  // Unlink any foreign key references from settlements before deleting orders
+  await serviceClient
+    .from('settlements')
+    .update({ order_id: null })
+    .in('order_id', validIds)
+
+  // Permanently delete the orders
+  const { error: deleteErr } = await serviceClient
+    .from('orders')
+    .delete()
+    .in('id', validIds)
+    .eq('shop_id', shop.id)
+
+  if (deleteErr) {
+    return NextResponse.json({ error: deleteErr.message }, { status: 500 })
+  }
+
+  // Log to audit log
+  await serviceClient.from('audit_log').insert({
+    workspace_id: shop.workspace_id,
+    actor_id: user.id,
+    actor_email: user.email,
+    action: 'orders.merchant_orders_deleted',
+    entity_type: 'orders',
+    diff: {
+      deletedCount: validIds.length,
+      codes: matchingOrders.map(o => o.code),
+    },
+  })
+
+  return NextResponse.json({
+    success: true,
+    message: `Successfully deleted ${validIds.length} order ${validIds.length === 1 ? 'record' : 'records'}.`,
+    deletedIds: validIds,
+  })
+}

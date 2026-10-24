@@ -107,6 +107,42 @@ export function PortalClient({
     }
   }
 
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  async function handleDeleteOrders(targetIds: string[], codesLabel?: string) {
+    if (targetIds.length === 0) return
+    const msg = targetIds.length === 1
+      ? `Are you sure you want to permanently delete order ${codesLabel || ''}? This action cannot be undone.`
+      : `Are you sure you want to permanently delete these ${targetIds.length} orders? This action cannot be undone.`
+
+    if (!window.confirm(msg)) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const res = await fetch('/api/portal/orders', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderIds: targetIds }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete orders')
+      }
+
+      setOrders(prev => prev.filter(o => !targetIds.includes(o.id)))
+      setSelectedOrderIds(prev => prev.filter(id => !targetIds.includes(id)))
+      if (inspectingOrder && targetIds.includes(inspectingOrder.id)) {
+        setInspectingOrder(null)
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error deleting orders')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   // Derived selected area & fee
   const selectedArea = areas.find(a => a.id === areaId) || areas[0]
   const deliveryFeeUSD = selectedArea ? Number(selectedArea.fee_usd) : 3.00
@@ -519,6 +555,17 @@ export function PortalClient({
               >
                 🖨️ Print {selectedOrderIds.length} Waybills Batch
               </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => handleDeleteOrders(selectedOrderIds)}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 12, color: '#dc2626', border: '1px solid #fecaca', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                title="Permanently delete selected order records"
+              >
+                <span>🗑️</span>
+                <span>{isDeleting ? 'Deleting…' : `Delete (${selectedOrderIds.length})`}</span>
+              </button>
             </div>
           </div>
         )}
@@ -736,6 +783,17 @@ export function PortalClient({
                           >
                             Track ↗
                           </Link>
+
+                          <button
+                            type="button"
+                            disabled={isDeleting}
+                            onClick={() => handleDeleteOrders([order.id], `#${order.code}`)}
+                            className="btn btn-ghost btn-sm"
+                            style={{ padding: '4px 7px', fontSize: 11, color: '#dc2626' }}
+                            title={`Delete order #${order.code}`}
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1383,19 +1441,31 @@ export function PortalClient({
 
             {/* Modal Actions */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
-              {inspectingOrder.status === 'pending' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {inspectingOrder.status === 'pending' && (
+                  <button
+                    type="button"
+                    disabled={isCancelling}
+                    onClick={() => handleCancelOrder(inspectingOrder.id)}
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: '#d97706', border: '1px solid #fde68a', fontSize: 12 }}
+                  >
+                    {isCancelling ? 'Cancelling…' : '✕ Cancel Pickup'}
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  disabled={isCancelling}
-                  onClick={() => handleCancelOrder(inspectingOrder.id)}
+                  disabled={isDeleting}
+                  onClick={() => handleDeleteOrders([inspectingOrder.id], `#${inspectingOrder.code}`)}
                   className="btn btn-ghost btn-sm"
-                  style={{ color: '#dc2626', border: '1px solid #fecaca', fontSize: 12 }}
+                  style={{ color: '#dc2626', border: '1px solid #fecaca', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  title="Permanently delete this order record"
                 >
-                  {isCancelling ? 'Cancelling…' : '✕ Cancel Pending Order'}
+                  <span>🗑️</span>
+                  <span>{isDeleting ? 'Deleting…' : 'Delete Record'}</span>
                 </button>
-              ) : (
-                <div />
-              )}
+              </div>
 
               <div style={{ display: 'flex', gap: 8 }}>
                 <Link

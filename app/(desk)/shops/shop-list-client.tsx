@@ -62,6 +62,24 @@ export function ShopListClient({ shops: initialShops, workspaceId, userRole }: S
     }
   }
 
+  async function handleDeleteShop(shopId: string, shopName: string) {
+    if (!window.confirm(`Are you sure you want to permanently delete shop "${shopName}"? This will detach its orders and settlements.`)) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/shops/${shopId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete shop')
+
+      setShops(prev => prev.filter(s => s.id !== shopId))
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error deleting shop')
+    }
+  }
+
   return (
     <>
       <div className="page-heading">
@@ -139,13 +157,26 @@ export function ShopListClient({ shops: initialShops, workspaceId, userRole }: S
                     </span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <Link
-                      href={`/shops/${shop.id}`}
-                      className="btn btn-secondary"
-                      style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none' }}
-                    >
-                      View Profile
-                    </Link>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Link
+                        href={`/shops/${shop.id}`}
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none' }}
+                      >
+                        View Profile
+                      </Link>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => handleDeleteShop(shop.id, shop.name)}
+                          style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
+                          title="Delete shop record"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
