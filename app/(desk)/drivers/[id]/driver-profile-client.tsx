@@ -449,6 +449,46 @@ export function DriverProfileClient({
 
           {/* Action buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Dedicated Mobile Run Sheet link */}
+            <Link
+              href={`/driver/${driver.id}`}
+              target="_blank"
+              className="btn btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="Open driver's mobile daily run sheet"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                <line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+              Mobile Run Sheet
+            </Link>
+
+            {driver.phone && (
+              <a
+                href={`https://wa.me/${driver.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                  `Marhaba ${driver.name}, here is your active Cedar Delivery Daily Run Sheet:\n\n${
+                    typeof window !== 'undefined' ? window.location.origin : ''
+                  }/driver/${driver.id}\n\nPlease update order statuses live as you deliver.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: '#10b981',
+                  borderColor: '#10b981',
+                  color: '#fff',
+                }}
+                title="Send daily run sheet link to driver via WhatsApp"
+              >
+                <WhatsAppIcon size={15} />
+                Send Run Sheet
+              </a>
+            )}
+
             {canManage && (
               <>
                 <button
