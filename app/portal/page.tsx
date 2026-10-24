@@ -2,10 +2,11 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PortalClient } from './portal-client'
 import { PortalHeader } from '@/components/portal-header'
+import { getShopForUser } from '@/lib/shop-auth'
 
 export const metadata = {
-  title: 'Merchant Order Portfolio — Cedar Delivery',
-  description: 'Manage store deliveries, place customer orders, print barcode waybills, and track client payouts.',
+  title: 'Merchant & Client Order Portfolio — Cedar Delivery',
+  description: 'Manage store deliveries, place customer orders, print barcode waybills, and track payouts.',
 }
 
 export default async function MerchantPortalPage() {
@@ -18,26 +19,33 @@ export default async function MerchantPortalPage() {
 
   const serviceClient = createServiceClient()
 
-  // Find shop connected to this user
-  let { data: shop } = await serviceClient
-    .from('shops')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  // Find shop connected to this user via multi-level fallback
+  let shop = await getShopForUser(serviceClient, user)
 
-  // Fallback for desk owners or managers previewing the portal
+  // Fallback for desk owners or managers testing the portal
   if (!shop) {
-    const { data: anyShop } = await serviceClient
-      .from('shops')
-      .select('*')
-      .limit(1)
-      .single()
-    shop = anyShop
+    const { data: member } = await serviceClient
+      .from('workspace_members')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (member && (member.role === 'owner' || member.role === 'manager')) {
+      const { data: anyShop } = await serviceClient
+        .from('shops')
+        .select('*')
+        .limit(1)
+        .maybeSingle()
+      shop = anyShop
+    }
   }
 
   if (!shop) {
     redirect('/portal/signup')
   }
+
+  const shopPrefix = shop.prefix || user.user_metadata?.prefix || 'CD'
+  const effectiveShop = { ...shop, prefix: shopPrefix }
 
   // Fetch shop orders
   const { data: orders } = await serviceClient
@@ -49,14 +57,14 @@ export default async function MerchantPortalPage() {
       area:area_id(id, name, fee_usd),
       driver:driver_id(id, name, phone)
     `)
-    .eq('shop_id', shop.id)
+    .eq('shop_id', effectiveShop.id)
     .order('created_at', { ascending: false })
 
   // Fetch delivery areas
   const { data: areas } = await serviceClient
     .from('delivery_areas')
     .select('id, name, fee_usd')
-    .eq('workspace_id', shop.workspace_id)
+    .eq('workspace_id', effectiveShop.workspace_id)
     .eq('active', true)
     .order('name')
 
@@ -64,7 +72,7 @@ export default async function MerchantPortalPage() {
   const { data: ws } = await serviceClient
     .from('workspaces')
     .select('name, usd_to_lbp')
-    .eq('id', shop.workspace_id)
+    .eq('id', effectiveShop.workspace_id)
     .single()
 
   const mappedOrders = ((orders || []) as any[]).map(o => ({
@@ -76,13 +84,13 @@ export default async function MerchantPortalPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       <PortalHeader
-        shopName={shop.name}
-        shopPrefix={shop.prefix || 'CD'}
+        shopName={effectiveShop.name}
+        shopPrefix={effectiveShop.prefix || 'CD'}
         userEmail={user.email || ''}
       />
       <main style={{ flex: 1, padding: '24px 20px', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         <PortalClient
-          shop={shop}
+          shop={effectiveShop}
           initialOrders={mappedOrders}
           areas={areas || []}
           rate={Number(ws?.usd_to_lbp) || 89500}

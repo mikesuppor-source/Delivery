@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateUniqueOrderCode, formatOrderCode, isOrderCodeUnique } from '@/lib/order-codes'
 import { isValidLebanesePhone, formatLebanesePhone } from '@/lib/phone'
+import { getShopForUser } from '@/lib/shop-auth'
 
 export async function GET() {
   const supabase = await createClient()
@@ -11,11 +12,7 @@ export async function GET() {
   const serviceClient = createServiceClient()
 
   // Find shop connected to this merchant user
-  const { data: shop } = await serviceClient
-    .from('shops')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  const shop = await getShopForUser(serviceClient, user)
 
   if (!shop) {
     return NextResponse.json({ error: 'No merchant shop profile found for this account.' }, { status: 404 })
@@ -70,11 +67,7 @@ export async function POST(req: NextRequest) {
   const serviceClient = createServiceClient()
 
   // Find shop connected to this user
-  const { data: shop } = await serviceClient
-    .from('shops')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  const shop = await getShopForUser(serviceClient, user)
 
   if (!shop) {
     return NextResponse.json({ error: 'No merchant shop associated with this login.' }, { status: 403 })
@@ -143,7 +136,8 @@ export async function POST(req: NextRequest) {
     finalCode = candidate
   } else {
     // Auto-generate unique code using shop prefix if available (e.g. ZARA-XXXXXX or CD-XXXXXX)
-    finalCode = await generateUniqueOrderCode(serviceClient, shop.prefix || 'CD')
+    const effectivePrefix = shop.prefix || user.user_metadata?.prefix || 'CD'
+    finalCode = await generateUniqueOrderCode(serviceClient, effectivePrefix)
   }
 
   const codAmount = Math.max(0, Number(collectionUsd) || 0)
