@@ -278,24 +278,27 @@ tr:hover td { background: var(--bg); }
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   padding: 3px 9px;
   border-radius: 99px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .3px;
   text-transform: uppercase;
+  border: 1px solid transparent;
+  line-height: 1.3;
 }
-.badge-delivered  { background: #d4edda; color: #24634f; }
-.badge-pending    { background: #fff3cd; color: #856404; }
-.badge-assigned   { background: #cce5ff; color: #004085; }
-.badge-picked_up  { background: #d1ecf1; color: #0c5460; }
-.badge-failed     { background: #f8d7da; color: #721c24; }
-.badge-returned   { background: #e2e3e5; color: #383d41; }
-.badge-owner      { background: #24634f; color: #fff; }
-.badge-manager    { background: var(--brand-light); color: var(--brand); }
-.badge-driver     { background: #e8f4fd; color: #1565c0; }
-.badge-readonly   { background: #f0f0f0; color: #666; }
+.badge-delivered  { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+.badge-pending    { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.badge-assigned   { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+.badge-dispatched { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+.badge-picked_up  { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
+.badge-failed     { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+.badge-returned   { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+.badge-owner      { background: var(--brand-light); color: var(--brand); border-color: var(--brand); }
+.badge-manager    { background: var(--brand-light); color: var(--brand); border-color: var(--line); }
+.badge-driver     { background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
+.badge-readonly   { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
 
 /* ─── Buttons ───────────────────────────────────────────────────────── */
 .btn {
@@ -969,15 +972,16 @@ tr:hover td { background: var(--bg); }
 
 /* ─── Print Media Styles ─────────────────────────────────────────────── */
 @media print {
+  @page {
+    size: auto;
+    margin: 6mm 8mm;
+  }
   aside, .topbar, .print-controls, nav, .page-heading, .stats, .panel-title,
   .btn, .toolbar, .back-link, header, .no-print {
     display: none !important;
   }
-  .no-print {
-    display: none !important;
-  }
   main {
-    margin-left: 0 !important;
+    margin: 0 !important;
     width: 100% !important;
     padding: 0 !important;
   }
@@ -985,8 +989,10 @@ tr:hover td { background: var(--bg); }
     padding: 0 !important;
   }
   body {
-    background: #fff !important;
+    background: #ffffff !important;
     color: #111827 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .panel {
     border: none !important;
@@ -1002,10 +1008,17 @@ tr:hover td { background: var(--bg); }
   }
   .printable-receipt-area {
     box-shadow: none !important;
-    border: 1.5px solid #111827 !important;
-    padding: 16px !important;
+    border: 2px solid #111827 !important;
+    padding: 16px 20px !important;
     max-width: 100% !important;
     margin: 0 auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .bulk-waybill-item {
+    page-break-after: always !important;
+    break-after: page !important;
+    margin-bottom: 0 !important;
   }
 }
 

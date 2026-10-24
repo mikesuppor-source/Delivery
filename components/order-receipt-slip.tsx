@@ -253,49 +253,85 @@ export function OrderReceiptSlip({
         style={{
           background: '#ffffff',
           color: '#111827',
-          padding: '28px 30px',
+          padding: '24px 26px',
           borderRadius: 8,
-          border: '2px dashed #9ca3af',
+          border: '2px solid #111827',
           maxWidth: 620,
           margin: '0 auto',
           fontFamily: 'system-ui, -apple-system, sans-serif',
           boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
         }}
       >
-        {/* Header Branding */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #111827', paddingBottom: 14 }}>
+        {/* Header Branding & Order Status */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #111827', paddingBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Image src="/logo.png" alt="Cedar Logo" width={44} height={44} style={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
+            <Image src="/logo.png" alt="Cedar Logo" width={42} height={42} style={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
             <div>
-              <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.3px', textTransform: 'uppercase', color: '#15803d' }}>
+              <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.3px', textTransform: 'uppercase', color: '#15803d' }}>
                 {workspaceName}
               </div>
-              <small style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#4b5563', display: 'block' }}>
+              <small style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#4b5563', display: 'block' }}>
                 Official Delivery Waybill & COD Clearance Slip
               </small>
             </div>
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <span
+            <div
               style={{
-                display: 'inline-block',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
                 fontSize: 11,
-                fontWeight: 800,
+                fontWeight: 900,
                 textTransform: 'uppercase',
-                padding: '3px 8px',
-                borderRadius: 4,
-                background: isReturn ? '#fee2e2' : '#dcfce7',
-                color: isReturn ? '#991b1b' : '#166534',
-                border: isReturn ? '1px solid #f87171' : '1px solid #86efac',
+                padding: '4px 10px',
+                borderRadius: 6,
+                background: isReturn ? '#fef2f2' : order.status === 'delivered' ? '#ecfdf5' : order.status === 'picked_up' ? '#eef2ff' : '#fef3c7',
+                color: isReturn ? '#991b1b' : order.status === 'delivered' ? '#065f46' : order.status === 'picked_up' ? '#3730a3' : '#92400e',
+                border: `1.5px solid ${isReturn ? '#f87171' : order.status === 'delivered' ? '#86efac' : order.status === 'picked_up' ? '#c7d2fe' : '#fde68a'}`,
+                letterSpacing: '0.4px',
               }}
             >
-              {isReturn ? '🔄 Retail Refund ($2 Fee)' : ORDER_STATUS_LABELS[order.status] || order.status}
-            </span>
-            <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
+              <span>{order.status === 'delivered' ? '✓' : order.status === 'picked_up' ? '🛵' : isReturn ? '🔄' : '📦'}</span>
+              <span>STATUS: {isReturn ? 'RETAIL REFUND ($2)' : ORDER_STATUS_LABELS[order.status] || order.status}</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#4b5563', marginTop: 3 }}>
               {formatDate(order.created_at)}
             </div>
           </div>
+        </div>
+
+        {/* Visual Order Status Timeline Tracker */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#f9fafb',
+            border: '1px solid #e5e7eb',
+            borderRadius: 6,
+            padding: '6px 14px',
+            margin: '12px 0',
+            fontSize: 10,
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            letterSpacing: '0.3px',
+          }}
+        >
+          <span style={{ color: '#059669' }}>✓ 1. Registered</span>
+          <span style={{ color: '#cbd5e1' }}>➔</span>
+          <span style={{ color: order.status !== 'pending' ? '#059669' : '#9ca3af' }}>
+            {order.status !== 'pending' ? '✓' : '○'} 2. Courier Assigned
+          </span>
+          <span style={{ color: '#cbd5e1' }}>➔</span>
+          <span style={{ color: (order.status === 'picked_up' || order.status === 'delivered') ? '#059669' : '#9ca3af' }}>
+            {(order.status === 'picked_up' || order.status === 'delivered') ? '✓' : '○'} 3. Out for Delivery
+          </span>
+          <span style={{ color: '#cbd5e1' }}>➔</span>
+          <span style={{ color: order.status === 'delivered' ? '#059669' : '#9ca3af' }}>
+            {order.status === 'delivered' ? '✓' : '○'} 4. Delivered
+          </span>
         </div>
 
         {/* Barcode & QR Code Section */}

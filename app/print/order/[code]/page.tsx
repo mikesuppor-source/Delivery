@@ -51,20 +51,37 @@ export default async function PrintOrderPage({ params, searchParams }: PrintOrde
   return (
     <div style={{ minHeight: '100vh', background: '#f3f4f6', padding: '24px 16px' }}>
       <div className="no-print" style={{ maxWidth: 620, margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link
-          href="/orders"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--brand)',
-            textDecoration: 'none',
-          }}
-        >
-          ← Back to Orders Desk
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <Link
+            href="/portal"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--brand)',
+              textDecoration: 'none',
+            }}
+          >
+            ← Store Portal
+          </Link>
+          <span style={{ color: 'var(--line)' }}>|</span>
+          <Link
+            href="/orders"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--muted)',
+              textDecoration: 'none',
+            }}
+          >
+            Orders Desk
+          </Link>
+        </div>
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>
           Order Waybill: <strong>#{order.code}</strong>
         </span>

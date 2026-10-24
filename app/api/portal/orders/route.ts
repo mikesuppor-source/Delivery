@@ -193,3 +193,94 @@ export async function POST(req: NextRequest) {
     order,
   })
 }
+
+export async function PATCH(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const serviceClient = createServiceClient()
+
+  // Find shop connected to this user
+  const shop = await getShopForUser(serviceClient, user)
+  if (!shop) {
+    return NextResponse.json({ error: 'No merchant shop associated with this login.' }, { status: 403 })
+  }
+
+  const body = await req.json()
+  const { orderId, action, reason } = body
+
+  if (!orderId) {
+    return NextResponse.json({ error: 'Order ID is required' }, { status: 400 })
+  }
+
+  // Fetch the order and ensure it belongs to this shop
+  const { data: order, error: findErr } = await serviceClient
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .eq('shop_id', shop.id)
+    .single()
+
+  if (findErr || !order) {
+    return NextResponse.json({ error: 'Order not found or does not belong to your store' }, { status: 404 })
+  }
+
+  if (action === 'cancel') {
+    if (order.status !== 'pending') {
+      return NextResponse.json({
+        error: `Order cannot be cancelled because it is already "${order.status}". Contact courier dispatch for assistance.`,
+      }, { status: 400 })
+    }
+
+    const cancelNote = reason
+      ? `[Cancelled by Merchant: ${reason}]`
+      : '[Cancelled by Merchant before dispatch]'
+    const updatedNotes = order.notes
+      ? `${order.notes}\n${cancelNote}`
+      : cancelNote
+
+    const { data: updatedOrder, error: updateErr } = await serviceClient
+      .from('orders')
+      .update({
+        status: 'returned',
+        collection_usd: 0,
+        delivery_fee_usd: 0,
+        driver_pay_usd: 0,
+        shop_balance_usd: 0,
+        notes: updatedNotes,
+      })
+      .eq('id', orderId)
+      .select(`
+        id, code, status, collection_usd, delivery_fee_usd, shop_balance_usd,
+        usd_to_lbp_rate, created_at, notes,
+        recipient_name, recipient_phone, recipient_address,
+        shop:shop_id(name, phone),
+        area:area_id(id, name, fee_usd),
+        driver:driver_id(id, name, phone)
+      `)
+      .single()
+
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    }
+
+    await serviceClient.from('audit_log').insert({
+      workspace_id: shop.workspace_id,
+      actor_id: user.id,
+      actor_email: user.email,
+      action: 'orders.merchant_order_cancelled',
+      entity_type: 'orders',
+      entity_id: orderId,
+      diff: { code: order.code, reason: cancelNote },
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: `Order #${order.code} has been cancelled.`,
+      order: updatedOrder,
+    })
+  }
+
+  return NextResponse.json({ error: 'Unsupported action' }, { status: 400 })
+}

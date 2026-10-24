@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { OrderReceiptSlip } from '@/components/order-receipt-slip'
+import { PrintButton } from '@/components/print-button'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
@@ -81,7 +82,7 @@ export default async function PrintBulkPage({ searchParams }: PrintBulkPageProps
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <Link
-            href="/orders"
+            href="/portal"
             style={{
               fontSize: 13,
               fontWeight: 600,
@@ -92,31 +93,17 @@ export default async function PrintBulkPage({ searchParams }: PrintBulkPageProps
               gap: 4,
             }}
           >
-            ← Back to Orders Desk
+            ← Back
           </Link>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
             Batch Printing: <strong>{rawOrders.length} Waybills</strong>
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={undefined}
-          className="btn btn-primary"
-          style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-        >
-          <a
-            href="javascript:window.print()"
-            style={{ color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
-            Print All ({rawOrders.length}) Waybills
-          </a>
-        </button>
+        <PrintButton
+          label={`Print All (${rawOrders.length}) Waybills`}
+          style={{ fontSize: 13 }}
+        />
       </div>
 
       <style>{`
