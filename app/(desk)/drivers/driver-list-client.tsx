@@ -7,6 +7,7 @@ import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
+import { TrashIcon } from '@/components/icons'
 
 interface Driver {
   id: string
@@ -193,7 +194,7 @@ export function DriverListClient({
                           style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
                           title="Delete driver record"
                         >
-                          🗑️
+                          <TrashIcon size={13} color="#dc2626" />
                         </button>
                       )}
                     </div>

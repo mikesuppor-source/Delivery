@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isValidLebanesePhone } from '@/lib/phone'
+import { StoreIcon, UserIcon } from '@/components/icons'
 
 export default function PortalSignupPage() {
   const router = useRouter()
@@ -167,7 +168,7 @@ export default function PortalSignupPage() {
               transition: 'all 0.15s ease',
             }}
           >
-            <span>🏢</span>
+            <StoreIcon size={14} />
             <span>Store / Business</span>
           </button>
           <button
@@ -190,7 +191,7 @@ export default function PortalSignupPage() {
               transition: 'all 0.15s ease',
             }}
           >
-            <span>👤</span>
+            <UserIcon size={14} />
             <span>Personal Client</span>
           </button>
         </div>
@@ -267,7 +268,7 @@ export default function PortalSignupPage() {
                 </label>
                 {isPhoneValid !== null && (
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: isPhoneValid ? '#059669' : '#dc2626' }}>
-                    {isPhoneValid ? '✓ Valid' : '⚠️ Invalid'}
+                    {isPhoneValid ? 'Valid format' : 'Invalid format'}
                   </span>
                 )}
               </div>

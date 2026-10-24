@@ -11,6 +11,7 @@ import { OrderReceiptSlip } from '@/components/order-receipt-slip'
 import { BarcodeScannerModal } from '@/components/barcode-scanner-modal'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
+import { TrashIcon, ScanIcon } from '@/components/icons'
 
 interface Order {
   id: string
@@ -500,7 +501,7 @@ export function OrderListClient({
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               title="Open Barcode & QR Code Warehouse Scanner"
             >
-              <span>⚡</span>
+              <ScanIcon size={14} />
               <span>Scan Barcode / QR</span>
             </button>
           )}
@@ -573,7 +574,7 @@ export function OrderListClient({
               { id: 'last_month', label: 'Last Month' },
               { id: 'this_year', label: 'This Year' },
               { id: 'last_year', label: 'Last Year' },
-              { id: 'custom', label: 'Custom Range ⚙️' },
+              { id: 'custom', label: 'Custom Range' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -614,10 +615,10 @@ export function OrderListClient({
                 cursor: 'pointer',
               }}
             >
-              <option value="newest">🕒 Newest Orders First</option>
-              <option value="oldest">⏳ Oldest Orders First</option>
-              <option value="collection_high">💵 Highest COD Collection ($)</option>
-              <option value="fee_high">⚡ Highest Delivery Fee ($)</option>
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="collection_high">Highest COD Collection ($)</option>
+              <option value="fee_high">Highest Delivery Fee ($)</option>
             </select>
           </div>
         </div>
@@ -840,7 +841,7 @@ export function OrderListClient({
                               width: 'fit-content',
                             }}
                           >
-                            ⚠️ Needs Driver
+                            Needs Courier
                           </span>
 
                           {canManage && (
@@ -984,7 +985,7 @@ export function OrderListClient({
                             style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
                             title="Delete order record"
                           >
-                            🗑️
+                            <TrashIcon size={13} color="#dc2626" />
                           </button>
                         )}
                       </div>
@@ -1207,7 +1208,7 @@ export function OrderListClient({
           setIsDriverRequiredModalOpen(false)
           setDriverRequiredOrder(null)
         }}
-        title="⚠️ Driver Assignment Required"
+        title="Driver Assignment Required"
       >
         <form onSubmit={handleConfirmDriverAndStatus}>
           <div style={{ padding: '4px 0 16px' }}>
@@ -1279,7 +1280,7 @@ export function OrderListClient({
             <div className="field full" style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--line)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <label style={{ margin: 0, color: 'var(--brand)', fontWeight: 700, fontSize: 13 }}>
-                  🏷️ Tracking Code / Waybill #
+                  Tracking Code / Waybill #
                 </label>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
@@ -1293,7 +1294,7 @@ export function OrderListClient({
                     style={{ fontSize: 11, padding: '2px 8px' }}
                     title="Generate code with shop prefix"
                   >
-                    🏷️ Shop Prefix
+                    Shop Prefix
                   </button>
                   <button
                     type="button"
@@ -1305,7 +1306,7 @@ export function OrderListClient({
                     style={{ fontSize: 11, padding: '2px 8px' }}
                     title="Generate standard Cedar CD-XXXX code"
                   >
-                    🎲 Random CD-XXXX
+                    Auto CD-XXXX
                   </button>
                 </div>
               </div>
@@ -1377,7 +1378,7 @@ export function OrderListClient({
                   color: '#0369a1',
                 }}
               >
-                🔄 <strong>Retail Refund / Return:</strong> Delivery fee is automatically set to <strong>$2.00</strong> (charged as a payable delivery service to merchant), customer collection is set to <strong>$0.00</strong>, and driver pay is set to <strong>$1.00</strong>.
+                <strong>Retail Refund / Return:</strong> Delivery fee is automatically set to <strong>$2.00</strong> (charged as a payable delivery service to merchant), customer collection is set to <strong>$0.00</strong>, and driver pay is set to <strong>$1.00</strong>.
               </div>
             )}
 
@@ -1526,7 +1527,7 @@ export function OrderListClient({
             {/* Quick Preset for Retail Return / Refund */}
             <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }}>
               <div>
-                <strong style={{ fontSize: 12, display: 'block' }}>🔄 Retail Return / Refund Pickup?</strong>
+                <strong style={{ fontSize: 12, display: 'block' }}>Retail Return / Refund Pickup?</strong>
                 <small style={{ color: 'var(--muted)', fontSize: 11 }}>Automatically set fee to $2.00, customer COD to $0.00, and courier pay to $1.00</small>
               </div>
               <button
@@ -1548,7 +1549,7 @@ export function OrderListClient({
             <div className="field full" style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--line)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <label style={{ margin: 0, fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
-                  🏷️ Custom Tracking Code / Waybill # <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
+                  Custom Tracking Code / Waybill # <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
                 </label>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
@@ -1563,7 +1564,7 @@ export function OrderListClient({
                     style={{ fontSize: 11, padding: '2px 8px' }}
                     title="Generate code with shop prefix (e.g. ZARA-101)"
                   >
-                    🏷️ Shop Prefix
+                    Shop Prefix
                   </button>
                   <button
                     type="button"
@@ -1575,7 +1576,7 @@ export function OrderListClient({
                     style={{ fontSize: 11, padding: '2px 8px' }}
                     title="Generate standard Cedar CD-XXXX code"
                   >
-                    🎲 Random CD-XXXX
+                    Auto CD-XXXX
                   </button>
                   {customCode && (
                     <button
@@ -1617,7 +1618,7 @@ export function OrderListClient({
                 Assign Driver <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
               </label>
               <select value={driverId} onChange={e => setDriverId(e.target.value)}>
-                <option value="">⚠️ Unassigned (Dispatch later)</option>
+                <option value="">Unassigned (Dispatch later)</option>
                 {drivers.map(d => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}

@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import { formatLebanesePhone } from '@/lib/phone'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { PackageIcon } from '@/components/icons'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -187,7 +188,7 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
               className="track-card text-center"
               style={{ padding: '36px 20px', background: 'var(--surface)', borderRadius: 12 }}
             >
-              <div style={{ fontSize: 36, marginBottom: 12 }}>📦</div>
+              <PackageIcon size={36} color="var(--muted)" style={{ margin: '0 auto 12px' }} />
               <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>No Active Shipments Found</h3>
               <p style={{ color: 'var(--muted)', fontSize: 13, maxWidth: 420, margin: '0 auto 18px' }}>
                 We couldn&apos;t find any current packages registered for <strong>{searchedPhoneFormatted}</strong>.
@@ -256,11 +257,11 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span className={`badge badge-${ord.status}`} style={{ fontSize: 12, padding: '4px 10px' }}>
                           {ord.status === 'picked_up'
-                            ? '🛵 Out for Delivery'
+                            ? 'Out for Delivery'
                             : ord.status === 'assigned'
-                            ? '📋 Courier Assigned'
+                            ? 'Courier Assigned'
                             : ord.status === 'delivered'
-                            ? '✓ Delivered'
+                            ? 'Delivered'
                             : ord.status.replace('_', ' ')}
                         </span>
                       </div>

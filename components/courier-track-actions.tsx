@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { PackageIcon, CheckIcon, RefreshIcon, TruckIcon } from '@/components/icons'
 
 interface Driver {
   id: string
@@ -73,14 +74,14 @@ export function CourierTrackActions({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 16 }}>🛵</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <TruckIcon size={16} color="var(--brand)" />
           <span style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: 'var(--brand)', letterSpacing: '0.5px' }}>
             Courier QR Dispatch & Check-In
           </span>
         </div>
         <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-          {currentDriverName ? `Assigned to: ${currentDriverName}` : '⚠️ Unassigned Courier'}
+          {currentDriverName ? `Assigned to: ${currentDriverName}` : 'Unassigned Courier'}
         </span>
       </div>
 
@@ -115,7 +116,7 @@ export function CourierTrackActions({
           <option value="">Select courier…</option>
           {drivers.map(d => (
             <option key={d.id} value={d.id}>
-              🛵 {d.name}
+              {d.name}
             </option>
           ))}
         </select>
@@ -140,7 +141,7 @@ export function CourierTrackActions({
           className="btn btn-secondary btn-sm"
           style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
         >
-          <span>📦</span>
+          <PackageIcon size={13} />
           <span>Mark Picked Up from Shop</span>
         </button>
 
@@ -151,7 +152,7 @@ export function CourierTrackActions({
           className="btn btn-primary btn-sm"
           style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
         >
-          <span>✅</span>
+          <CheckIcon size={13} />
           <span>Mark Delivered (COD Collected)</span>
         </button>
 
@@ -160,9 +161,9 @@ export function CourierTrackActions({
           disabled={loading || currentStatus === 'returned'}
           onClick={() => handleAction('returned')}
           className="btn btn-ghost btn-sm"
-          style={{ fontSize: 12, color: '#dc2626' }}
+          style={{ fontSize: 12, color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: 6 }}
         >
-          <span>🔄</span>
+          <RefreshIcon size={13} />
           <span>Mark Returned</span>
         </button>
       </div>

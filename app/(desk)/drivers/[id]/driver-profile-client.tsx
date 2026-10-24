@@ -519,7 +519,7 @@ export function DriverProfileClient({
           {/* Preset Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginRight: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-              📅 Timeframe:
+              Timeframe:
             </span>
             {[
               { id: 'all', label: 'All Time' },
@@ -528,7 +528,7 @@ export function DriverProfileClient({
               { id: 'last_month', label: 'Last Month' },
               { id: 'this_year', label: 'This Year' },
               { id: 'last_year', label: 'Last Year' },
-              { id: 'custom', label: 'Custom Range ⚙️' },
+              { id: 'custom', label: 'Custom Range' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -569,11 +569,11 @@ export function DriverProfileClient({
                 cursor: 'pointer',
               }}
             >
-              <option value="newest">🕒 Newest Orders First</option>
-              <option value="oldest">⏳ Oldest Orders First</option>
-              <option value="pay_high">💰 Highest Courier Pay ($)</option>
-              <option value="profit_high">📈 Highest Company Profit ($)</option>
-              <option value="collection_high">💵 Highest COD Collection ($)</option>
+              <option value="newest">Newest Orders First</option>
+              <option value="oldest">Oldest Orders First</option>
+              <option value="pay_high">Highest Courier Pay ($)</option>
+              <option value="profit_high">Highest Company Profit ($)</option>
+              <option value="collection_high">Highest COD Collection ($)</option>
             </select>
           </div>
         </div>

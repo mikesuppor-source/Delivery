@@ -181,7 +181,7 @@ export function OrderReceiptSlip({
               borderColor: qrMode === 'full_text' ? 'var(--brand)' : 'var(--line)',
             }}
           >
-            📋 Full Text Receipt Details
+            Full Text Receipt Details
           </button>
         </div>
 
@@ -192,7 +192,7 @@ export function OrderReceiptSlip({
             onClick={handleCopyTrackingUrl}
             style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            {copied ? '✓ Copied Link' : '🔗 Copy Tracking Link'}
+            {copied ? 'Copied Link' : 'Copy Tracking Link'}
           </button>
 
           {order.recipient_phone && (
@@ -293,7 +293,6 @@ export function OrderReceiptSlip({
                 letterSpacing: '0.4px',
               }}
             >
-              <span>{order.status === 'delivered' ? '✓' : order.status === 'picked_up' ? '🛵' : isReturn ? '🔄' : '📦'}</span>
               <span>STATUS: {isReturn ? 'RETAIL REFUND ($2)' : ORDER_STATUS_LABELS[order.status] || order.status}</span>
             </div>
             <div style={{ fontSize: 11, color: '#4b5563', marginTop: 3 }}>
@@ -405,11 +404,11 @@ export function OrderReceiptSlip({
             </div>
             {order.recipient_phone && (
               <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginTop: 2 }}>
-                📞 {order.recipient_phone}
+                {order.recipient_phone}
               </div>
             )}
             <div style={{ fontSize: 11.5, color: '#374151', marginTop: 3, lineHeight: 1.4 }}>
-              📍 {order.recipient_address || 'Address provided on file'}
+              {order.recipient_address || 'Address provided on file'}
             </div>
             {order.area && (
               <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', marginTop: 3 }}>
@@ -441,7 +440,7 @@ export function OrderReceiptSlip({
                   display: 'block',
                 }}
               >
-                {isReturn ? 'Retail Return (No COD to Collect)' : '💵 Total Cash to Collect on Delivery (COD)'}
+                {isReturn ? 'Retail Return (No COD to Collect)' : 'Total Cash to Collect on Delivery (COD)'}
               </span>
               <div style={{ fontSize: 28, fontWeight: 900, color: isReturn ? '#c2410c' : '#15803d', letterSpacing: '-0.5px', marginTop: 2 }}>
                 {formatUSD(codUSD)}

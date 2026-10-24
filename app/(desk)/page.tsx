@@ -119,7 +119,7 @@ export default async function OverviewPage() {
         {canManage && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Link href="/orders" className="btn btn-secondary">
-              ⚡ Orders Desk & Scanner
+              Orders Desk & Scanner
             </Link>
             <Link href="/orders?new=1" className="btn btn-primary">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -293,7 +293,7 @@ export default async function OverviewPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {canManage && (
               <Link href="/orders" className="btn btn-secondary btn-sm">
-                ⚡ Batch Actions & Waybills
+                Batch Actions & Waybills
               </Link>
             )}
             <Link href="/orders" className="btn btn-ghost btn-sm">View all →</Link>

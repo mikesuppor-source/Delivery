@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Modal } from '@/components/modal'
 import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
+import { TrashIcon } from '@/components/icons'
 
 interface Area {
   id: string
@@ -123,10 +124,11 @@ export function AreaListClient({ areas: initialAreas, workspaceId, userRole }: A
                         type="button"
                         className="btn btn-ghost"
                         onClick={() => handleDeleteArea(area.id, area.name)}
-                        style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
+                        style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: 5 }}
                         title="Delete delivery area"
                       >
-                        🗑️ Delete
+                        <TrashIcon size={12} color="#dc2626" />
+                        <span>Delete</span>
                       </button>
                     </td>
                   )}

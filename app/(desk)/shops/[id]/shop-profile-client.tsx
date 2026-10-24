@@ -420,7 +420,7 @@ export function ShopProfileClient({
                   <>
                     <span style={{ color: 'var(--line)' }}>•</span>
                     <span style={{ fontSize: 13, color: 'var(--text)' }}>
-                      📍 {shop.address}
+                      {shop.address}
                     </span>
                   </>
                 )}
@@ -523,7 +523,7 @@ export function ShopProfileClient({
           {/* Preset Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginRight: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-              📅 Timeframe:
+              Timeframe:
             </span>
             {[
               { id: 'all', label: 'All Time' },
@@ -532,7 +532,7 @@ export function ShopProfileClient({
               { id: 'last_month', label: 'Last Month' },
               { id: 'this_year', label: 'This Year' },
               { id: 'last_year', label: 'Last Year' },
-              { id: 'custom', label: 'Custom Range ⚙️' },
+              { id: 'custom', label: 'Custom Range' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -573,11 +573,11 @@ export function ShopProfileClient({
                 cursor: 'pointer',
               }}
             >
-              <option value="newest">🕒 Newest Orders First</option>
-              <option value="oldest">⏳ Oldest Orders First</option>
-              <option value="collection_high">💵 Highest COD Collection ($)</option>
-              <option value="net_high">🏷️ Highest Net Store Credit ($)</option>
-              <option value="fee_high">⚡ Highest Delivery Fee ($)</option>
+              <option value="newest">Newest Orders First</option>
+              <option value="oldest">Oldest Orders First</option>
+              <option value="collection_high">Highest COD Collection ($)</option>
+              <option value="net_high">Highest Net Store Credit ($)</option>
+              <option value="fee_high">Highest Delivery Fee ($)</option>
             </select>
           </div>
         </div>
@@ -1382,8 +1382,8 @@ export function ShopProfileClient({
                 <div>
                   <small style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Merchant Account</small>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', marginTop: 2 }}>{shop.name}</div>
-                  {shop.phone && <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>📞 {shop.phone}</div>}
-                  {shop.address && <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>📍 {shop.address}</div>}
+                  {shop.phone && <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>{shop.phone}</div>}
+                  {shop.address && <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>{shop.address}</div>}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <small style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Financial Position</small>

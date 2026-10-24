@@ -7,6 +7,7 @@ import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
+import { TrashIcon } from '@/components/icons'
 
 interface Shop {
   id: string
@@ -173,7 +174,7 @@ export function ShopListClient({ shops: initialShops, workspaceId, userRole }: S
                           style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
                           title="Delete shop record"
                         >
-                          🗑️
+                          <TrashIcon size={13} color="#dc2626" />
                         </button>
                       )}
                     </div>

@@ -319,7 +319,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              📍 Delivery Assistance & Pin Location
+              Delivery Assistance & Pin Location
             </span>
             {order.recipient_phone && (
               <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>

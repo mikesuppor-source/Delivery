@@ -5,6 +5,7 @@ import { Modal } from './modal'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import type { OrderStatus } from '@/lib/roles'
 import Link from 'next/link'
+import { PrinterIcon } from '@/components/icons'
 
 export interface ScannedOrder {
   id: string
@@ -248,7 +249,7 @@ export function BarcodeScannerModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="⚡ Warehouse Barcode & QR Scanner">
+    <Modal isOpen={isOpen} onClose={onClose} title="Warehouse Barcode & QR Scanner">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Scanner instructions & hardware laser wedge field */}
         <div
@@ -262,7 +263,7 @@ export function BarcodeScannerModal({
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              🔫 Laser Gun / Camera Ready
+              Barcode Scanner & Camera Ready
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -272,7 +273,7 @@ export function BarcodeScannerModal({
                   checked={soundEnabled}
                   onChange={e => setSoundEnabled(e.target.checked)}
                 />
-                Audio Beep 🔔
+                Audio Feedback
               </label>
 
               <button
@@ -281,7 +282,7 @@ export function BarcodeScannerModal({
                 className="btn btn-secondary btn-sm"
                 style={{ fontSize: 11, padding: '3px 8px' }}
               >
-                {cameraActive ? '❌ Stop Camera' : '📷 Use Camera'}
+                {cameraActive ? 'Stop Camera' : 'Use Camera'}
               </button>
             </div>
           </div>
@@ -346,9 +347,9 @@ export function BarcodeScannerModal({
               }}
             >
               <option value="none">Manual Action (Prompt below)</option>
-              <option value="assign_driver">🛵 Auto-Assign to Courier (Connect Driver)</option>
-              <option value="picked_up">⚡ Auto Check-In (Mark Picked Up)</option>
-              <option value="delivered">✅ Auto Mark Delivered</option>
+              <option value="assign_driver">Auto-Assign to Courier (Connect Driver)</option>
+              <option value="picked_up">Auto Check-In (Mark Picked Up)</option>
+              <option value="delivered">Auto Mark Delivered</option>
             </select>
 
             {autoAction === 'assign_driver' && (
@@ -368,7 +369,7 @@ export function BarcodeScannerModal({
                 <option value="">Select courier to auto-assign…</option>
                 {drivers.map(d => (
                   <option key={d.id} value={d.id}>
-                    🛵 {d.name}
+                    {d.name}
                   </option>
                 ))}
               </select>
@@ -436,7 +437,7 @@ export function BarcodeScannerModal({
               </div>
               <div>
                 <span style={{ color: 'var(--muted)', display: 'block', fontSize: 11 }}>Assigned Courier</span>
-                <strong>{matchedOrder.driver?.name || '⚠️ Unassigned'}</strong>
+                <strong>{matchedOrder.driver?.name || 'Unassigned'}</strong>
               </div>
             </div>
 
@@ -454,7 +455,7 @@ export function BarcodeScannerModal({
                   className="btn btn-secondary"
                   style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                 >
-                  ⚡ Mark Picked Up (Warehouse Check-In)
+                  Mark Picked Up (Warehouse Check-In)
                 </button>
 
                 <button
@@ -464,7 +465,7 @@ export function BarcodeScannerModal({
                   className="btn btn-primary"
                   style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                 >
-                  ✅ Mark Delivered
+                  Mark Delivered
                 </button>
 
                 <button
@@ -474,16 +475,17 @@ export function BarcodeScannerModal({
                   className="btn btn-ghost"
                   style={{ fontSize: 12, color: '#dc2626' }}
                 >
-                  🔄 Mark Returned
+                  Mark Returned
                 </button>
 
                 <Link
                   href={`/print/order/${matchedOrder.code}?print=true`}
                   target="_blank"
                   className="btn btn-secondary"
-                  style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}
+                  style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
                 >
-                  🖨️ Print Waybill Slip
+                  <PrinterIcon size={13} />
+                  <span>Print Waybill Slip</span>
                 </Link>
               </div>
 

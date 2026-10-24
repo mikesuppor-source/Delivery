@@ -8,6 +8,7 @@ import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
 import { Modal } from '@/components/modal'
+import { TrashIcon, PrinterIcon, MapPinIcon } from '@/components/icons'
 
 interface Shop {
   id: string
@@ -553,7 +554,8 @@ export function PortalClient({
                 className="btn btn-primary btn-sm"
                 style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                🖨️ Print {selectedOrderIds.length} Waybills Batch
+                <PrinterIcon size={14} />
+                <span>Print {selectedOrderIds.length} Waybills</span>
               </button>
               <button
                 type="button"
@@ -563,7 +565,7 @@ export function PortalClient({
                 style={{ fontSize: 12, color: '#dc2626', border: '1px solid #fecaca', display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 title="Permanently delete selected order records"
               >
-                <span>🗑️</span>
+                <TrashIcon size={13} color="#dc2626" />
                 <span>{isDeleting ? 'Deleting…' : `Delete (${selectedOrderIds.length})`}</span>
               </button>
             </div>
@@ -660,13 +662,13 @@ export function PortalClient({
                         </strong>
                         {order.recipient_phone && (
                           <span style={{ fontSize: 12, color: 'var(--muted)', display: 'block' }}>
-                            📞 {order.recipient_phone}
+                            {order.recipient_phone}
                           </span>
                         )}
                         {order.recipient_address && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                             <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                              📍 {order.recipient_address}
+                              {order.recipient_address}
                             </span>
                             <a
                               href={getGoogleMapsDirectionsUrl(order.recipient_address)}
@@ -716,14 +718,13 @@ export function PortalClient({
                           title="Click to inspect order status timeline"
                         >
                           <span>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
-                          <span style={{ fontSize: 9 }}>ℹ️</span>
                         </button>
                       </td>
 
                       <td style={{ padding: '12px' }}>
                         {order.driver ? (
                           <div>
-                            <span style={{ fontWeight: 600, fontSize: 12 }}>🛵 {order.driver.name}</span>
+                            <span style={{ fontWeight: 600, fontSize: 12 }}>{order.driver.name}</span>
                             {order.driver.phone && (
                               <small style={{ display: 'block', fontSize: 11, color: 'var(--muted)' }}>
                                 {order.driver.phone}
@@ -768,10 +769,11 @@ export function PortalClient({
                             href={`/print/order/${order.code}?print=true`}
                             target="_blank"
                             className="btn btn-secondary btn-sm"
-                            style={{ padding: '4px 8px', fontSize: 11, textDecoration: 'none' }}
+                            style={{ padding: '4px 8px', fontSize: 11, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                             title="Print scannable Waybill receipt"
                           >
-                            🖨️ Slip
+                            <PrinterIcon size={12} />
+                            <span>Slip</span>
                           </Link>
 
                           <Link
@@ -792,7 +794,7 @@ export function PortalClient({
                             style={{ padding: '4px 7px', fontSize: 11, color: '#dc2626' }}
                             title={`Delete order #${order.code}`}
                           >
-                            🗑️
+                            <TrashIcon size={12} color="#dc2626" />
                           </button>
                         </div>
                       </td>
@@ -806,7 +808,7 @@ export function PortalClient({
       </div>
 
       {/* Make Order Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="📦 Place Delivery Order (With Price Transparency)">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Place Delivery Order — Transparent Pricing">
         <form onSubmit={handleCreateOrder} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {formError && (
             <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 12.5 }}>
@@ -838,7 +840,7 @@ export function PortalClient({
               </label>
               {isPhoneValid !== null && (
                 <span style={{ fontSize: 11, fontWeight: 700, color: isPhoneValid ? '#059669' : '#dc2626' }}>
-                  {isPhoneValid ? `✓ Valid (${formatLebanesePhone(recipientPhone)})` : '⚠️ Invalid number'}
+                  {isPhoneValid ? `Valid (${formatLebanesePhone(recipientPhone)})` : 'Invalid format'}
                 </span>
               )}
             </div>
@@ -958,7 +960,7 @@ export function PortalClient({
             }}
           >
             <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: 'var(--brand)' }}>
-              💰 Upfront Price & Payout Breakdown
+              Upfront Price & Payout Breakdown
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1076,7 +1078,7 @@ export function PortalClient({
 
               <div style={{ marginTop: 12, padding: '10px', background: '#ecfdf5', borderRadius: 6, border: '1px solid #86efac', textAlign: 'left', fontSize: 12.5 }}>
                 <span style={{ color: '#065f46', fontWeight: 700, display: 'block' }}>
-                  💰 Amount to Collect: {formatUSD(Number(confirmedOrder.collection_usd))} ({formatLBP(usdToLbp(Number(confirmedOrder.collection_usd), confirmedOrder.usd_to_lbp_rate || rate))})
+                  Amount to Collect: {formatUSD(Number(confirmedOrder.collection_usd))} ({formatLBP(usdToLbp(Number(confirmedOrder.collection_usd), confirmedOrder.usd_to_lbp_rate || rate))})
                 </span>
                 <small style={{ color: '#065f46' }}>
                   Net payout to your store: {formatUSD(Number(confirmedOrder.shop_balance_usd))}
@@ -1101,7 +1103,7 @@ export function PortalClient({
                   textDecoration: 'none',
                 }}
               >
-                <span>🖨️</span>
+                <PrinterIcon size={16} />
                 <span>Print Scannable Barcode & QR Slip</span>
               </Link>
 
@@ -1153,7 +1155,7 @@ export function PortalClient({
             setInspectingOrder(null)
             setCancelError('')
           }}
-          title={`📦 Order Details & Live Status — #${inspectingOrder.code}`}
+          title={`Order Details & Live Status — #${inspectingOrder.code}`}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Header Status Bar */}
@@ -1269,7 +1271,7 @@ export function PortalClient({
                     </strong>
                     <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
                       {inspectingOrder.driver
-                        ? `🛵 Assigned to ${inspectingOrder.driver.name}${inspectingOrder.driver.phone ? ` (${inspectingOrder.driver.phone})` : ''}`
+                        ? `Assigned to ${inspectingOrder.driver.name}${inspectingOrder.driver.phone ? ` (${inspectingOrder.driver.phone})` : ''}`
                         : 'Waiting for dispatch manager to assign courier'}
                     </div>
                   </div>
@@ -1359,7 +1361,7 @@ export function PortalClient({
                 </strong>
                 {inspectingOrder.recipient_phone && (
                   <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ color: 'var(--muted)' }}>📞 {inspectingOrder.recipient_phone}</span>
+                    <span style={{ color: 'var(--muted)' }}>{inspectingOrder.recipient_phone}</span>
                     <a
                       href={`https://wa.me/${inspectingOrder.recipient_phone.replace(/[^0-9]/g, '')}`}
                       target="_blank"
@@ -1375,7 +1377,7 @@ export function PortalClient({
 
               <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)' }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', display: 'block' }}>
                     Delivery Destination
                   </span>
                   {inspectingOrder.recipient_address && (
@@ -1394,7 +1396,7 @@ export function PortalClient({
                   {inspectingOrder.area?.name || 'Standard Area'}
                 </strong>
                 <span style={{ fontSize: 11.5, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
-                  📍 {inspectingOrder.recipient_address || 'Address on file'}
+                  {inspectingOrder.recipient_address || 'Address on file'}
                 </span>
               </div>
             </div>
@@ -1459,10 +1461,10 @@ export function PortalClient({
                   disabled={isDeleting}
                   onClick={() => handleDeleteOrders([inspectingOrder.id], `#${inspectingOrder.code}`)}
                   className="btn btn-ghost btn-sm"
-                  style={{ color: '#dc2626', border: '1px solid #fecaca', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  style={{ color: '#dc2626', border: '1px solid #fecaca', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                   title="Permanently delete this order record"
                 >
-                  <span>🗑️</span>
+                  <TrashIcon size={13} color="#dc2626" />
                   <span>{isDeleting ? 'Deleting…' : 'Delete Record'}</span>
                 </button>
               </div>
@@ -1472,9 +1474,9 @@ export function PortalClient({
                   href={`/print/order/${inspectingOrder.code}?print=true`}
                   target="_blank"
                   className="btn btn-secondary btn-sm"
-                  style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                  style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
-                  <span>🖨️</span>
+                  <PrinterIcon size={13} />
                   <span>Print Slip</span>
                 </Link>
 
