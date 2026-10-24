@@ -31,9 +31,12 @@ export async function middleware(request: NextRequest) {
                    path.startsWith('/invite') ||
                    path.startsWith('/track') ||
                    path.startsWith('/print') ||
+                   path.startsWith('/shopify') ||
                    path.startsWith('/portal/login') ||
                    path.startsWith('/portal/signup') ||
                    path.startsWith('/api/portal/auth') ||
+                   path.startsWith('/api/webhooks') ||
+                   path.startsWith('/api/shops/shopify') ||
                    path.startsWith('/_next') ||
                    path.startsWith('/api/invite') ||
                    path === '/favicon.ico' ||
