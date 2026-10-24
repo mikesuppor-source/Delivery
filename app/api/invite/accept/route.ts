@@ -41,6 +41,40 @@ export async function POST(req: NextRequest) {
 
   if (memberError) return NextResponse.json({ error: memberError.message }, { status: 500 })
 
+  // If invited role is driver, auto-link to existing driver or create new profile
+  if (invite.role === 'driver') {
+    const driverName = displayName || user.email?.split('@')[0] || 'Driver'
+    const { data: existingDriver } = await serviceClient
+      .from('drivers')
+      .select('id')
+      .eq('workspace_id', invite.workspace_id)
+      .ilike('name', driverName)
+      .is('user_id', null)
+      .maybeSingle()
+
+    if (existingDriver) {
+      await serviceClient
+        .from('drivers')
+        .update({ user_id: user.id })
+        .eq('id', existingDriver.id)
+    } else {
+      const { data: alreadyLinked } = await serviceClient
+        .from('drivers')
+        .select('id')
+        .eq('workspace_id', invite.workspace_id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!alreadyLinked) {
+        await serviceClient.from('drivers').insert({
+          workspace_id: invite.workspace_id,
+          name: driverName,
+          user_id: user.id,
+        })
+      }
+    }
+  }
+
   // Mark invitation as accepted
   await serviceClient
     .from('invitations')

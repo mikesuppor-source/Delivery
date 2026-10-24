@@ -25,10 +25,15 @@ export function InviteForm({ workspaceId, pendingInvites }: InviteFormProps) {
   const [success, setSuccess] = useState('')
   const [invites, setInvites] = useState(pendingInvites)
 
+  const [createdInviteUrl, setCreatedInviteUrl] = useState('')
+  const [copied, setCopied] = useState(false)
+
   async function sendInvite(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setSuccess('')
+    setCreatedInviteUrl('')
+    setCopied(false)
     setLoading(true)
 
     const res = await fetch('/api/invite', {
@@ -37,8 +42,12 @@ export function InviteForm({ workspaceId, pendingInvites }: InviteFormProps) {
       body: JSON.stringify({ email, role, workspaceId }),
     })
 
+    const data = await res.json()
     if (res.ok) {
-      setSuccess(`Invitation sent to ${email}`)
+      setSuccess(`Invitation created for ${email}`)
+      if (data.inviteUrl) {
+        setCreatedInviteUrl(data.inviteUrl)
+      }
       setEmail('')
       // Optimistically add to pending list
       setInvites(prev => [{
@@ -49,7 +58,6 @@ export function InviteForm({ workspaceId, pendingInvites }: InviteFormProps) {
         created_at: new Date().toISOString(),
       }, ...prev])
     } else {
-      const data = await res.json()
       setError(data.error ?? 'Failed to send invitation.')
     }
 
@@ -103,6 +111,43 @@ export function InviteForm({ workspaceId, pendingInvites }: InviteFormProps) {
             </div>
             {error && <p className="error-msg" style={{ marginTop: 10 }}>{error}</p>}
             {success && <p style={{ color: 'var(--brand)', fontSize: 12, marginTop: 10 }}>✓ {success}</p>}
+            {createdInviteUrl && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: '12px 16px',
+                  background: 'var(--brand-light)',
+                  border: '1.5px solid var(--brand)',
+                  borderRadius: 6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <small style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)', display: 'block', textTransform: 'uppercase' }}>
+                    Direct Invite Link (Share via WhatsApp / Email):
+                  </small>
+                  <code style={{ fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', display: 'block', marginTop: 2 }}>
+                    {createdInviteUrl}
+                  </code>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdInviteUrl)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2500)
+                  }}
+                  className="btn btn-primary btn-sm"
+                  style={{ fontSize: 12 }}
+                >
+                  {copied ? '✓ Copied!' : 'Copy Link'}
+                </button>
+              </div>
+            )}
             <div className="form-actions">
               <button type="submit" className="btn btn-primary" disabled={loading}>
                 {loading ? 'Sending…' : 'Send invite'}

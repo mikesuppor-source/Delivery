@@ -7,6 +7,8 @@ import QRCode from 'qrcode'
 import { formatUSD, formatLBP, usdToLbp, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getCustomerOrderWhatsAppUrl } from '@/lib/whatsapp'
+import { GoogleMapsIcon } from '@/components/google-maps-icon'
+import { getGoogleMapsDirectionsUrl } from '@/lib/maps'
 
 export interface ReceiptOrder {
   id: string
@@ -212,6 +214,20 @@ export function OrderReceiptSlip({
             >
               <WhatsAppIcon size={14} />
               <span>WhatsApp Customer</span>
+            </a>
+          )}
+
+          {order.recipient_address && (
+            <a
+              href={getGoogleMapsDirectionsUrl(order.recipient_address)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="Open turn-by-turn navigation in Google Maps"
+            >
+              <GoogleMapsIcon size={14} />
+              <span>Navigate (Maps)</span>
             </a>
           )}
 
