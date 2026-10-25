@@ -112,6 +112,8 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
   const [continuousMode, setContinuousMode] = useState(false)
   const [targetAction, setTargetAction] = useState<'view' | 'pickup' | 'deliver'>('view')
   const [targetDriverId, setTargetDriverId] = useState<string>('')
+  const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([])
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('')
 
   const scannerRef = useRef<unknown>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -257,59 +259,136 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
   // Camera Scanner Lifecycle
   useEffect(() => {
     let html5QrCode: any = null
+    let isCancelled = false
 
     if (isScanning) {
+      setCameraError(null)
+
       // Dynamic import to prevent SSR issues
-      import('html5-qrcode').then(({ Html5Qrcode }) => {
+      import('html5-qrcode').then(async ({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
+        if (isCancelled) return
         const scannerElement = document.getElementById('qr-reader')
         if (!scannerElement) return
 
-        html5QrCode = new Html5Qrcode('qr-reader')
-        scannerRef.current = html5QrCode
+        try {
+          // Formats to support (Shipping parcels: Code 128 barcodes + QR codes)
+          const formatsToSupport = [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.UPC_A,
+          ]
 
-        html5QrCode
-          .start(
-            { facingMode: 'environment' },
+          html5QrCode = new Html5Qrcode('qr-reader', {
+            formatsToSupport,
+            verbose: false,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true,
+            },
+          })
+          scannerRef.current = html5QrCode
+
+          // Default camera config: use environment (rear) camera unless user explicitly picked a specific ID
+          const cameraConfig = selectedCameraId
+            ? selectedCameraId
+            : { facingMode: 'environment' }
+
+          await html5QrCode.start(
+            cameraConfig,
             {
               fps: 15,
-              qrbox: { width: 280, height: 280 },
-              aspectRatio: 1.0,
+              qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+                const edge = Math.floor(minEdge * 0.75)
+                const width = Math.max(160, Math.min(Math.floor(edge * 1.3), Math.max(160, viewfinderWidth - 24)))
+                const height = Math.max(100, Math.min(Math.floor(edge * 0.8), Math.max(100, viewfinderHeight - 24)))
+                return { width, height }
+              },
             },
             (decodedText: string) => {
               processCode(decodedText)
             },
             () => {
-              // Ignore frame scan failures
+              // Frame scan error, ignore
             }
           )
-          .catch((err: unknown) => {
-            setCameraError(err instanceof Error ? err.message : 'Could not access device camera. Please check browser permissions.')
+
+          if (isCancelled) {
+            html5QrCode.stop().catch((e: unknown) => { void e }).finally(() => {
+              html5QrCode.clear()
+            })
+            return
+          }
+
+          // Force video element to play inline on mobile WebKit / iOS Safari
+          setTimeout(() => {
+            const video = document.querySelector('#qr-reader video') as HTMLVideoElement | null
+            if (video) {
+              video.setAttribute('playsinline', 'true')
+              video.setAttribute('webkit-playsinline', 'true')
+              video.muted = true
+              if (video.paused) {
+                video.play().catch((e: unknown) => { void e })
+              }
+            }
+          }, 300)
+
+          // Enumerate cameras in the background to populate the switcher dropdown (without auto-selecting)
+          Html5Qrcode.getCameras().then((cameras) => {
+            if (cameras && cameras.length > 0 && !isCancelled) {
+              setAvailableCameras(
+                cameras.map((c) => ({
+                  id: c.id,
+                  label: c.label || `Camera (${c.id.slice(0, 6)})`,
+                }))
+              )
+            }
+          }).catch((e: unknown) => { void e })
+
+        } catch (err: unknown) {
+          if (!isCancelled) {
+            setCameraError(
+              err instanceof Error
+                ? err.message
+                : 'Could not access device camera. Please check browser permissions and ensure no other app is using it.'
+            )
             setIsScanning(false)
-          })
+          }
+        }
+      }).catch((err: unknown) => {
+        if (!isCancelled) {
+          setCameraError(err instanceof Error ? err.message : 'Failed to load camera library')
+          setIsScanning(false)
+        }
       })
     } else if (scannerRef.current) {
       try {
         const instance = scannerRef.current as { stop: () => Promise<void>; clear: () => void }
-        instance.stop().catch(() => {}).finally(() => {
+        instance.stop().catch((e: unknown) => { void e }).finally(() => {
           instance.clear()
           scannerRef.current = null
         })
-      } catch {
-        // Ignore stop error
+      } catch (e: unknown) {
+        void e
       }
     }
 
     return () => {
+      isCancelled = true
       if (scannerRef.current) {
         try {
           const instance = scannerRef.current as { stop: () => Promise<void>; clear: () => void }
-          instance.stop().catch(() => {})
-        } catch {
-          // Ignore
+          instance.stop().catch((e: unknown) => { void e }).finally(() => {
+            instance.clear()
+            scannerRef.current = null
+          })
+        } catch (e: unknown) {
+          void e
         }
       }
     }
-  }, [isScanning])
+  }, [isScanning, selectedCameraId])
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', paddingBottom: 60 }}>
@@ -377,30 +456,108 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
             )}
           </div>
 
-          {/* Camera Viewfinder Box */}
+          {/* Camera Viewfinder Box Container */}
           <div
-            id="qr-reader"
             style={{
               width: '100%',
-              minHeight: 260,
+              minHeight: 280,
               background: '#0a0f1d',
               borderRadius: 12,
               overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               border: isScanning ? '2px solid var(--brand)' : '1px dashed var(--line)',
               position: 'relative',
             }}
           >
+            {/* The dedicated clean DOM container for Html5Qrcode. MUST be completely empty of React child nodes when active */}
+            <div id="qr-reader" style={{ width: '100%', minHeight: isScanning ? 280 : 0 }} />
+
+            {/* Inactive state placeholder - rendered as absolute overlay so it never touches #qr-reader DOM */}
             {!isScanning && (
-              <div style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  padding: 30,
+                  color: 'var(--muted)',
+                }}
+              >
                 <ScanIcon size={40} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Camera is Off</div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>Click &quot;Start Camera Scanner&quot; above to scan with your device</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>Click &quot;Start Camera Scanner&quot; above to scan with your phone or webcam</div>
               </div>
             )}
           </div>
+
+          {/* Camera Switcher (shown on multi-camera devices like iPhones and Android smartphones) */}
+          {availableCameras.length > 1 && (
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ color: 'var(--muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Camera:</span>
+              <select
+                value={selectedCameraId}
+                onChange={(e) => setSelectedCameraId(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--ink)',
+                  fontSize: 12,
+                }}
+              >
+                <option value="">Default Rear Lens</option>
+                {availableCameras.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Video element styling for responsive mobile camera streaming */}
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
+                #qr-reader {
+                  width: 100% !important;
+                  border: none !important;
+                  position: relative !important;
+                  background: #0a0f1d !important;
+                }
+                #qr-reader video {
+                  width: 100% !important;
+                  height: auto !important;
+                  min-height: 280px !important;
+                  max-height: 440px !important;
+                  object-fit: cover !important;
+                  border-radius: 10px !important;
+                  display: block !important;
+                  background: #0a0f1d !important;
+                }
+                #qr-reader__scan_region {
+                  position: relative !important;
+                  width: 100% !important;
+                  min-height: 280px !important;
+                  display: flex !important;
+                  align-items: center !important;
+                  justify-content: center !important;
+                  background: #0a0f1d !important;
+                }
+                #qr-reader__dashboard {
+                  display: none !important;
+                }
+                #qr-reader__scan_region img {
+                  display: none !important;
+                }
+              `,
+            }}
+          />
 
           {cameraError && (
             <div style={{ marginTop: 12, fontSize: 12, color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '8px 12px', borderRadius: 8 }}>
