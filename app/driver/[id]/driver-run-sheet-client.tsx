@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   formatUSD,
@@ -57,6 +57,25 @@ export interface DriverInfo {
   active: boolean
 }
 
+export interface OfflineSyncItem {
+  id: string
+  orderId: string
+  orderCode: string
+  status: DriverRunSheetOrder['status']
+  payload: {
+    orderId: string
+    driverId: string
+    status: DriverRunSheetOrder['status']
+    notes?: string
+    podSignature?: string | null
+    podPhoto?: string | null
+    podCollectedUsd?: number | null
+    podCollectedLbp?: number | null
+    failureReason?: string
+  }
+  timestamp: number
+}
+
 interface DriverRunSheetClientProps {
   driver: DriverInfo
   initialOrders: DriverRunSheetOrder[]
@@ -75,6 +94,11 @@ export function DriverRunSheetClient({
   const [search, setSearch] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // Offline-First Sync Queue & Connectivity State
+  const [isOnline, setIsOnline] = useState<boolean>(true)
+  const [offlineQueue, setOfflineQueue] = useState<OfflineSyncItem[]>([])
+  const [isSyncing, setIsSyncing] = useState<boolean>(false)
 
   // POD & Failure modals
   const [podModalOrder, setPodModalOrder] = useState<DriverRunSheetOrder | null>(null)
@@ -146,7 +170,128 @@ export function DriverRunSheetClient({
     }
   }, [orders])
 
-  // Handle status transitions
+  // ─── OFFLINE-FIRST LIFECYCLE & PERSISTENCE ───
+  useEffect(() => {
+    const queueKey = `cedar_driver_offline_queue_${driver.id}`
+    const ordersKey = `cedar_driver_orders_${driver.id}`
+
+    // 1. Initial connectivity check
+    setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true)
+
+    // 2. Load stored offline queue
+    try {
+      const savedQueue = localStorage.getItem(queueKey)
+      if (savedQueue) {
+        setOfflineQueue(JSON.parse(savedQueue))
+      }
+    } catch (e: unknown) {
+      void e
+    }
+
+    // 3. Fallback to cached orders if loaded completely offline
+    if (initialOrders.length === 0) {
+      try {
+        const savedOrders = localStorage.getItem(ordersKey)
+        if (savedOrders) {
+          const parsed = JSON.parse(savedOrders)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOrders(parsed)
+          }
+        }
+      } catch (e: unknown) {
+        void e
+      }
+    } else {
+      try {
+        localStorage.setItem(ordersKey, JSON.stringify(initialOrders))
+      } catch (e: unknown) {
+        void e
+      }
+    }
+
+    const handleOnline = () => {
+      setIsOnline(true)
+      showNotification('success', 'Back online! Syncing pending deliveries…')
+    }
+
+    const handleOffline = () => {
+      setIsOnline(false)
+      showNotification('error', 'Network disconnected. Working in Offline Mode.')
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [driver.id, initialOrders])
+
+  // Cache updated orders to localStorage
+  useEffect(() => {
+    if (orders.length > 0) {
+      try {
+        localStorage.setItem(`cedar_driver_orders_${driver.id}`, JSON.stringify(orders))
+      } catch (e: unknown) {
+        void e
+      }
+    }
+  }, [orders, driver.id])
+
+  // Sync offline queue items to the server
+  const syncOfflineQueue = useCallback(async () => {
+    if (isSyncing || offlineQueue.length === 0) return
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showNotification('error', 'Cannot sync while offline. Please connect to internet.')
+      return
+    }
+
+    setIsSyncing(true)
+    const queueKey = `cedar_driver_offline_queue_${driver.id}`
+    const remaining: OfflineSyncItem[] = []
+    let syncedCount = 0
+
+    for (const item of offlineQueue) {
+      try {
+        const res = await fetch('/api/driver/orders', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item.payload),
+        })
+
+        if (res.ok || res.status === 409) {
+          // 409 means already updated on server, treat as resolved
+          syncedCount++
+        } else {
+          remaining.push(item)
+        }
+      } catch {
+        remaining.push(item)
+      }
+    }
+
+    setOfflineQueue(remaining)
+    try {
+      localStorage.setItem(queueKey, JSON.stringify(remaining))
+    } catch (e: unknown) {
+      void e
+    }
+
+    setIsSyncing(false)
+    if (syncedCount > 0) {
+      showNotification('success', `✓ Successfully synced ${syncedCount} delivery${syncedCount > 1 ? 's' : ''}!`)
+    }
+  }, [driver.id, isSyncing, offlineQueue])
+
+  // Auto-sync whenever back online with pending queue items
+  useEffect(() => {
+    if (isOnline && offlineQueue.length > 0 && !isSyncing) {
+      syncOfflineQueue()
+    }
+  }, [isOnline, offlineQueue.length, isSyncing, syncOfflineQueue])
+
+  // Handle status transitions with seamless offline queueing
   async function handleUpdateStatus(
     orderId: string,
     newStatus: DriverRunSheetOrder['status'],
@@ -160,16 +305,54 @@ export function DriverRunSheetClient({
     }
   ) {
     setUpdatingId(orderId)
+    const targetOrder = orders.find(o => o.id === orderId)
+    const queueKey = `cedar_driver_offline_queue_${driver.id}`
+    const payload = {
+      orderId,
+      driverId: driver.id,
+      status: newStatus,
+      ...extraData,
+    }
+
+    // If device is definitely offline upfront
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const queueItem: OfflineSyncItem = {
+        id: crypto.randomUUID(),
+        orderId,
+        orderCode: targetOrder?.code || orderId,
+        status: newStatus,
+        payload,
+        timestamp: Date.now(),
+      }
+
+      const updatedQueue = [...offlineQueue, queueItem]
+      setOfflineQueue(updatedQueue)
+      try {
+        localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
+      } catch (e: unknown) {
+        void e
+      }
+
+      setOrders(prev =>
+        prev.map(o => (o.id === orderId ? {
+          ...o,
+          status: newStatus,
+          notes: extraData?.notes || o.notes,
+          pod_signature: extraData?.podSignature || o.pod_signature,
+          pod_photo: extraData?.podPhoto || o.pod_photo,
+          pod_collected_lbp: extraData?.podCollectedLbp !== undefined ? extraData.podCollectedLbp : o.pod_collected_lbp,
+        } : o))
+      )
+      showNotification('success', `⚡ Saved offline! Will sync automatically when connection restores.`)
+      setUpdatingId(null)
+      return
+    }
+
     try {
       const res = await fetch('/api/driver/orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId,
-          driverId: driver.id,
-          status: newStatus,
-          ...extraData,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await res.json()
@@ -184,8 +367,45 @@ export function DriverRunSheetClient({
 
       showNotification('success', `Order #${data.order.code} updated to ${ORDER_STATUS_LABELS[newStatus] || newStatus}!`)
     } catch (err: unknown) {
-      showNotification('error', err instanceof Error ? err.message : 'Error updating status')
-      throw err
+      // If it failed due to network / fetch error, save to offline queue instead of failing
+      const isNetworkError =
+        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        (err instanceof TypeError && err.message.toLowerCase().includes('fetch')) ||
+        (err instanceof Error && (err.message.includes('network') || err.message.includes('Failed to fetch') || err.message.includes('aborted')))
+
+      if (isNetworkError) {
+        const queueItem: OfflineSyncItem = {
+          id: crypto.randomUUID(),
+          orderId,
+          orderCode: targetOrder?.code || orderId,
+          status: newStatus,
+          payload,
+          timestamp: Date.now(),
+        }
+
+        const updatedQueue = [...offlineQueue, queueItem]
+        setOfflineQueue(updatedQueue)
+        try {
+          localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
+        } catch (e: unknown) {
+          void e
+        }
+
+        setOrders(prev =>
+          prev.map(o => (o.id === orderId ? {
+            ...o,
+            status: newStatus,
+            notes: extraData?.notes || o.notes,
+            pod_signature: extraData?.podSignature || o.pod_signature,
+            pod_photo: extraData?.podPhoto || o.pod_photo,
+            pod_collected_lbp: extraData?.podCollectedLbp !== undefined ? extraData.podCollectedLbp : o.pod_collected_lbp,
+          } : o))
+        )
+        showNotification('success', `⚡ Network drop detected: Saved locally! Will sync when connection restores.`)
+      } else {
+        showNotification('error', err instanceof Error ? err.message : 'Error updating status')
+        throw err
+      }
     } finally {
       setUpdatingId(null)
     }
@@ -288,6 +508,74 @@ export function DriverRunSheetClient({
           </a>
         </div>
       </header>
+
+      {/* Offline Status & Cloud Sync Banner */}
+      {(!isOnline || offlineQueue.length > 0) && (
+        <div
+          style={{
+            position: 'sticky',
+            top: 63,
+            zIndex: 49,
+            background: !isOnline ? '#991b1b' : '#b45309',
+            borderBottom: '1px solid ' + (!isOnline ? '#b91c1c' : '#d97706'),
+            padding: '10px 16px',
+            color: '#ffffff',
+            fontSize: 12.5,
+            fontWeight: 600,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 640,
+              margin: '0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>{!isOnline ? '📡' : '⚡'}</span>
+              <span>
+                {!isOnline ? (
+                  <>
+                    <strong>Offline Mode:</strong> No internet connection. Deliveries and signatures will save locally.
+                  </>
+                ) : (
+                  <>
+                    <strong>{offlineQueue.length} pending offline deliver{offlineQueue.length > 1 ? 'ies' : 'y'}</strong> ready to upload to cloud.
+                  </>
+                )}
+              </span>
+            </div>
+
+            {offlineQueue.length > 0 && (
+              <button
+                type="button"
+                onClick={syncOfflineQueue}
+                disabled={isSyncing || !isOnline}
+                style={{
+                  background: isOnline ? '#fbbf24' : '#64748b',
+                  color: isOnline ? '#0f172a' : '#cbd5e1',
+                  border: 'none',
+                  padding: '5px 12px',
+                  borderRadius: 6,
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  cursor: isOnline && !isSyncing ? 'pointer' : 'not-allowed',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                {isSyncing ? 'Syncing…' : `Sync Now (${offlineQueue.length})`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Notification Toast */}
       {notification && (
@@ -584,32 +872,54 @@ export function DriverRunSheetClient({
                       </Link>
                     </div>
 
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 800,
-                        padding: '3px 8px',
-                        borderRadius: 99,
-                        background:
-                          order.status === 'delivered'
-                            ? '#064e3b'
-                            : order.status === 'picked_up'
-                            ? '#1e3a8a'
-                            : order.status === 'assigned'
-                            ? '#3730a3'
-                            : '#7f1d1d',
-                        color:
-                          order.status === 'delivered'
-                            ? '#6ee7b7'
-                            : order.status === 'picked_up'
-                            ? '#93c5fd'
-                            : order.status === 'assigned'
-                            ? '#c7d2fe'
-                            : '#fca5a5',
-                      }}
-                    >
-                      {ORDER_STATUS_LABELS[order.status] || order.status}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {offlineQueue.some(q => q.orderId === order.id) && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            padding: '2px 7px',
+                            borderRadius: 99,
+                            background: '#78350f',
+                            color: '#fef08a',
+                            border: '1px solid #ca8a04',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                          }}
+                        >
+                          <span>⚡</span>
+                          <span>Pending Sync</span>
+                        </span>
+                      )}
+
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 800,
+                          padding: '3px 8px',
+                          borderRadius: 99,
+                          background:
+                            order.status === 'delivered'
+                              ? '#064e3b'
+                              : order.status === 'picked_up'
+                              ? '#1e3a8a'
+                              : order.status === 'assigned'
+                              ? '#3730a3'
+                              : '#7f1d1d',
+                          color:
+                            order.status === 'delivered'
+                              ? '#6ee7b7'
+                              : order.status === 'picked_up'
+                              ? '#93c5fd'
+                              : order.status === 'assigned'
+                              ? '#c7d2fe'
+                              : '#fca5a5',
+                        }}
+                      >
+                        {ORDER_STATUS_LABELS[order.status] || order.status}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Customer & Merchant Info */}
