@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import { createClient } from '@/lib/supabase/server'
 import { formatUSD, formatLBP, usdToLbp, formatDate } from '@/lib/utils'
 import Link from 'next/link'
@@ -11,7 +12,7 @@ export default async function PrintPage() {
     .from('workspace_members')
     .select('*')
     .eq('user_id', user?.id ?? '')
-    .single()
+    .order('created_at').limit(1).single()
 
   const member = memberData as { workspace_id: string } | null
   if (!member) return null
@@ -25,16 +26,16 @@ export default async function PrintPage() {
   const workspace = wsData as { id: string; name: string; usd_to_lbp: number } | null
   if (!workspace) return null
 
-  const { data: orders } = await supabase
+  const { data: orders } = await allRows(supabase
     .from('orders')
     .select(`
-      id, code, collection_usd, delivery_fee_usd, driver_pay_usd,
+      id, code, tracking_token, collection_usd, delivery_fee_usd, driver_pay_usd,
       shop_balance_usd, usd_to_lbp_rate, created_at,
       shop:shop_id(name), driver:driver_id(name)
     `)
     .eq('workspace_id', workspace.id)
     .eq('status', 'delivered')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }))
 
   const rate = Number(workspace.usd_to_lbp)
   const totalCollected   = orders?.reduce((s, o) => s + Number(o.collection_usd), 0) ?? 0

@@ -9,7 +9,8 @@ export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
 
-  return createServerClient<any>(
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) throw new Error('Supabase is not configured')
+  return createServerClient<Database>(
     url,
     key,
     {
@@ -34,7 +35,8 @@ export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key'
 
-  return createSupabaseClient<any>(
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Server database credentials are not configured')
+  return createSupabaseClient<Database>(
     url,
     key,
     { auth: { autoRefreshToken: false, persistSession: false } }

@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { InviteForm } from './invite-form'
@@ -13,7 +14,7 @@ export default async function AdminPage() {
     .from('workspace_members')
     .select('*')
     .eq('user_id', user?.id ?? '')
-    .single()
+    .order('created_at').limit(1).single()
 
   const member = memberData as { workspace_id: string; role: string } | null
   if (!member) return null
@@ -31,19 +32,19 @@ export default async function AdminPage() {
   await requireRole(workspace.id, 'owner')
 
   const [membersResult, invitesResult, auditResult] = await Promise.all([
-    supabase
+    allRows(supabase
       .from('workspace_members')
       .select('id, role, display_name, joined_at, user_id')
       .eq('workspace_id', workspace.id)
-      .order('created_at'),
+      .order('created_at')),
 
-    supabase
+    allRows(supabase
       .from('invitations')
       .select('id, email, role, expires_at, created_at')
       .eq('workspace_id', workspace.id)
       .is('accepted_at', null)
       .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })),
 
     supabase
       .from('audit_log')

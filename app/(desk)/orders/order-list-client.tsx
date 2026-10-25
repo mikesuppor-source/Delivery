@@ -19,6 +19,7 @@ import { BulkOrderImportModal } from '@/components/bulk-order-import-modal'
 interface Order {
   id: string
   code: string
+  tracking_token?: string
   status: OrderStatus
   collection_usd: number
   delivery_fee_usd: number
@@ -835,7 +836,7 @@ export function OrderListClient({
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <Link
-                          href={`/track/${order.code}`}
+                          href={`/track/${order.tracking_token || order.code}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ fontWeight: 700, color: 'var(--brand)', textDecoration: 'none' }}
@@ -1141,7 +1142,7 @@ export function OrderListClient({
                           </button>
                         )}
                         <Link
-                          href={`/track/${order.code}`}
+                          href={`/track/${order.tracking_token || order.code}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-ghost"
@@ -1492,7 +1493,7 @@ export function OrderListClient({
                 style={{ fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.5px' }}
               />
               <small style={{ color: 'var(--muted)', fontSize: 11, display: 'block', marginTop: 4 }}>
-                Public tracking link: <code>/track/{editCode || '...'}</code>
+                The private customer tracking link is available after saving.
               </small>
             </div>
 
@@ -1773,7 +1774,7 @@ export function OrderListClient({
                 style={{ fontFamily: 'monospace', fontWeight: 600, letterSpacing: '0.5px' }}
               />
               <small style={{ color: 'var(--muted)', fontSize: 11, display: 'block', marginTop: 4 }}>
-                Public customer tracking link: <code>/track/{customCode || 'CD-XXXXXXXX'}</code>
+                A private customer tracking link will be generated after creation.
               </small>
             </div>
 

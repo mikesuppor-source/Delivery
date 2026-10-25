@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
@@ -12,7 +13,7 @@ export default async function DriverPortalIndexPage() {
   const userSupabase = await createClient()
   const { data: { user } } = await userSupabase.auth.getUser()
 
-  const serviceSupabase = createServiceClient()
+  const serviceSupabase = await createClient()
 
   // If logged in, check if user is directly linked to a driver
   if (user?.id) {
@@ -28,18 +29,18 @@ export default async function DriverPortalIndexPage() {
   }
 
   // Fetch active drivers and their open orders count
-  const { data: drivers } = await serviceSupabase
+  const { data: drivers } = await allRows(serviceSupabase
     .from('drivers')
     .select('id, name, phone, active')
     .eq('active', true)
-    .order('name')
+    .order('name'))
 
   // Fetch count of pending orders for each driver
-  const { data: pendingOrders } = await serviceSupabase
+  const { data: pendingOrders } = await allRows(serviceSupabase
     .from('orders')
     .select('driver_id')
     .in('status', ['assigned', 'picked_up'])
-    .not('driver_id', 'is', null)
+    .not('driver_id', 'is', null))
 
   const countsByDriver: Record<string, number> = {}
   for (const o of pendingOrders || []) {

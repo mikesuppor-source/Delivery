@@ -28,6 +28,7 @@ import { DeliveryPodViewModal } from './delivery-pod-view-modal'
 export interface DriverRunSheetOrder {
   id: string
   code: string
+  tracking_token?: string
   status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'failed' | 'returned'
   collection_usd: number
   delivery_fee_usd: number
@@ -153,6 +154,7 @@ export function DriverRunSheetClient({
       notes?: string
       podSignature?: string | null
       podPhoto?: string | null
+      podCollectedUsd?: number | null
       podCollectedLbp?: number | null
       failureReason?: string
     }
@@ -566,7 +568,7 @@ export function DriverRunSheetClient({
                         {isDelivered ? '✓' : idx + 1}
                       </span>
                       <Link
-                        href={`/track/${order.code}`}
+                        href={`/track/${order.tracking_token || order.code}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{

@@ -8,6 +8,7 @@ interface DeliveryPodModalProps {
   order: {
     id: string
     code: string
+    tracking_token?: string
     recipient_name: string | null
     recipient_address: string | null
     collection_usd: number
@@ -18,6 +19,7 @@ interface DeliveryPodModalProps {
   onConfirm: (data: {
     podSignature: string | null
     podPhoto: string | null
+    podCollectedUsd: number | null
     podCollectedLbp: number | null
     notes?: string
   }) => Promise<void>
@@ -173,6 +175,7 @@ export function DeliveryPodModal({
       await onConfirm({
         podSignature: signatureDataUrl,
         podPhoto: photoPreview,
+        podCollectedUsd: Number(collectedUsd) || 0,
         podCollectedLbp: Number(collectedLbp) || 0,
         notes: notes.trim() || undefined,
       })

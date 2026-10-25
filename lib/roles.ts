@@ -11,7 +11,8 @@ export function roleLevel(role: UserRole): number {
 
 /** Check if userRole meets or exceeds the required minRole */
 export function hasMinRole(userRole: UserRole, minRole: UserRole | UserRole[]): boolean {
-  const allowed = Array.isArray(minRole) ? minRole : [minRole]
+  if (Array.isArray(minRole)) return minRole.includes(userRole)
+  const allowed = [minRole]
   const userLevel = roleLevel(userRole)
   const minLevel = Math.min(...allowed.map(r => roleLevel(r)))
   return userLevel >= minLevel

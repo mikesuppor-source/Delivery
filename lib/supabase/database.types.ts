@@ -14,6 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
+      shop_integrations: {
+        Row: {
+          shop_id: string
+          api_key: string
+          access_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          shop_id?: string
+          api_key?: string
+          access_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          shop_id?: string
+          api_key?: string
+          access_token?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      oauth_states: {
+        Row: {
+          nonce: string
+          user_id: string
+          shop_id: string
+          domain: string
+          expires_at: string
+        }
+        Insert: {
+          nonce?: string
+          user_id?: string
+          shop_id?: string
+          domain?: string
+          expires_at?: string
+        }
+        Update: {
+          nonce?: string
+          user_id?: string
+          shop_id?: string
+          domain?: string
+          expires_at?: string
+        }
+        Relationships: []
+      }
+      order_events: {
+        Row: {
+          id: string
+          workspace_id: string
+          order_id: string
+          old_status: string | null
+          new_status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id?: string
+          order_id?: string
+          old_status?: string | null
+          new_status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          order_id?: string
+          old_status?: string | null
+          new_status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -105,6 +177,7 @@ export type Database = {
       }
       drivers: {
         Row: {
+          cash_held_lbp: number
           active: boolean
           cash_held_usd: number
           created_at: string
@@ -116,6 +189,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          cash_held_lbp?: number
           active?: boolean
           cash_held_usd?: number
           created_at?: string
@@ -127,6 +201,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          cash_held_lbp?: number
           active?: boolean
           cash_held_usd?: number
           created_at?: string
@@ -193,6 +268,11 @@ export type Database = {
       }
       orders: {
         Row: {
+          tracking_token: string
+          pod_collected_usd: number | null
+          cash_discrepancy_usd: number | null
+          location_lat: number | null
+          location_lng: number | null
           area_id: string | null
           code: string
           collection_usd: number
@@ -220,6 +300,11 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          tracking_token?: string
+          pod_collected_usd?: number | null
+          cash_discrepancy_usd?: number | null
+          location_lat?: number | null
+          location_lng?: number | null
           area_id?: string | null
           code?: string
           collection_usd?: number
@@ -247,6 +332,11 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          tracking_token?: string
+          pod_collected_usd?: number | null
+          cash_discrepancy_usd?: number | null
+          location_lat?: number | null
+          location_lng?: number | null
           area_id?: string | null
           code?: string
           collection_usd?: number
@@ -306,6 +396,8 @@ export type Database = {
       }
       settlements: {
         Row: {
+          idempotency_key: string | null
+          amount_lbp: number
           amount_usd: number
           created_at: string
           created_by: string | null
@@ -319,6 +411,8 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          idempotency_key?: string | null
+          amount_lbp?: number
           amount_usd: number
           created_at?: string
           created_by?: string | null
@@ -332,6 +426,8 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          idempotency_key?: string | null
+          amount_lbp?: number
           amount_usd?: number
           created_at?: string
           created_by?: string | null
@@ -379,14 +475,12 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
-          api_key: string | null
           balance_usd: number
           created_at: string
           id: string
           name: string
           phone: string | null
           prefix: string | null
-          shopify_access_token: string | null
           shopify_domain: string | null
           user_id: string | null
           workspace_id: string
@@ -394,14 +488,12 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
-          api_key?: string | null
           balance_usd?: number
           created_at?: string
           id?: string
           name: string
           phone?: string | null
           prefix?: string | null
-          shopify_access_token?: string | null
           shopify_domain?: string | null
           user_id?: string | null
           workspace_id: string
@@ -409,14 +501,12 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
-          api_key?: string | null
           balance_usd?: number
           created_at?: string
           id?: string
           name?: string
           phone?: string | null
           prefix?: string | null
-          shopify_access_token?: string | null
           shopify_domain?: string | null
           user_id?: string | null
           workspace_id?: string
@@ -504,6 +594,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_staff_invite: { Args: { p_token: string; p_user: string; p_email: string; p_name: string }; Returns: boolean }
+      consume_limit: { Args: { p_key: string; p_max: number }; Returns: boolean }
       is_member: { Args: { ws_id: string }; Returns: boolean }
       my_role: {
         Args: { ws_id: string }
@@ -517,7 +609,7 @@ export type Database = {
         | "picked_up"
         | "delivered"
         | "failed"
-        | "returned"
+        | "returned" | "cancelled"
       settlement_type: "shop_payment" | "driver_cash_remittance" | "driver_pay"
       user_role: "owner" | "manager" | "driver" | "readonly"
     }
@@ -654,6 +746,7 @@ export const Constants = {
         "delivered",
         "failed",
         "returned",
+        "cancelled",
       ],
       settlement_type: ["shop_payment", "driver_cash_remittance", "driver_pay"],
       user_role: ["owner", "manager", "driver", "readonly"],

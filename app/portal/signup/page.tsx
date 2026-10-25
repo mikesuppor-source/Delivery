@@ -52,6 +52,7 @@ export default function PortalSignupPage() {
         throw new Error(data.error || 'Failed to register account.')
       }
 
+      if (data.requiresConfirmation) { setError(data.message); return }
       // Auto sign-in with credentials
       const supabase = createClient()
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -342,7 +343,7 @@ export default function PortalSignupPage() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Min 6 characters"
                 required
-                minLength={6}
+                minLength={10}
                 style={{
                   width: '100%',
                   padding: '10px 14px',

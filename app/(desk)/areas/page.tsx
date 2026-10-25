@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { AreaListClient } from './area-list-client'
@@ -11,25 +12,28 @@ export default async function AreasPage() {
     .from('workspace_members')
     .select('*')
     .eq('user_id', user?.id ?? '')
-    .single()
+    .order('created_at').limit(1).single()
 
   const member = memberData as { workspace_id: string; role: any } | null
   if (!member) return null
   await requireRole(member.workspace_id, 'manager')
 
   const [areasRes, driversRes] = await Promise.all([
-    supabase
-      .from('delivery_areas')
-      .select('id, name, fee_usd, active, default_driver_id, default_driver:default_driver_id(id, name, phone)')
-      .eq('workspace_id', member.workspace_id)
-      .order('name'),
-
-    supabase
-      .from('drivers')
-      .select('id, name, phone, active')
-      .eq('workspace_id', member.workspace_id)
-      .eq('active', true)
-      .order('name'),
+    allRows(
+      supabase
+        .from('delivery_areas')
+        .select('id, name, fee_usd, active, default_driver_id, default_driver:default_driver_id(id, name, phone)')
+        .eq('workspace_id', member.workspace_id)
+        .order('name')
+    ),
+    allRows(
+      supabase
+        .from('drivers')
+        .select('id, name, phone, active')
+        .eq('workspace_id', member.workspace_id)
+        .eq('active', true)
+        .order('name')
+    ),
   ])
 
   return (

@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import { createClient } from '@/lib/supabase/server'
 import { formatUSD, formatLBP, usdToLbp, formatDateOnly } from '@/lib/utils'
 import Link from 'next/link'
@@ -14,7 +15,7 @@ export default async function OverviewPage() {
     .from('workspace_members')
     .select('*')
     .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
-    .single()
+    .order('created_at').limit(1).single()
 
   const member = memberData as { workspace_id: string; role: any } | null
   if (!member) return null
@@ -32,15 +33,15 @@ export default async function OverviewPage() {
 
   // Parallel data fetching for analytics
   const [ordersRes, recentOrdersRes, shopsRes, driversRes] = await Promise.all([
-    supabase
+    allRows(supabase
       .from('orders')
       .select('status, collection_usd, delivery_fee_usd, driver_pay_usd, shop_id, driver_id, created_at')
-      .eq('workspace_id', workspace.id),
+      .eq('workspace_id', workspace.id)),
 
     supabase
       .from('orders')
       .select(`
-        id, code, status, collection_usd, usd_to_lbp_rate, created_at,
+        id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at,
         recipient_name, recipient_phone, recipient_address,
         shop:shop_id(name),
         driver:driver_id(name)
@@ -49,17 +50,17 @@ export default async function OverviewPage() {
       .order('created_at', { ascending: false })
       .limit(8),
 
-    supabase
+    allRows(supabase
       .from('shops')
       .select('id, name, balance_usd, shopify_domain')
       .eq('workspace_id', workspace.id)
-      .eq('active', true),
+      .eq('active', true)),
 
-    supabase
+    allRows(supabase
       .from('drivers')
       .select('id, name, cash_held_usd, pay_owed_usd')
       .eq('workspace_id', workspace.id)
-      .eq('active', true),
+      .eq('active', true)),
   ])
 
   const orders = (ordersRes.data as any[]) || []
@@ -345,7 +346,7 @@ export default async function OverviewPage() {
                     <tr key={order.id}>
                       <td>
                         <Link
-                          href={`/track/${order.code}`}
+                          href={`/track/${order.tracking_token || order.code}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ fontWeight: 700, color: 'var(--brand)', textDecoration: 'none' }}

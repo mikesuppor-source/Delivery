@@ -35,6 +35,7 @@ interface DeliveryArea {
 interface PortalOrder {
   id: string
   code: string
+  tracking_token?: string
   status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'failed' | 'returned'
   collection_usd: number
   delivery_fee_usd: number
@@ -358,7 +359,7 @@ export function PortalClient({
     }
   }
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://delivery-five-roan.vercel.app'
+  const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || '')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -657,7 +658,7 @@ export function PortalClient({
               </thead>
               <tbody>
                 {filteredOrders.map(order => {
-                  const trackingUrl = `${origin}/track/${order.code}`
+                  const trackingUrl = `${origin}/track/${order.tracking_token || order.code}`
                   const whatsappMsg = `Hello ${order.recipient_name || 'Customer'}, your order from ${shop.name} has been registered! Tracking code: #${order.code}. Live tracking: ${trackingUrl}. Amount on delivery: $${Number(order.collection_usd).toFixed(2)} (${usdToLbp(Number(order.collection_usd), order.usd_to_lbp_rate || rate).toLocaleString()} L.L.).`
                   const whatsappUrl = `https://wa.me/${order.recipient_phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`
                   const isRowSelected = selectedOrderIds.includes(order.id)
@@ -837,7 +838,7 @@ export function PortalClient({
                           </Link>
 
                           <Link
-                            href={`/track/${order.code}`}
+                            href={`/track/${order.tracking_token || order.code}`}
                             target="_blank"
                             className="btn btn-ghost btn-sm"
                             style={{ padding: '4px 8px', fontSize: 11, textDecoration: 'none' }}
@@ -1151,7 +1152,7 @@ export function PortalClient({
               {confirmedOrder.recipient_phone && (
                 <a
                   href={`https://wa.me/${confirmedOrder.recipient_phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                    `Hello ${confirmedOrder.recipient_name}! Your delivery from ${shop.name} has been booked. Tracking code: #${confirmedOrder.code}. Track your package live: ${origin}/track/${confirmedOrder.code}. Total Cash on Delivery: $${Number(confirmedOrder.collection_usd).toFixed(2)} (${usdToLbp(Number(confirmedOrder.collection_usd), confirmedOrder.usd_to_lbp_rate || rate).toLocaleString()} L.L.). Thank you!`
+                    `Hello ${confirmedOrder.recipient_name}! Your delivery from ${shop.name} has been booked. Tracking code: #${confirmedOrder.code}. Track your package live: ${origin}/track/${confirmedOrder.tracking_token || confirmedOrder.code}. Total Cash on Delivery: $${Number(confirmedOrder.collection_usd).toFixed(2)} (${usdToLbp(Number(confirmedOrder.collection_usd), confirmedOrder.usd_to_lbp_rate || rate).toLocaleString()} L.L.). Thank you!`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -1534,7 +1535,7 @@ export function PortalClient({
                 </Link>
 
                 <Link
-                  href={`/track/${inspectingOrder.code}`}
+                  href={`/track/${inspectingOrder.tracking_token || inspectingOrder.code}`}
                   target="_blank"
                   className="btn btn-primary btn-sm"
                   style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
@@ -1553,7 +1554,7 @@ export function PortalClient({
         onClose={() => setIsShopifyModalOpen(false)}
         shop={shop}
         onOrderCreated={newOrder => {
-          setOrders(prev => [newOrder, ...prev])
+          setOrders(prev => [newOrder as any, ...prev])
         }}
       />
 

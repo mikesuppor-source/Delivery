@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       .from('delivery_areas')
       .select('id, name, default_driver_id')
       .eq('workspace_id', workspaceId)
+      .eq('active', true)
       .not('default_driver_id', 'is', null)
 
     if (areaErr || !areas || areas.length === 0) {
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     // 2. Fetch all unassigned pending orders in this workspace
     const { data: unassignedOrders, error: orderErr } = await serviceClient
       .from('orders')
-      .select('id, code, area_id')
+      .select('id, code, tracking_token, area_id')
       .eq('workspace_id', workspaceId)
       .is('driver_id', null)
       .eq('status', 'pending')
@@ -76,16 +77,18 @@ export async function POST(req: NextRequest) {
     for (const order of unassignedOrders) {
       if (order.area_id && areaDriverMap.has(order.area_id)) {
         const driverId = areaDriverMap.get(order.area_id)!
-        const { error: updErr } = await serviceClient
+        const { data: activeDriver } = await serviceClient.from('drivers').select('id').eq('id', driverId).eq('workspace_id', workspaceId).eq('active', true).maybeSingle()
+        if (!activeDriver) continue
+        const { data: assigned, error: updErr } = await serviceClient
           .from('orders')
           .update({
             driver_id: driverId,
             status: 'assigned',
             updated_at: new Date().toISOString(),
           })
-          .eq('id', order.id)
+          .eq('id', order.id).eq('status', 'pending').is('driver_id', null).select('id')
 
-        if (!updErr) {
+        if (!updErr && assigned?.length) {
           assignedCount++
           assignedCodes.push(order.code)
         }

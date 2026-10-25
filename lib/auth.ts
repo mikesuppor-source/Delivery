@@ -1,3 +1,4 @@
+import type { Json } from './supabase/database.types'
 import { redirect } from 'next/navigation'
 import { createClient } from './supabase/server'
 import { UserRole, hasMinRole } from './roles'
@@ -69,6 +70,6 @@ export async function writeAuditLog({
     action,
     entity_type: entityType,
     entity_id: entityId,
-    diff: diff ?? null,
+    diff: (diff ?? null) as Json,
   })
 }

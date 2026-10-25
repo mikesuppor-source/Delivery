@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { syncShopify } from '@/lib/shopify-client'
+import { useRef, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Modal } from '@/components/modal'
@@ -36,6 +37,7 @@ interface Shop {
 interface OrderItem {
   id: string
   code: string
+  tracking_token?: string
   status: string
   collection_usd: number
   delivery_fee_usd: number
@@ -84,6 +86,7 @@ export function ShopProfileClient({
   workspace,
   userRole,
 }: ShopProfileClientProps) {
+  const settlementRequestId = useRef<string | null>(null)
   const [shop, setShop] = useState<Shop>(initialShop)
   const [orders] = useState<OrderItem[]>(initialOrders)
   const [settlements, setSettlements] = useState<SettlementItem[]>(initialSettlements)
@@ -120,22 +123,7 @@ export function ShopProfileClient({
   async function handleSyncShopifyOrders() {
     setSyncingShopify(true)
     try {
-      const res = await fetch('/api/shops/shopify/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shopId: shop.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        if (data.reauthUrl) {
-          if (confirm(`${data.error}\n\nWould you like to re-authorize Cedar Delivery now to upgrade your token with Shopify?`)) {
-            window.location.href = data.reauthUrl
-            return
-          }
-        }
-        throw new Error(data.error || 'Failed to sync Shopify orders')
-      }
-
+      const data = await syncShopify(shop.id)
       alert(data.message || `Successfully synced ${data.importedCount || 0} order(s)!`)
       window.location.reload()
     } catch (err: unknown) {
@@ -265,10 +253,12 @@ export function ShopProfileClient({
     }
 
     try {
+      const requestId = settlementRequestId.current ||= crypto.randomUUID()
       const res = await fetch('/api/settle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          idempotencyKey: requestId,
           workspaceId: workspace.id,
           type: 'shop_payment',
           direction: settlementDirection,
@@ -280,6 +270,7 @@ export function ShopProfileClient({
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to record shop settlement')
+      settlementRequestId.current = null
 
       // Update shop balance in local state:
       // Payout (Desk -> Shop): decreases balance
@@ -1194,7 +1185,7 @@ export function ShopProfileClient({
                       {/* Code */}
                       <td>
                         <Link
-                          href={`/track/${order.code}`}
+                          href={`/track/${order.tracking_token || order.code}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
@@ -1225,6 +1216,7 @@ export function ShopProfileClient({
                                   customerPhone: order.recipient_phone,
                                   customerName: order.recipient_name,
                                   orderCode: order.code,
+      trackingToken: order.tracking_token,
                                   shopName: shop.name,
                                   collectionUsd: Number(order.collection_usd) || 0,
                                   collectionLbp: codLbp,
@@ -1308,7 +1300,7 @@ export function ShopProfileClient({
                       {/* Actions */}
                       <td style={{ textAlign: 'right' }}>
                         <Link
-                          href={`/track/${order.code}`}
+                          href={`/track/${order.tracking_token || order.code}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-ghost"

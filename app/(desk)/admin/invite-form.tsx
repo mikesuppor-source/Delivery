@@ -44,14 +44,14 @@ export function InviteForm({ workspaceId, pendingInvites }: InviteFormProps) {
 
     const data = await res.json()
     if (res.ok) {
-      setSuccess(`Invitation created for ${email}`)
+      setSuccess(data.message || `Invitation created for ${email}`)
       if (data.inviteUrl) {
         setCreatedInviteUrl(data.inviteUrl)
       }
       setEmail('')
       // Optimistically add to pending list
       setInvites(prev => [{
-        id: Date.now().toString(),
+        id: data.invitationId,
         email,
         role,
         expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),

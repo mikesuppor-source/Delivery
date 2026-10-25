@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { OrderReceiptSlip } from '@/components/order-receipt-slip'
 import { PrintButton } from '@/components/print-button'
 import Link from 'next/link'
@@ -20,7 +20,7 @@ export async function generateMetadata({ searchParams }: PrintBulkPageProps): Pr
 
 export default async function PrintBulkPage({ searchParams }: PrintBulkPageProps) {
   const { ids, codes, print } = await searchParams
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   const idList = ids ? ids.split(',').map(s => s.trim()).filter(Boolean) : []
   const codeList = codes ? codes.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : []
@@ -32,7 +32,7 @@ export default async function PrintBulkPage({ searchParams }: PrintBulkPageProps
   let query = supabase
     .from('orders')
     .select(`
-      id, code, status, collection_usd, delivery_fee_usd, driver_pay_usd,
+      id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
       shop_balance_usd, usd_to_lbp_rate, created_at, notes,
       recipient_name, recipient_phone, recipient_address,
       shop:shop_id(id, name, phone),

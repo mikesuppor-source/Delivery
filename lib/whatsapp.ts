@@ -45,7 +45,7 @@ export function getBaseUrl(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin.replace(/\/$/, '')
   }
-  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://delivery-five-roan.vercel.app').replace(/\/$/, '')
+  return (process.env.NEXT_PUBLIC_SITE_URL || (process.env.NEXT_PUBLIC_SITE_URL || '')).replace(/\/$/, '')
 }
 
 /**
@@ -55,6 +55,7 @@ export function getCustomerOrderWhatsAppUrl(order: {
   customerPhone?: string | null
   customerName?: string | null
   orderCode: string
+  trackingToken?: string
   shopName?: string | null
   collectionUsd: number
   collectionLbp?: number
@@ -72,7 +73,7 @@ export function getCustomerOrderWhatsAppUrl(order: {
   if (order.collectionUsd > 0) {
     msg += `💵 *COD to Collect:* ${formatUSD(order.collectionUsd)}\n`
   }
-  msg += `📦 *Live Tracking:* ${baseUrl}/track/${order.orderCode}\n\n`
+  msg += `📦 *Live Tracking:* ${baseUrl}/track/${order.trackingToken || order.orderCode}\n\n`
   msg += `Please reply with your delivery instructions or live location pin 📍. Thank you! 🌲`
   return getWhatsAppUrl(order.customerPhone, msg)
 }
@@ -82,6 +83,7 @@ export function getCustomerOrderWhatsAppUrl(order: {
  */
 export function buildCustomerOrderMessage(order: {
   code: string
+  tracking_token?: string
   recipient_name?: string | null
   recipient_address?: string | null
   collection_usd: number
@@ -110,7 +112,7 @@ export function buildCustomerOrderMessage(order: {
     if (order.recipient_address) {
       msg += `📍 *Destination:* ${order.recipient_address}\n`
     }
-    msg += `📦 *Live Tracking:* ${baseUrl}/track/${order.code}\n\n`
+    msg += `📦 *Live Tracking:* ${baseUrl}/track/${order.tracking_token || order.code}\n\n`
     msg += `The courier will contact you shortly before arrival. Thank you! 🌲`
     return msg
   }
@@ -122,7 +124,7 @@ export function buildCustomerOrderMessage(order: {
     if (colUSD > 0) {
       msg += `💵 *Amount Collected:* ${formatUSD(colUSD)}\n`
     }
-    msg += `📦 *Delivery Receipt:* ${baseUrl}/track/${order.code}\n\n`
+    msg += `📦 *Delivery Receipt:* ${baseUrl}/track/${order.tracking_token || order.code}\n\n`
     msg += `Thank you for trusting Cedar Delivery! 🌲`
     return msg
   }
@@ -140,7 +142,7 @@ export function buildCustomerOrderMessage(order: {
     msg += `📍 *Delivery Address:* ${order.recipient_address}\n`
   }
 
-  msg += `📦 *Track Package:* ${baseUrl}/track/${order.code}\n`
+  msg += `📦 *Track Package:* ${baseUrl}/track/${order.tracking_token || order.code}\n`
 
   msg += `\nPlease reply with your live location pin 📍 or let us know if you are available to receive your order today.\n\nThank you! 🌲`
   return msg
@@ -151,6 +153,7 @@ export function buildCustomerOrderMessage(order: {
  */
 export function buildDriverDispatchMessage(order: {
   code: string
+  tracking_token?: string
   recipient_name?: string | null
   recipient_phone?: string | null
   recipient_address?: string | null

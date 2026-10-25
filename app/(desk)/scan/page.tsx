@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import { createClient } from '@/lib/supabase/server'
 // Interactive barcode & QR code camera scanner client
 import { ScanClient } from './scan-client'
@@ -16,17 +17,17 @@ export default async function ScanPage() {
     .from('workspace_members')
     .select('workspace_id, role')
     .eq('user_id', user?.id ?? '')
-    .single()
+    .order('created_at').limit(1).single()
 
   const workspaceId = member?.workspace_id || ''
 
   // Fetch active drivers for quick in-scanner assignment
-  const { data: drivers } = await supabase
+  const { data: drivers } = await allRows(supabase
     .from('drivers')
     .select('id, name, phone, active')
     .eq('workspace_id', workspaceId)
     .eq('active', true)
-    .order('name')
+    .order('name'))
 
   // Fetch workspace exchange rate
   const { data: ws } = await supabase

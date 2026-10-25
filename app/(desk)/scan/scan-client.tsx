@@ -35,6 +35,7 @@ interface Driver {
 interface ScannedOrder {
   id: string
   code: string
+  tracking_token?: string
   status: string
   collection_usd: number
   delivery_fee_usd: number
@@ -190,11 +191,12 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
     setActionLoading(true)
     try {
       const payload: Record<string, unknown> = {
-        id: orderId,
+        orderId,
+        workspaceId,
         status: newStatus,
       }
       if (driverId) {
-        payload.driver_id = driverId
+        payload.driverId = driverId
       }
 
       const res = await fetch('/api/orders', {
@@ -226,8 +228,9 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: order.id,
-          driver_id: driverId || null,
+          orderId: order.id,
+          workspaceId,
+          driverId: driverId || null,
           status: driverId && order.status === 'pending' ? 'assigned' : order.status,
         }),
       })
@@ -623,7 +626,7 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
               </Link>
 
               <Link
-                href={`/track/${order.code}`}
+                href={`/track/${order.tracking_token || order.code}`}
                 target="_blank"
                 className="btn btn-ghost"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
@@ -658,6 +661,7 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
                       customerPhone: order.recipient_phone,
                       customerName: order.recipient_name,
                       orderCode: order.code,
+      trackingToken: order.tracking_token,
                       shopName: order.shop?.name,
                       collectionUsd: Number(order.collection_usd) || 0,
                       driverName: order.driver?.name,

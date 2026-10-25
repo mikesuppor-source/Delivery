@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ShopProfileClient } from './shop-profile-client'
@@ -40,10 +41,10 @@ export default async function ShopProfilePage({ params }: ShopProfilePageProps) 
       .eq('workspace_id', workspace.id)
       .single(),
 
-    supabase
+    allRows(supabase
       .from('orders')
       .select(`
-        id, code, status, collection_usd, delivery_fee_usd, driver_pay_usd,
+        id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
         shop_balance_usd, usd_to_lbp_rate, created_at, recipient_name,
         recipient_phone, recipient_address, notes,
         shopify_order_id, shopify_order_number,
@@ -52,14 +53,14 @@ export default async function ShopProfilePage({ params }: ShopProfilePageProps) 
       `)
       .eq('workspace_id', workspace.id)
       .eq('shop_id', id)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })),
 
-    supabase
+    allRows(supabase
       .from('settlements')
       .select('id, type, amount_usd, usd_to_lbp, note, created_at, created_by')
       .eq('workspace_id', workspace.id)
       .eq('shop_id', id)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })),
   ])
 
   if (!shopRes.data) {

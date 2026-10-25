@@ -55,6 +55,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   delivered: 'Delivered',
   failed: 'Failed',
   returned: 'Returned',
+  cancelled: 'Cancelled',
 }
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
@@ -64,6 +65,7 @@ export const ORDER_STATUS_COLORS: Record<string, string> = {
   delivered: '#24634f',
   failed: '#c0392b',
   returned: '#777',
+  cancelled: '#777',
 }
 
 /** Role display */

@@ -7,6 +7,7 @@ interface DeliveryFailModalProps {
   order: {
     id: string
     code: string
+    tracking_token?: string
     recipient_name: string | null
     recipient_phone: string | null
     shop?: { name: string; phone?: string | null } | null

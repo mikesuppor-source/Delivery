@@ -38,8 +38,7 @@ export function CustomerGpsShare({ orderId, orderCode, currentAddress }: Custome
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              orderId,
-              code: orderCode,
+              token: orderCode,
               lat,
               lng,
               extraNotes: extraNotes.trim() || undefined,

@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import { createClient } from '@/lib/supabase/server'
 import { ShopListClient } from './shop-list-client'
 import type { UserRole } from '@/lib/auth'
@@ -10,16 +11,16 @@ export default async function ShopsPage() {
     .from('workspace_members')
     .select('*')
     .eq('user_id', user?.id ?? '')
-    .single()
+    .order('created_at').limit(1).single()
 
   const member = memberData as { workspace_id: string; role: any } | null
   if (!member) return null
 
-  const { data: shops } = await supabase
+  const { data: shops } = await allRows(supabase
     .from('shops')
     .select('id, name, phone, address, active, balance_usd, created_at, shopify_domain')
     .eq('workspace_id', member.workspace_id)
-    .order('name')
+    .order('name'))
 
   return (
     <div className="content">

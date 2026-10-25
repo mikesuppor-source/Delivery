@@ -13,6 +13,9 @@ export default async function DeskLayout({
 
   if (!user) redirect('/login')
 
+  const { data: merchantShop } = await supabase.from('shops').select('id').eq('user_id', user.id).limit(1).maybeSingle()
+  if (merchantShop) redirect('/portal')
+
   // Get user's workspace membership
   const { data: memberData } = await supabase
     .from('workspace_members')

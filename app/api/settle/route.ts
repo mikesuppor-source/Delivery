@@ -1,123 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
-
-export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const {
-    workspaceId,
-    type, // 'driver_cash_remittance' | 'shop_payment' | 'driver_pay'
-    direction, // 'payout_to_shop' | 'collection_from_shop'
-    amountUsd,
-    shopId,
-    driverId,
-    orderId,
-    note,
-  } = await req.json()
-
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('role')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (!member || (member.role !== 'owner' && member.role !== 'manager')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  // Get current workspace exchange rate
-  const { data: ws } = await supabase
-    .from('workspaces')
-    .select('usd_to_lbp')
-    .eq('id', workspaceId)
-    .single()
-
-  const usdToLbp = ws?.usd_to_lbp || 89500
-  const serviceClient = createServiceClient()
-  const rawAmount = Math.abs(Number(amountUsd) || 0)
-  // If company is collecting cash from the merchant (merchant paying debt to company),
-  // settlement amount is negative so balance_usd increases towards 0: balance - (-rawAmount) = balance + rawAmount
-  const amount = type === 'shop_payment' && direction === 'collection_from_shop' ? -rawAmount : rawAmount
-
-  // Insert settlement record
-  const { data: settlement, error } = await serviceClient
-    .from('settlements')
-    .insert({
-      workspace_id: workspaceId,
-      type,
-      amount_usd: amount,
-      usd_to_lbp: usdToLbp,
-      shop_id: shopId || null,
-      driver_id: driverId || null,
-      order_id: orderId || null,
-      note: note || null,
-      created_by: user.id,
-    })
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Adjust balances based on settlement type
-  if (type === 'driver_cash_remittance' && driverId) {
-    const { data: drv } = await serviceClient
-      .from('drivers')
-      .select('cash_held_usd')
-      .eq('id', driverId)
-      .single()
-
-    if (drv) {
-      await serviceClient
-        .from('drivers')
-        .update({
-          cash_held_usd: Math.max(0, Number(drv.cash_held_usd) - amount),
-        })
-        .eq('id', driverId)
-    }
-  } else if (type === 'driver_pay' && driverId) {
-    const { data: drv } = await serviceClient
-      .from('drivers')
-      .select('pay_owed_usd')
-      .eq('id', driverId)
-      .single()
-
-    if (drv) {
-      await serviceClient
-        .from('drivers')
-        .update({
-          pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) - amount),
-        })
-        .eq('id', driverId)
-    }
-  } else if (type === 'shop_payment' && shopId) {
-    const { data: shp } = await serviceClient
-      .from('shops')
-      .select('balance_usd')
-      .eq('id', shopId)
-      .single()
-
-    if (shp) {
-      await serviceClient
-        .from('shops')
-        .update({
-          balance_usd: Number(shp.balance_usd) - amount,
-        })
-        .eq('id', shopId)
-    }
-  }
-
-  await serviceClient.from('audit_log').insert({
-    workspace_id: workspaceId,
-    actor_id: user.id,
-    actor_email: user.email,
-    action: `settlement.${type}`,
-    entity_type: 'settlement',
-    entity_id: settlement.id,
-    diff: { amount, type, note },
-  })
-
-  return NextResponse.json({ success: true, settlement })
-}
+import { NextResponse } from 'next/server'
+import { api, ApiError, checked, money, textField, uuid } from '@/lib/api'
+import { workspaceAccess, validateReferences } from '@/lib/access'
+export const POST=api(async req=>{
+ const body=await req.json()
+ const {db,user,workspaceId}=await workspaceAccess(body.workspaceId)
+ if(!['shop_payment','driver_cash_remittance','driver_pay'].includes(body.type)) throw new ApiError(400,'Invalid settlement type')
+ const key=uuid(body.idempotencyKey,'payment request ID')
+ const amount=money(body.amountUsd,'amount'), lbp=money(body.amountLbp,'LBP amount')
+ if(amount===0 && lbp===0) throw new ApiError(400,'Enter a positive payment')
+ if(body.type==='shop_payment' ? !body.shopId||body.driverId||lbp : !body.driverId||body.shopId) throw new ApiError(400,'Select the correct settlement recipient')
+ if(body.type==='driver_pay' && lbp) throw new ApiError(400,'Driver pay is in USD')
+ if(body.type==='shop_payment' && !['payout_to_shop','collection_from_shop',undefined].includes(body.direction)) throw new ApiError(400,'Invalid payment direction')
+ await validateReferences(db,workspaceId,{shops:body.shopId,drivers:body.driverId,orders:body.orderId})
+ const ws=checked(await db.from('workspaces').select('usd_to_lbp').eq('id',workspaceId).single())
+ const payload={workspace_id:workspaceId,type:body.type,amount_usd:body.direction==='collection_from_shop'?-amount:amount,amount_lbp:lbp,
+   shop_id:body.shopId||null,driver_id:body.driverId||null,order_id:body.orderId||null,note:textField(body.note,'note',2000),
+   usd_to_lbp:ws.usd_to_lbp,created_by:user.id,idempotency_key:key}
+ const result=await db.from('settlements').insert(payload).select().single()
+ if(result.error?.code==='23505') {
+   const old=checked(await db.from('settlements').select('*').eq('workspace_id',workspaceId).eq('idempotency_key',key).single())
+   if(old.created_by!==user.id || old.type!==payload.type || Number(old.amount_usd)!==payload.amount_usd || Number(old.amount_lbp)!==lbp || old.shop_id!==payload.shop_id || old.driver_id!==payload.driver_id || old.order_id!==payload.order_id || old.note!==payload.note) throw new ApiError(409,'Payment request ID already used for different details')
+   return NextResponse.json({success:true,settlement:old})
+ }
+ return NextResponse.json({success:true,settlement:checked(result)})
+})

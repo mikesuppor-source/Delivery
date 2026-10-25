@@ -1,35 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
-
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const rawShop = searchParams.get('shop')
-
-    if (!rawShop) {
-      return NextResponse.json({ error: 'Missing ?shop= parameter (e.g. yourstore.myshopify.com)' }, { status: 400 })
-    }
-
-    let cleanShop = rawShop.trim().toLowerCase()
-    cleanShop = cleanShop.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-    if (!cleanShop.includes('.')) {
-      cleanShop = `${cleanShop}.myshopify.com`
-    }
-
-    const clientId = process.env.SHOPIFY_CLIENT_ID || process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || 'cf8028e469ae3e06ebefe5fec8fd96d3'
-
-    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000'
-    const proto = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https')
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || `${proto}://${host}`
-
-    const redirectUri = `${appBaseUrl}/api/shops/shopify/callback`
-    const scopes = 'read_orders,write_orders,read_fulfillments,write_fulfillments'
-    const state = crypto.randomBytes(16).toString('hex')
-
-    const installUrl = `https://${cleanShop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
-
-    return NextResponse.redirect(installUrl)
-  } catch (err: unknown) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Auth redirect error' }, { status: 500 })
-  }
-}
+import { NextResponse } from 'next/server'
+import { randomBytes } from 'node:crypto'
+import { api, checked } from '@/lib/api'
+import { shopAccess } from '@/lib/access'
+import { shopDomain, siteUrl, shopifyCredentials } from '@/lib/shopify-security'
+export const GET=api(async req=>{
+ const params=new URL(req.url).searchParams
+ const {db,user,shop}=await shopAccess(params.get('shopId')||undefined)
+ const domain=shopDomain(params.get('shop')||shop.shopify_domain)
+ const {clientId}=shopifyCredentials()
+ const state=randomBytes(32).toString('hex')
+ checked(await db.from('oauth_states').insert({nonce:state,user_id:user.id,shop_id:shop.id,domain}).select('nonce'))
+ const query=new URLSearchParams({client_id:clientId,scope:'read_orders,write_orders',redirect_uri:siteUrl()+'/api/shops/shopify/callback',state})
+ const response=NextResponse.redirect('https://'+domain+'/admin/oauth/authorize?'+query)
+ response.cookies.set('cedar_oauth_state',state,{httpOnly:true,secure:siteUrl().startsWith('https:'),sameSite:'lax',path:'/api/shops/shopify/callback',maxAge:600})
+ return response
+})

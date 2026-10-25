@@ -1,5 +1,6 @@
+import { allRows } from '@/lib/pagination'
 import { notFound } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { DriverRunSheetClient } from './driver-run-sheet-client'
 import type { Metadata } from 'next'
 
@@ -9,7 +10,7 @@ interface DriverRunSheetPageProps {
 
 export async function generateMetadata({ params }: DriverRunSheetPageProps): Promise<Metadata> {
   const { id } = await params
-  const supabase = createServiceClient()
+  const supabase = await createClient()
   const { data: driver } = await supabase
     .from('drivers')
     .select('name')
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: DriverRunSheetPageProps): Pro
 
 export default async function DriverRunSheetPage({ params }: DriverRunSheetPageProps) {
   const { id } = await params
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   // 1. Fetch driver details
   const { data: driver, error: driverErr } = await supabase
@@ -48,20 +49,20 @@ export default async function DriverRunSheetPage({ params }: DriverRunSheetPageP
   const rate = Number(workspace?.usd_to_lbp) || 89500
 
   // 3. Fetch all orders assigned to this driver
-  const { data: rawOrders } = await supabase
+  const { data: rawOrders } = await allRows(supabase
     .from('orders')
     .select(`
-      id, code, status, collection_usd, delivery_fee_usd, driver_pay_usd,
+      id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
       shop_balance_usd, usd_to_lbp_rate, created_at, delivered_at,
-      recipient_name, recipient_phone, recipient_address, notes,
+      recipient_name, recipient_phone, recipient_address, location_lat, location_lng, notes,
       pod_signature, pod_photo, pod_collected_lbp,
       shop:shop_id(id, name, phone),
       area:area_id(id, name)
     `)
     .eq('driver_id', id)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }))
 
-  const orders = (rawOrders as any[]) || []
+  const orders = ((rawOrders as any[]) || []).map(o => ({...o, recipient_address: o.location_lat != null && o.location_lng != null ? (o.recipient_address || '') + ' (https://maps.google.com/?q=' + o.location_lat + ',' + o.location_lng + ')' : o.recipient_address}))
 
   return (
     <DriverRunSheetClient

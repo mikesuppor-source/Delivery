@@ -47,7 +47,7 @@ export function LocationHelper({
         const pinUrl = `https://maps.google.com/?q=${lat},${lng}`
 
         // If user already typed some text instructions (e.g. "Bldg 4, 3rd floor"), preserve it and append pin
-        let newAddr = ''
+        let newAddr: string
         if (address && !address.includes('http') && !address.includes(lat)) {
           newAddr = `${address.trim()} (${pinUrl})`
         } else {

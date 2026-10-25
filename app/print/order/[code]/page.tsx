@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { OrderReceiptSlip } from '@/components/order-receipt-slip'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -20,12 +20,12 @@ export async function generateMetadata({ params }: PrintOrderPageProps): Promise
 export default async function PrintOrderPage({ params, searchParams }: PrintOrderPageProps) {
   const { code } = await params
   const { print } = await searchParams
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   const { data: rawOrder } = await supabase
     .from('orders')
     .select(`
-      id, code, status, collection_usd, delivery_fee_usd, driver_pay_usd,
+      id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
       shop_balance_usd, usd_to_lbp_rate, created_at, notes,
       recipient_name, recipient_phone, recipient_address,
       shop:shop_id(id, name, phone),

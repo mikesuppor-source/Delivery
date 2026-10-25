@@ -7,6 +7,7 @@ export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
 
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return NextResponse.json({error:'Application is not configured'}, {status:503})
   const supabase = createServerClient(
     url,
     key,
@@ -27,24 +28,11 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const isPublic = path.startsWith('/login') ||
-                   path.startsWith('/invite') ||
-                   path.startsWith('/track') ||
-                   path.startsWith('/print') ||
-                   path.startsWith('/shopify') ||
-                   path.startsWith('/portal/login') ||
-                   path.startsWith('/portal/signup') ||
-                   path.startsWith('/api/portal/auth') ||
-                   path.startsWith('/api/webhooks') ||
-                   path.startsWith('/api/shops/shopify') ||
-                   path.startsWith('/_next') ||
-                   path.startsWith('/api/invite') ||
-                   path === '/favicon.ico' ||
-                   path === '/logo.png' ||
-                   /\.(png|jpg|jpeg|svg|ico|webp)$/.test(path)
+  const isPublic = ['/login','/portal/login','/portal/signup','/shopify','/track','/api/portal/auth/signup','/api/webhooks/shopify','/api/orders/location','/api/invite/preview','/favicon.ico','/logo.png'].includes(path) || path.startsWith('/track/') || path.startsWith('/invite/')
 
   // Redirect unauthenticated users
   if (!user && !isPublic) {
+    if (path.startsWith('/api/')) return NextResponse.json({ error: 'Please sign in' }, { status: 401 })
     const url = request.nextUrl.clone()
     if (path.startsWith('/portal')) {
       url.pathname = '/portal/login'

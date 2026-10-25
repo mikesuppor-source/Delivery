@@ -1,3 +1,4 @@
+import { allRows } from '@/lib/pagination'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 // Merchant self-service dashboard client
@@ -23,23 +24,7 @@ export default async function MerchantPortalPage() {
   // Find shop connected to this user via multi-level fallback
   let shop = await getShopForUser(serviceClient, user)
 
-  // Fallback for desk owners or managers testing the portal
-  if (!shop) {
-    const { data: member } = await serviceClient
-      .from('workspace_members')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle()
 
-    if (member && (member.role === 'owner' || member.role === 'manager')) {
-      const { data: anyShop } = await serviceClient
-        .from('shops')
-        .select('*')
-        .limit(1)
-        .maybeSingle()
-      shop = anyShop
-    }
-  }
 
   if (!shop) {
     redirect('/portal/signup')
@@ -49,10 +34,10 @@ export default async function MerchantPortalPage() {
   const effectiveShop = { ...shop, prefix: shopPrefix }
 
   // Fetch shop orders
-  const { data: orders } = await serviceClient
+  const { data: orders } = await allRows(serviceClient
     .from('orders')
     .select(`
-      id, code, status, collection_usd, delivery_fee_usd, shop_balance_usd,
+      id, code, tracking_token, status, collection_usd, delivery_fee_usd, shop_balance_usd,
       usd_to_lbp_rate, created_at, delivered_at, notes,
       recipient_name, recipient_phone, recipient_address,
       shopify_order_id, shopify_order_number,
@@ -60,15 +45,15 @@ export default async function MerchantPortalPage() {
       driver:driver_id(id, name, phone)
     `)
     .eq('shop_id', effectiveShop.id)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }))
 
   // Fetch delivery areas
-  const { data: areas } = await serviceClient
+  const { data: areas } = await allRows(serviceClient
     .from('delivery_areas')
     .select('id, name, fee_usd')
     .eq('workspace_id', effectiveShop.workspace_id)
     .eq('active', true)
-    .order('name')
+    .order('name'))
 
   // Fetch workspace exchange rate
   const { data: ws } = await serviceClient

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { formatUSD, formatLBP, usdToLbp, formatDate } from '@/lib/utils'
 import type { Metadata } from 'next'
 
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: SettlementPrintPageProps): Pr
 export default async function SettlementPrintPage({ params, searchParams }: SettlementPrintPageProps) {
   const { id } = await params
   const { print } = await searchParams
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   // 1. Fetch settlement record
   const { data: settlement } = await supabase

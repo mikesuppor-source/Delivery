@@ -10,6 +10,7 @@ import { PrinterIcon } from '@/components/icons'
 export interface ScannedOrder {
   id: string
   code: string
+  tracking_token?: string
   status: OrderStatus
   collection_usd: number
   delivery_fee_usd: number

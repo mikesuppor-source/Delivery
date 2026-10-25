@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Modal } from '@/components/modal'
 import { formatUSD, formatLBP, usdToLbp, formatDate } from '@/lib/utils'
 
 interface Order {
   id: string
   code: string
+  tracking_token?: string
   status: string
   collection_usd: number
   delivery_fee_usd: number
@@ -47,6 +48,7 @@ export function StatementClient({
   workspaceId,
   rate,
 }: StatementClientProps) {
+  const settlementRequestId = useRef<string | null>(null)
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [shops, setShops] = useState<Shop[]>(initialShops)
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers)
@@ -97,10 +99,12 @@ export function StatementClient({
       const direction = settlementType === 'shop_collection' ? 'collection_from_shop' : 'payout_to_shop'
       const apiType = isShop ? 'shop_payment' : settlementType
 
+      const requestId = settlementRequestId.current ||= crypto.randomUUID()
       const res = await fetch('/api/settle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          idempotencyKey: requestId,
           workspaceId,
           type: apiType,
           direction: isShop ? direction : undefined,
@@ -113,6 +117,7 @@ export function StatementClient({
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to process settlement')
+      settlementRequestId.current = null
 
       const amt = Number(amountUsd)
       if (settlementType === 'driver_cash_remittance') {

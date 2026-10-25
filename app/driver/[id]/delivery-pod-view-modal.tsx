@@ -5,7 +5,9 @@ import { formatDate } from '@/lib/utils'
 
 interface DeliveryPodViewModalProps {
   order: {
+    id: string
     code: string
+    tracking_token?: string
     recipient_name: string | null
     delivered_at?: string | null
     pod_signature?: string | null
@@ -102,7 +104,7 @@ export function DeliveryPodViewModal({ order, onClose }: DeliveryPodViewModalPro
                 }}
               >
                 <img
-                  src={order.pod_signature}
+                  src={'/api/orders/'+order.id+'/pod?kind=signature'}
                   alt="Customer Signature"
                   style={{ maxHeight: 120, width: 'auto', display: 'block' }}
                 />
@@ -128,7 +130,7 @@ export function DeliveryPodViewModal({ order, onClose }: DeliveryPodViewModalPro
                 }}
               >
                 <img
-                  src={order.pod_photo}
+                  src={'/api/orders/'+order.id+'/pod?kind=photo'}
                   alt="Handover Snapshot"
                   style={{ width: '100%', maxHeight: 280, objectFit: 'contain', display: 'block', background: '#020617' }}
                 />

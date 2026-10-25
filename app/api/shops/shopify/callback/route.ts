@@ -1,176 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { api, ApiError, checked } from '@/lib/api'
+import { shopAccess } from '@/lib/access'
 import { createServiceClient } from '@/lib/supabase/server'
-import crypto from 'crypto'
-
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const code = searchParams.get('code')
-    const rawShop = searchParams.get('shop')
-
-    if (!code || !rawShop) {
-      return NextResponse.json({ error: 'Missing code or shop parameter from Shopify callback' }, { status: 400 })
-    }
-
-    let cleanShop = rawShop.trim().toLowerCase()
-    cleanShop = cleanShop.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-
-    const clientId = process.env.SHOPIFY_CLIENT_ID || process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || 'cf8028e469ae3e06ebefe5fec8fd96d3'
-    const clientSecret = process.env.SHOPIFY_CLIENT_SECRET || ''
-
-    if (!clientSecret) {
-      return NextResponse.json({
-        error: 'SHOPIFY_CLIENT_SECRET is not configured in Vercel environment variables.',
-      }, { status: 500 })
-    }
-
-    // 1. Exchange temporary code for expiring access token & refresh token
-    const tokenRes = await fetch(`https://${cleanShop}/admin/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        expiring: '1',
-      }),
-    })
-
-    if (!tokenRes.ok) {
-      const errBody = await tokenRes.text()
-      return NextResponse.json({
-        error: `Shopify token exchange failed (${tokenRes.status}): ${errBody.slice(0, 150)}`,
-      }, { status: 400 })
-    }
-
-    const tokenData = await tokenRes.json()
-    const accessToken = tokenData.access_token
-
-    if (!accessToken) {
-      return NextResponse.json({ error: 'No access token received from Shopify' }, { status: 400 })
-    }
-
-    // Persist expiring token with refresh token and expiry timestamp
-    const storedToken = JSON.stringify({
-      access_token: accessToken,
-      refresh_token: tokenData.refresh_token || null,
-      expires_at: Date.now() + ((tokenData.expires_in || 3600) - 120) * 1000,
-    })
-
-    // 2. Fetch store info from Shopify
-    let storeName = cleanShop.split('.')[0]
-    let storePhone = null
-    let storeEmail = null
-
-    try {
-      const shopRes = await fetch(`https://${cleanShop}/admin/api/2024-01/shop.json`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': accessToken,
-        },
-      })
-      if (shopRes.ok) {
-        const data = await shopRes.json()
-        if (data.shop) {
-          storeName = data.shop.name || storeName
-          storePhone = data.shop.phone || null
-          storeEmail = data.shop.email || null
-        }
-      }
-    } catch {
-      // Continue even if shop info fetch fails
-    }
-
-    const serviceClient = createServiceClient()
-
-    // 3. Find or create the shop in Cedar Delivery database
-    const { data: existingShop } = await serviceClient
-      .from('shops')
-      .select('*')
-      .eq('shopify_domain', cleanShop)
-      .maybeSingle()
-
-    let targetShop = existingShop
-    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000'
-    const proto = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https')
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || `${proto}://${host}`
-
-    if (!targetShop) {
-      // Find active workspace
-      const { data: ws } = await serviceClient
-        .from('workspaces')
-        .select('id')
-        .order('created_at')
-        .limit(1)
-        .single()
-
-      const generatedKey = 'cdr_shop_' + crypto.randomBytes(16).toString('hex')
-
-      const { data: newShop, error: createErr } = await serviceClient
-        .from('shops')
-        .insert({
-          workspace_id: ws?.id,
-          name: storeName,
-          shopify_domain: cleanShop,
-          shopify_access_token: storedToken,
-          api_key: generatedKey,
-          phone: storePhone,
-          active: true,
-          balance_usd: 0,
-        })
-        .select()
-        .single()
-
-      if (createErr || !newShop) {
-        return NextResponse.json({ error: `Failed to create shop record: ${createErr?.message}` }, { status: 500 })
-      }
-      targetShop = newShop
-    } else {
-      // Update existing shop with new access token
-      let apiKey = targetShop.api_key
-      if (!apiKey) {
-        apiKey = 'cdr_shop_' + crypto.randomBytes(16).toString('hex')
-      }
-
-      await serviceClient
-        .from('shops')
-        .update({
-          shopify_access_token: storedToken,
-          shopify_domain: cleanShop,
-          api_key: apiKey,
-        })
-        .eq('id', targetShop.id)
-
-      targetShop.api_key = apiKey
-    }
-
-    // 4. Automatically register order webhook on Shopify
-    const webhookUrl = `${appBaseUrl}/api/webhooks/shopify?shop_key=${targetShop.api_key}`
-    try {
-      await fetch(`https://${cleanShop}/admin/api/2024-01/webhooks.json`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': accessToken,
-        },
-        body: JSON.stringify({
-          webhook: {
-            topic: 'orders/create',
-            address: webhookUrl,
-            format: 'json',
-          },
-        }),
-      })
-    } catch {
-      // Non-fatal if webhook registration fails on first try
-    }
-
-    // 5. Redirect merchant to success screen
-    return NextResponse.redirect(`${appBaseUrl}/shopify?connected=true&shop=${encodeURIComponent(cleanShop)}`)
-  } catch (err: unknown) {
-    console.error('Error in Shopify OAuth callback:', err)
-    return NextResponse.json({
-      error: err instanceof Error ? err.message : 'Error completing Shopify OAuth callback',
-    }, { status: 500 })
-  }
-}
+import { shopDomain, siteUrl, shopifyCredentials, verifyOAuth, equalSignature, shopifyFetch } from '@/lib/shopify-security'
+import { installShopify } from '@/lib/shopify-install'
+export const GET=api(async req=>{
+ const params=new URL(req.url).searchParams
+ const domain=shopDomain(params.get('shop'))
+ const {clientId,secret}=shopifyCredentials()
+ if(!verifyOAuth(params,secret)) throw new ApiError(403,'Invalid Shopify callback signature')
+ const state=params.get('state')||''
+ if(!equalSignature(state,req.cookies.get('cedar_oauth_state')?.value||'')) throw new ApiError(403,'Invalid OAuth state')
+ const db=createServiceClient()
+ const {data:pending}=await db.from('oauth_states').select('*').eq('nonce',state).eq('domain',domain).gt('expires_at',new Date().toISOString()).maybeSingle()
+ if(!pending) throw new ApiError(403,'OAuth request expired or already used')
+ const {user}=await shopAccess(pending.shop_id)
+ if(user.id!==pending.user_id) throw new ApiError(403,'OAuth session changed')
+ const consumed=checked(await db.from('oauth_states').delete().eq('nonce',state).select('nonce'))
+ if(consumed.length!==1) throw new ApiError(409,'OAuth request already used')
+ const code=params.get('code')
+ if(!code) throw new ApiError(400,'Missing authorization code')
+ const result=await shopifyFetch(domain,'/admin/oauth/access_token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_id:clientId,client_secret:secret,code,expiring:'1'})})
+ if(!result.ok) throw new ApiError(502,'Shopify token exchange failed')
+ const token=await result.json()
+ if(!token.access_token) throw new ApiError(502,'Shopify did not return an access token')
+ await installShopify(pending.shop_id,domain,JSON.stringify({access_token:token.access_token,refresh_token:token.refresh_token,expires_at:token.expires_in?Date.now()+token.expires_in*1000:undefined}))
+ const response=NextResponse.redirect(siteUrl()+'/portal')
+ response.cookies.delete('cedar_oauth_state')
+ return response
+})

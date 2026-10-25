@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Modal } from '@/components/modal'
 import {
@@ -35,6 +35,7 @@ interface Driver {
 interface OrderItem {
   id: string
   code: string
+  tracking_token?: string
   status: string
   collection_usd: number
   delivery_fee_usd: number
@@ -81,6 +82,7 @@ export function DriverProfileClient({
   workspace,
   userRole,
 }: DriverProfileClientProps) {
+  const settlementRequestId = useRef<string | null>(null)
   const [driver, setDriver] = useState<Driver>(initialDriver)
   const [orders] = useState<OrderItem[]>(initialOrders)
   const [settlements, setSettlements] = useState<SettlementItem[]>(initialSettlements)
@@ -235,10 +237,12 @@ export function DriverProfileClient({
     }
 
     try {
+      const requestId = settlementRequestId.current ||= crypto.randomUUID()
       const res = await fetch('/api/settle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          idempotencyKey: requestId,
           workspaceId: workspace.id,
           type: settlementType,
           amountUsd: amount,
@@ -249,6 +253,7 @@ export function DriverProfileClient({
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to record settlement')
+      settlementRequestId.current = null
 
       // Update driver balances in local state
       if (settlementType === 'driver_cash_remittance') {
@@ -1153,7 +1158,7 @@ export function DriverProfileClient({
                       {/* Code */}
                       <td>
                         <Link
-                          href={`/track/${order.code}`}
+                          href={`/track/${order.tracking_token || order.code}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
@@ -1206,6 +1211,7 @@ export function DriverProfileClient({
                                   customerPhone: order.recipient_phone,
                                   customerName: order.recipient_name,
                                   orderCode: order.code,
+      trackingToken: order.tracking_token,
                                   shopName: order.shop?.name,
                                   collectionUsd: Number(order.collection_usd) || 0,
                                   collectionLbp: codLbp,
@@ -1305,7 +1311,7 @@ export function DriverProfileClient({
                       {/* Actions */}
                       <td style={{ textAlign: 'right' }}>
                         <Link
-                          href={`/track/${order.code}`}
+                          href={`/track/${order.tracking_token || order.code}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-ghost"

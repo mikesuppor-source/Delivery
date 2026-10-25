@@ -10,7 +10,7 @@ export default async function SettingsPage() {
     .from('workspace_members')
     .select('*')
     .eq('user_id', user?.id ?? '')
-    .single()
+    .order('created_at').limit(1).single()
 
   const member = memberData as { workspace_id: string; role: any } | null
   if (!member) return null

@@ -13,6 +13,7 @@ import { getGoogleMapsDirectionsUrl, formatDisplayAddress, parseLocation } from 
 export interface ReceiptOrder {
   id: string
   code: string
+  tracking_token?: string
   status: string
   collection_usd: number
   delivery_fee_usd: number
@@ -53,8 +54,8 @@ export function OrderReceiptSlip({
   const isReturn = order.status === 'returned'
 
   // Get current site URL or fallback
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://delivery-five-roan.vercel.app'
-  const trackingUrl = `${origin}/track/${order.code}`
+  const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || '')
+  const trackingUrl = `${origin}/track/${order.tracking_token || order.code}`
 
   // Full Text Receipt summary encoded into QR Code
   const fullTextReceipt = [
@@ -201,6 +202,7 @@ export function OrderReceiptSlip({
                 customerPhone: order.recipient_phone,
                 customerName: order.recipient_name,
                 orderCode: order.code,
+      trackingToken: order.tracking_token,
                 shopName: order.shop?.name,
                 collectionUsd: codUSD,
                 collectionLbp: codLBP,

@@ -1,507 +1,62 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
-import type { OrderStatus } from '@/lib/auth'
-import { generateUniqueOrderCode, formatOrderCode, isOrderCodeUnique } from '@/lib/order-codes'
+import { NextResponse } from 'next/server'
+import { api, ApiError, checked, ids, money, textField, uuid } from '@/lib/api'
+import { authenticated, workspaceAccess, validateReferences } from '@/lib/access'
+import { createClient } from '@/lib/supabase/server'
+import { generateUniqueOrderCode, formatOrderCode } from '@/lib/order-codes'
+import { ORDER_SELECT, orderPatch } from '@/lib/orders'
 
-export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const body = await req.json()
-  const {
-    workspaceId,
-    code: rawCode,
-    shopId,
-    driverId,
-    areaId,
-    collectionUsd,
-    deliveryFeeUsd,
-    driverPayUsd,
-    recipientName,
-    recipientPhone,
-    recipientAddress,
-    notes,
-  } = body
-
-  // Check caller role
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('role')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (!member || (member.role !== 'owner' && member.role !== 'manager')) {
-    return NextResponse.json({ error: 'Forbidden: only owners and managers can create orders' }, { status: 403 })
+export const GET = api(async req => {
+  const { client } = await authenticated()
+  const params = new URL(req.url).searchParams
+  const search = textField(params.get('search'), 'search', 100)
+  const page = Math.max(0, Math.floor(Number(params.get('page')) || 0))
+  let query = client.from('orders').select(ORDER_SELECT, { count: 'exact' })
+  if (search) query = /^[a-f0-9]{64}$/i.test(search) ? query.eq('tracking_token', search.toLowerCase()) : query.eq('code', formatOrderCode(search))
+  const result = await query.order('created_at',{ascending:false}).order('id').range(page*100,page*100+99)
+  const orders=checked(result)
+  return NextResponse.json({ orders, count:result.count, page })
+})
+export const POST = api(async req => {
+  const body=await req.json()
+  const { db,user,workspaceId }=await workspaceAccess(body.workspaceId)
+  await validateReferences(db,workspaceId,{shops:body.shopId,drivers:body.driverId,delivery_areas:body.areaId})
+  const ws=checked(await db.from('workspaces').select('usd_to_lbp').eq('id',workspaceId).single())
+  const code=body.code ? formatOrderCode(textField(body.code,'code',60,true)) : await generateUniqueOrderCode(db,'CD')
+  if (!code) throw new ApiError(400,'Invalid tracking code')
+  const order=checked(await db.from('orders').insert({
+    workspace_id:workspaceId,code,shop_id:body.shopId||null,driver_id:body.driverId||null,area_id:body.areaId||null,
+    status:body.driverId?'assigned':'pending',usd_to_lbp_rate:ws.usd_to_lbp,
+    collection_usd:money(body.collectionUsd,'collection'),delivery_fee_usd:money(body.deliveryFeeUsd,'delivery fee'),
+    driver_pay_usd:money(body.driverPayUsd,'driver pay'),recipient_name:textField(body.recipientName,'recipient',200),
+    recipient_phone:textField(body.recipientPhone,'phone',40),recipient_address:textField(body.recipientAddress,'address',1000),
+    notes:textField(body.notes,'notes',4000),created_by:user.id
+  }).select(ORDER_SELECT).single())
+  return NextResponse.json({success:true,order})
+})
+export const PATCH = api(async req => {
+  const body=await req.json()
+  const {db,user,member,workspaceId}=await workspaceAccess(body.workspaceId,['owner','manager','driver'])
+  const order=checked(await db.from('orders').select('*').eq('id',uuid(body.orderId)).eq('workspace_id',workspaceId).single())
+  if (!order) throw new ApiError(404,'Order not found')
+  const isDriver=member.role==='driver'
+  if(isDriver) {
+    if(!order.driver_id)throw new ApiError(403,'Order is not assigned to you')
+    const {data:driver}=await db.from('drivers').select('id').eq('id',order.driver_id).eq('user_id',user.id).eq('active',true).maybeSingle()
+    if(!driver) throw new ApiError(403,'Order is not assigned to you')
   }
-
-  const serviceClient = createServiceClient()
-
-  // Sanitize and validate custom tracking code if provided, or generate a guaranteed unique non-repeating code
-  let finalCode = ''
-  if (typeof rawCode === 'string' && rawCode.trim()) {
-    const candidate = formatOrderCode(rawCode)
-    const isUnique = await isOrderCodeUnique(serviceClient, candidate)
-    if (!isUnique) {
-      return NextResponse.json({ error: `Barcode tracking code "${candidate}" is already in use and cannot be repeated.` }, { status: 400 })
-    }
-    finalCode = candidate
-  } else {
-    // Generate guaranteed unique non-colliding order code
-    finalCode = await generateUniqueOrderCode(serviceClient, 'CD')
-  }
-
-  // Get current workspace exchange rate
-  const { data: ws } = await supabase
-    .from('workspaces')
-    .select('usd_to_lbp')
-    .eq('id', workspaceId)
-    .single()
-
-  const usdToLbpRate = ws?.usd_to_lbp || 89500
-
-  const { data: order, error } = await serviceClient
-    .from('orders')
-    .insert({
-      workspace_id: workspaceId,
-      code: finalCode,
-      shop_id: shopId || null,
-      driver_id: driverId || null,
-      area_id: areaId || null,
-      status: driverId ? 'assigned' : 'pending',
-      collection_usd: Number(collectionUsd) || 0,
-      delivery_fee_usd: Number(deliveryFeeUsd) || 0,
-      driver_pay_usd: Number(driverPayUsd) || 0,
-      usd_to_lbp_rate: usdToLbpRate,
-      recipient_name: recipientName || null,
-      recipient_phone: recipientPhone || null,
-      recipient_address: recipientAddress || null,
-      notes: notes || null,
-      created_by: user.id,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  // Log action
-  await serviceClient.from('audit_log').insert({
-    workspace_id: workspaceId,
-    actor_id: user.id,
-    actor_email: user.email,
-    action: 'order.created',
-    entity_type: 'order',
-    entity_id: order.id,
-    diff: { code: order.code, collection: order.collection_usd },
-  })
-
-  return NextResponse.json({ success: true, order })
-}
-
-export async function PATCH(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const body = await req.json()
-  const {
-    orderId,
-    workspaceId,
-    code: rawCode,
-    status,
-    driverId,
-    recipientName,
-    recipientPhone,
-    recipientAddress,
-    notes,
-    collectionUsd,
-    deliveryFeeUsd,
-    driverPayUsd,
-    areaId,
-  } = body
-
-  // Fetch membership
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('role')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const serviceClient = createServiceClient()
-
-  // Get current order
-  const { data: order } = await serviceClient
-    .from('orders')
-    .select('*')
-    .eq('id', orderId)
-    .single()
-
-  if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-
-  // Drivers can only update their own assigned orders
-  if (member.role === 'driver') {
-    const { data: driver } = await serviceClient
-      .from('drivers')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('workspace_id', workspaceId)
-      .single()
-
-    if (!driver || order.driver_id !== driver.id) {
-      return NextResponse.json({ error: 'Forbidden: you can only update orders assigned to you' }, { status: 403 })
-    }
-  }
-
-  const updates: Record<string, unknown> = {}
-  if (status) {
-    updates.status = status as OrderStatus
-    if (status === 'delivered') {
-      updates.delivered_at = new Date().toISOString()
-    } else if (status === 'returned') {
-      // Automatic $2.00 fee for retail refunds / returns, customer COD set to 0
-      if (deliveryFeeUsd === undefined) {
-        updates.delivery_fee_usd = 2.00
-      }
-      if (collectionUsd === undefined) {
-        updates.collection_usd = 0.00
-      }
-      if (driverPayUsd === undefined) {
-        updates.driver_pay_usd = Math.min(1.00, Number(order.driver_pay_usd) || 1.00)
-      }
-      const finalCol = updates.collection_usd !== undefined ? Number(updates.collection_usd) : 0
-      const finalFee = updates.delivery_fee_usd !== undefined ? Number(updates.delivery_fee_usd) : 2.00
-      updates.shop_balance_usd = finalCol - finalFee // e.g. 0 - 2 = -2.00
-    }
-  }
-
-  // Manager / Owner editing fields
-  if (member.role === 'owner' || member.role === 'manager') {
-    if (rawCode !== undefined) {
-      const customCode = typeof rawCode === 'string' && rawCode.trim() ? formatOrderCode(rawCode) : null
-      if (customCode && customCode !== order.code) {
-        const isUnique = await isOrderCodeUnique(serviceClient, customCode, orderId)
-        if (!isUnique) {
-          return NextResponse.json({ error: `Barcode tracking code "${customCode}" is already in use and cannot be repeated.` }, { status: 400 })
-        }
-        updates.code = customCode
-      }
-    }
-    if (driverId !== undefined) {
-      updates.driver_id = driverId || null
-      if (driverId && order.status === 'pending') {
-        updates.status = 'assigned'
-      }
-    }
-    if (recipientName !== undefined) updates.recipient_name = recipientName ? String(recipientName).trim() : null
-    if (recipientPhone !== undefined) updates.recipient_phone = recipientPhone ? String(recipientPhone).trim() : null
-    if (recipientAddress !== undefined) updates.recipient_address = recipientAddress ? String(recipientAddress).trim() : null
-    if (notes !== undefined) updates.notes = notes ? String(notes).trim() : null
-    if (areaId !== undefined) updates.area_id = areaId || null
-
-    if (collectionUsd !== undefined) updates.collection_usd = Number(collectionUsd)
-    if (deliveryFeeUsd !== undefined) updates.delivery_fee_usd = Number(deliveryFeeUsd)
-    if (driverPayUsd !== undefined) updates.driver_pay_usd = Number(driverPayUsd)
-
-    // Recalculate shop balance if financials were changed
-    const finalCollection = updates.collection_usd !== undefined ? Number(updates.collection_usd) : Number(order.collection_usd)
-    const finalFee = updates.delivery_fee_usd !== undefined ? Number(updates.delivery_fee_usd) : Number(order.delivery_fee_usd)
-    if (updates.collection_usd !== undefined || updates.delivery_fee_usd !== undefined) {
-      updates.shop_balance_usd = finalCollection - finalFee
-    }
-  }
-
-  const { data: updated, error } = await serviceClient
-    .from('orders')
-    .update(updates)
-    .eq('id', orderId)
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Financial accounting when status transitions to delivered or returned:
-  const wasDelivered = order.status === 'delivered'
-  const isDelivered = updated.status === 'delivered'
-  const wasReturned = order.status === 'returned'
-  const isReturned = updated.status === 'returned'
-
-  // Case A: Newly delivered
-  if (!wasDelivered && isDelivered) {
-    if (updated.driver_id) {
-      const { data: drv } = await serviceClient
-        .from('drivers')
-        .select('cash_held_usd, pay_owed_usd')
-        .eq('id', updated.driver_id)
-        .single()
-
-      if (drv) {
-        // If it was previously returned, reverse the return driver pay first
-        const prevReturnPay = wasReturned ? Number(order.driver_pay_usd) || 0 : 0
-        await serviceClient
-          .from('drivers')
-          .update({
-            cash_held_usd: Math.max(0, Number(drv.cash_held_usd) + Number(updated.collection_usd)),
-            pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) - prevReturnPay + Number(updated.driver_pay_usd)),
-          })
-          .eq('id', updated.driver_id)
-      }
-    }
-
-    if (updated.shop_id) {
-      const { data: shp } = await serviceClient
-        .from('shops')
-        .select('balance_usd')
-        .eq('id', updated.shop_id)
-        .single()
-
-      if (shp) {
-        // If it was previously returned, reverse the previous return fee charge first
-        const prevReturnNet = wasReturned ? Number(order.shop_balance_usd) || 0 : 0
-        await serviceClient
-          .from('shops')
-          .update({
-            balance_usd: Number(shp.balance_usd) - prevReturnNet + Number(updated.shop_balance_usd),
-          })
-          .eq('id', updated.shop_id)
-      }
-    }
-  }
-
-  // Case B: Newly returned (retail refund: charged as a billable $2 fee to merchant, credited to driver)
-  if (!wasReturned && isReturned) {
-    if (updated.driver_id) {
-      const { data: drv } = await serviceClient
-        .from('drivers')
-        .select('cash_held_usd, pay_owed_usd')
-        .eq('id', updated.driver_id)
-        .single()
-
-      if (drv) {
-        // If previously delivered, customer was refunded COD cash, so deduct order.collection_usd from driver cash held
-        const prevCol = wasDelivered ? Number(order.collection_usd) || 0 : 0
-        const prevDriverPay = wasDelivered ? Number(order.driver_pay_usd) || 0 : 0
-        await serviceClient
-          .from('drivers')
-          .update({
-            cash_held_usd: Math.max(0, Number(drv.cash_held_usd) - prevCol),
-            pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) - prevDriverPay + Number(updated.driver_pay_usd)),
-          })
-          .eq('id', updated.driver_id)
-      }
-    }
-
-    if (updated.shop_id) {
-      const { data: shp } = await serviceClient
-        .from('shops')
-        .select('balance_usd')
-        .eq('id', updated.shop_id)
-        .single()
-
-      if (shp) {
-        // If previously delivered, reverse previous COD credit, and apply -$2.00 return fee charge
-        const prevShopNet = wasDelivered ? Number(order.shop_balance_usd) || 0 : 0
-        await serviceClient
-          .from('shops')
-          .update({
-            balance_usd: Number(shp.balance_usd) - prevShopNet + Number(updated.shop_balance_usd),
-          })
-          .eq('id', updated.shop_id)
-      }
-    }
-  }
-
-  // Case B: Already delivered, and driver assignment was modified
-  if (wasDelivered && isDelivered && order.driver_id !== updated.driver_id) {
-    // Deduct from previous driver if there was one
-    if (order.driver_id) {
-      const { data: oldDrv } = await serviceClient
-        .from('drivers')
-        .select('cash_held_usd, pay_owed_usd')
-        .eq('id', order.driver_id)
-        .single()
-
-      if (oldDrv) {
-        await serviceClient
-          .from('drivers')
-          .update({
-            cash_held_usd: Math.max(0, Number(oldDrv.cash_held_usd) - Number(order.collection_usd)),
-            pay_owed_usd: Math.max(0, Number(oldDrv.pay_owed_usd) - Number(order.driver_pay_usd)),
-          })
-          .eq('id', order.driver_id)
-      }
-    }
-
-    // Add to new driver if one is assigned
-    if (updated.driver_id) {
-      const { data: newDrv } = await serviceClient
-        .from('drivers')
-        .select('cash_held_usd, pay_owed_usd')
-        .eq('id', updated.driver_id)
-        .single()
-
-      if (newDrv) {
-        await serviceClient
-          .from('drivers')
-          .update({
-            cash_held_usd: Math.max(0, Number(newDrv.cash_held_usd) + Number(updated.collection_usd)),
-            pay_owed_usd: Math.max(0, Number(newDrv.pay_owed_usd) + Number(updated.driver_pay_usd)),
-          })
-          .eq('id', updated.driver_id)
-      }
-    }
-  }
-
-  await serviceClient.from('audit_log').insert({
-    workspace_id: workspaceId,
-    actor_id: user.id,
-    actor_email: user.email,
-    action: 'order.updated',
-    entity_type: 'order',
-    entity_id: orderId,
-    diff: updates,
-  })
-
-  return NextResponse.json({ success: true, order: updated })
-}
-
-export async function DELETE(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  let workspaceId = ''
-  let targetOrderIds: string[] = []
-
-  try {
-    const body = await req.json()
-    workspaceId = body.workspaceId
-    if (body.orderIds && Array.isArray(body.orderIds)) {
-      targetOrderIds = body.orderIds
-    } else if (body.orderId) {
-      targetOrderIds = [body.orderId]
-    }
-  } catch {
-    const url = new URL(req.url)
-    workspaceId = url.searchParams.get('workspaceId') || ''
-    const id = url.searchParams.get('orderId')
-    const ids = url.searchParams.get('orderIds')
-    if (ids) {
-      targetOrderIds = ids.split(',').filter(Boolean)
-    } else if (id) {
-      targetOrderIds = [id]
-    }
-  }
-
-  if (!workspaceId) {
-    return NextResponse.json({ error: 'Workspace ID is required' }, { status: 400 })
-  }
-
-  if (targetOrderIds.length === 0) {
-    return NextResponse.json({ error: 'No order IDs provided for deletion.' }, { status: 400 })
-  }
-
-  // Check caller role
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('role')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (!member || (member.role !== 'owner' && member.role !== 'manager')) {
-    return NextResponse.json({ error: 'Forbidden: only owners and managers can delete orders' }, { status: 403 })
-  }
-
-  const serviceClient = createServiceClient()
-
-  // Find target orders
-  const { data: orders, error: findErr } = await serviceClient
-    .from('orders')
-    .select('id, code, status, shop_id, driver_id, shop_balance_usd, collection_usd, driver_pay_usd')
-    .in('id', targetOrderIds)
-    .eq('workspace_id', workspaceId)
-
-  if (findErr || !orders || orders.length === 0) {
-    return NextResponse.json({ error: 'No orders found matching the provided IDs.' }, { status: 404 })
-  }
-
-  const validIds = orders.map(o => o.id)
-
-  // Reverse financial balance effects for any delivered or returned orders being deleted
-  for (const ord of orders) {
-    if (ord.shop_id && (ord.status === 'delivered' || ord.status === 'returned')) {
-      const net = Number(ord.shop_balance_usd) || 0
-      if (net !== 0) {
-        const { data: shp } = await serviceClient
-          .from('shops')
-          .select('balance_usd')
-          .eq('id', ord.shop_id)
-          .single()
-        if (shp) {
-          await serviceClient
-            .from('shops')
-            .update({ balance_usd: Number(shp.balance_usd) - net })
-            .eq('id', ord.shop_id)
-        }
-      }
-    }
-
-    if (ord.driver_id && ord.status === 'delivered') {
-      const { data: drv } = await serviceClient
-        .from('drivers')
-        .select('cash_held_usd, pay_owed_usd')
-        .eq('id', ord.driver_id)
-        .single()
-      if (drv) {
-        await serviceClient
-          .from('drivers')
-          .update({
-            cash_held_usd: Math.max(0, Number(drv.cash_held_usd) - (Number(ord.collection_usd) || 0)),
-            pay_owed_usd: Math.max(0, Number(drv.pay_owed_usd) - (Number(ord.driver_pay_usd) || 0)),
-          })
-          .eq('id', ord.driver_id)
-      }
-    }
-  }
-
-  // Nullify foreign keys in settlements before deleting orders
-  await serviceClient
-    .from('settlements')
-    .update({ order_id: null })
-    .in('order_id', validIds)
-
-  // Permanently delete orders
-  const { error: deleteErr } = await serviceClient
-    .from('orders')
-    .delete()
-    .in('id', validIds)
-    .eq('workspace_id', workspaceId)
-
-  if (deleteErr) {
-    return NextResponse.json({ error: deleteErr.message }, { status: 500 })
-  }
-
-  await serviceClient.from('audit_log').insert({
-    workspace_id: workspaceId,
-    actor_id: user.id,
-    actor_email: user.email,
-    action: 'orders.deleted',
-    entity_type: 'orders',
-    diff: {
-      count: validIds.length,
-      codes: orders.map(o => o.code),
-    },
-  })
-
-  return NextResponse.json({
-    success: true,
-    message: `Successfully deleted ${validIds.length} order ${validIds.length === 1 ? 'record' : 'records'}.`,
-    deletedIds: validIds,
-  })
-}
+  const updates=orderPatch(body,order,isDriver)
+  if(!isDriver && body.code!==undefined) updates.code=formatOrderCode(textField(body.code,'code',60,true))
+  await validateReferences(db,workspaceId,{drivers:updates.driver_id,delivery_areas:updates.area_id})
+  const updated=checked(await db.from('orders').update(updates).eq('id',order.id).eq('workspace_id',workspaceId).eq('updated_at',order.updated_at).select(ORDER_SELECT).maybeSingle())
+  if(!updated) throw new ApiError(409,'Order changed. Refresh and try again.')
+  return NextResponse.json({success:true,order:updated})
+})
+export const DELETE = api(async req => {
+  const body=await req.json()
+  const {db,workspaceId}=await workspaceAccess(body.workspaceId)
+  const selected=ids(body.orderIds || [body.orderId])
+  const orders=checked(await db.from('orders').select('id,status').in('id',selected).eq('workspace_id',workspaceId))
+  if(orders.length!==selected.length || orders.some(o=>o.status!=='pending')) throw new ApiError(409,'Only pending orders can be cancelled. Completed records are retained.')
+  const cancelled=checked(await db.from('orders').update({status:'cancelled'}).in('id',selected).eq('workspace_id',workspaceId).eq('status','pending').select('id'))
+  return NextResponse.json({success:true,deletedIds:cancelled.map(o=>o.id),message:'Pending orders cancelled; records retained.'})
+})
