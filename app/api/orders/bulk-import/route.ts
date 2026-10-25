@@ -23,6 +23,6 @@ export const POST=api(async req=>{
    recipient_address:textField(item.recipientAddress||item.address,'address',1000,true),
    notes:textField(item.notes,'notes',4000),created_by:user.id})
  }
- const orders=checked(await db.from('orders').insert(rows).select('id,code,status,tracking_token,recipient_name,collection_usd'))
+ const orders=checked(await db.from('orders').insert(rows).select('id,code,status,recipient_name,collection_usd'))
  return NextResponse.json({success:true,count:orders.length,orders,message:orders.length+' orders imported'})
 })

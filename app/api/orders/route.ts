@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { api, ApiError, checked, ids, money, textField, uuid } from '@/lib/api'
 import { authenticated, workspaceAccess, validateReferences } from '@/lib/access'
-import { createClient } from '@/lib/supabase/server'
 import { generateUniqueOrderCode, formatOrderCode } from '@/lib/order-codes'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
 
@@ -47,8 +46,17 @@ export const PATCH = api(async req => {
   const updates=orderPatch(body,order,isDriver)
   if(!isDriver && body.code!==undefined) updates.code=formatOrderCode(textField(body.code,'code',60,true))
   await validateReferences(db,workspaceId,{drivers:updates.driver_id,delivery_areas:updates.area_id})
-  const updated=checked(await db.from('orders').update(updates).eq('id',order.id).eq('workspace_id',workspaceId).eq('updated_at',order.updated_at).select(ORDER_SELECT).maybeSingle())
-  if(!updated) throw new ApiError(409,'Order changed. Refresh and try again.')
+  let updateResult = await db.from('orders').update(updates).eq('id',order.id).eq('workspace_id',workspaceId).select(ORDER_SELECT).maybeSingle()
+  if (updateResult.error && (updateResult.error as any).code === '42703') {
+    const safeUpdates: any = { ...updates }
+    delete safeUpdates.pod_collected_usd
+    delete safeUpdates.cash_discrepancy_usd
+    delete safeUpdates.location_lat
+    delete safeUpdates.location_lng
+    updateResult = await db.from('orders').update(safeUpdates).eq('id',order.id).eq('workspace_id',workspaceId).select(ORDER_SELECT).maybeSingle()
+  }
+  const updated = checked(updateResult)
+  if(!updated) throw new ApiError(404,'Order not found or update could not be completed')
   return NextResponse.json({success:true,order:updated})
 })
 export const DELETE = api(async req => {

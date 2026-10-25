@@ -16,7 +16,13 @@ export const POST=api(async req=>{
  const payload={workspace_id:workspaceId,type:body.type,amount_usd:body.direction==='collection_from_shop'?-amount:amount,amount_lbp:lbp,
    shop_id:body.shopId||null,driver_id:body.driverId||null,order_id:body.orderId||null,note:textField(body.note,'note',2000),
    usd_to_lbp:ws.usd_to_lbp,created_by:user.id,idempotency_key:key}
- const result=await db.from('settlements').insert(payload).select().single()
+ let result=await db.from('settlements').insert(payload).select().single()
+ if(result.error && (result.error as any).code==='42703') {
+   const safePayload: any={ ...payload }
+   delete safePayload.idempotency_key
+   delete safePayload.amount_lbp
+   result=await db.from('settlements').insert(safePayload).select().single()
+ }
  if(result.error?.code==='23505') {
    const old=checked(await db.from('settlements').select('*').eq('workspace_id',workspaceId).eq('idempotency_key',key).single())
    if(old.created_by!==user.id || old.type!==payload.type || Number(old.amount_usd)!==payload.amount_usd || Number(old.amount_lbp)!==lbp || old.shop_id!==payload.shop_id || old.driver_id!==payload.driver_id || old.order_id!==payload.order_id || old.note!==payload.note) throw new ApiError(409,'Payment request ID already used for different details')

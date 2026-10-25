@@ -26,44 +26,19 @@ export default async function OrdersPage() {
   if (!workspace) return null
 
   // Parallel fetches for orders, shops, drivers, and delivery areas
-  const fetchOrders = async () => {
-    try {
-      return await allRows(
-        supabase
-          .from('orders')
-          .select(`
-            id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
-            shop_balance_usd, usd_to_lbp_rate, created_at, recipient_name,
-            recipient_phone, recipient_address, notes,
-            shopify_order_id, shopify_order_number,
-            shop:shop_id(id, name, phone),
-            driver:driver_id(id, name, phone),
-            area:area_id(id, name)
-          `)
-          .eq('workspace_id', workspace.id)
-          .order('created_at', { ascending: false })
-      )
-    } catch {
-      return await allRows(
-        supabase
-          .from('orders')
-          .select(`
-            id, code, status, collection_usd, delivery_fee_usd, driver_pay_usd,
-            shop_balance_usd, usd_to_lbp_rate, created_at, recipient_name,
-            recipient_phone, recipient_address, notes,
-            shopify_order_id, shopify_order_number,
-            shop:shop_id(id, name, phone),
-            driver:driver_id(id, name, phone),
-            area:area_id(id, name)
-          `)
-          .eq('workspace_id', workspace.id)
-          .order('created_at', { ascending: false })
-      )
-    }
-  }
-
   const [ordersRes, shopsRes, driversRes, areasRes] = await Promise.all([
-    fetchOrders(),
+    allRows(
+      supabase
+        .from('orders')
+        .select(`
+          *,
+          shop:shop_id(id, name, phone),
+          driver:driver_id(id, name, phone),
+          area:area_id(id, name)
+        `)
+        .eq('workspace_id', workspace.id)
+        .order('created_at', { ascending: false })
+    ),
     allRows(
       supabase
         .from('shops')

@@ -52,10 +52,7 @@ export default async function DriverRunSheetPage({ params }: DriverRunSheetPageP
   const { data: rawOrders } = await allRows(supabase
     .from('orders')
     .select(`
-      id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
-      shop_balance_usd, usd_to_lbp_rate, created_at, delivered_at,
-      recipient_name, recipient_phone, recipient_address, location_lat, location_lng, notes,
-      pod_signature, pod_photo, pod_collected_lbp,
+      *,
       shop:shop_id(id, name, phone),
       area:area_id(id, name)
     `)

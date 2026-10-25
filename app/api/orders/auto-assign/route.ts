@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     // 2. Fetch all unassigned pending orders in this workspace
     const { data: unassignedOrders, error: orderErr } = await serviceClient
       .from('orders')
-      .select('id, code, tracking_token, area_id')
+      .select('id, code, area_id')
       .eq('workspace_id', workspaceId)
       .is('driver_id', null)
       .eq('status', 'pending')

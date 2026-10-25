@@ -44,9 +44,7 @@ export default async function DriverProfilePage({ params }: DriverProfilePagePro
     allRows(supabase
       .from('orders')
       .select(`
-        id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
-        shop_balance_usd, usd_to_lbp_rate, created_at, recipient_name,
-        recipient_phone, recipient_address, notes,
+        *,
         shop:shop_id(id, name, phone),
         area:area_id(id, name)
       `)

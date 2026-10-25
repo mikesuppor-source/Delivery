@@ -41,8 +41,7 @@ export default async function OverviewPage() {
     supabase
       .from('orders')
       .select(`
-        id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at,
-        recipient_name, recipient_phone, recipient_address,
+        *,
         shop:shop_id(name),
         driver:driver_id(name)
       `)

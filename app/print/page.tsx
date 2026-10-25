@@ -29,8 +29,7 @@ export default async function PrintPage() {
   const { data: orders } = await allRows(supabase
     .from('orders')
     .select(`
-      id, code, tracking_token, collection_usd, delivery_fee_usd, driver_pay_usd,
-      shop_balance_usd, usd_to_lbp_rate, created_at,
+      *,
       shop:shop_id(name), driver:driver_id(name)
     `)
     .eq('workspace_id', workspace.id)

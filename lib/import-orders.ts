@@ -41,7 +41,7 @@ export async function importShopifyOrder(shop: {id:string;workspace_id:string;pr
   recipient_phone:formatLebanesePhone(String(shipping.phone||payload.customer?.phone||payload.phone||'')),
   recipient_address:[shipping.address1,shipping.address2,shipping.city,shipping.province,shipping.country].filter(Boolean).join(', ').slice(0,1000),
   notes:('Shopify '+String(payload.name||payload.id)+(area?'':' | Area needs manual review')+' | '+String(payload.note||'')).slice(0,4000)
- }).select('id,code,tracking_token,recipient_name,collection_usd').single()
+  }).select('id,code,recipient_name,collection_usd').single()
  if(result.error?.code==='23505') {
   const {data:existing}=await db.from('orders').select('id,code').eq('shop_id',shop.id).eq('shopify_order_id',String(payload.id)).maybeSingle()
   if(existing)return {skipped:true,order:existing}

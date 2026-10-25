@@ -25,9 +25,7 @@ export default async function PrintOrderPage({ params, searchParams }: PrintOrde
   const { data: rawOrder } = await supabase
     .from('orders')
     .select(`
-      id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
-      shop_balance_usd, usd_to_lbp_rate, created_at, notes,
-      recipient_name, recipient_phone, recipient_address,
+      *,
       shop:shop_id(id, name, phone),
       driver:driver_id(id, name, phone),
       area:area_id(id, name)

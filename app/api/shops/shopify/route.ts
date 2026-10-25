@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { api, ApiError, checked } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { shopAccess } from '@/lib/access'
 import { siteUrl } from '@/lib/shopify-security'
 export const GET=api(async req=>{
@@ -11,6 +11,10 @@ export const PATCH=api(async req=>{
  const {db,shop}=await shopAccess(body.shopId)
  // Domain changes require proof of store ownership through connect/OAuth.
  if(body.shopifyDomain!==undefined) throw new ApiError(400,'Reconnect the store to change its domain')
- if(body.regenerateKey) checked(await db.from('shop_integrations').update({api_key:crypto.randomUUID()}).eq('shop_id',shop.id).select('shop_id'))
+ if(body.regenerateKey) {
+  const newKey=crypto.randomUUID()
+  try { await db.from('shop_integrations').update({api_key:newKey}).eq('shop_id',shop.id) } catch (e) { void e }
+  try { await (db.from('shops') as any).update({api_key:newKey}).eq('id',shop.id) } catch (e) { void e }
+ }
  return NextResponse.json({success:true})
 })

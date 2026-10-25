@@ -31,8 +31,7 @@ export default async function StatementsPage() {
       supabase
         .from('orders')
         .select(`
-          id, code, tracking_token, status, collection_usd, delivery_fee_usd, driver_pay_usd,
-          shop_balance_usd, usd_to_lbp_rate, created_at, delivered_at,
+          *,
           shop:shop_id(id, name),
           driver:driver_id(id, name)
         `)

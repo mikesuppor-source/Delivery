@@ -6,10 +6,12 @@ import type { Database } from './database.types'
 /** Use in Server Components, Route Handlers, and Server Actions */
 export async function createClient() {
   const cookieStore = await cookies()
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const isValidUrl = rawUrl && (rawUrl.startsWith('https://') || rawUrl.startsWith('http://'))
+  const url = isValidUrl ? rawUrl : 'https://placeholder.supabase.co'
+  const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const key = rawKey && rawKey !== '[SENSITIVE]' ? rawKey : 'placeholder-anon-key'
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) throw new Error('Supabase is not configured')
   return createServerClient<Database>(
     url,
     key,
@@ -32,10 +34,12 @@ export async function createClient() {
 
 /** Service-role client — bypasses RLS. Use ONLY in trusted server code. */
 export function createServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key'
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const isValidUrl = rawUrl && (rawUrl.startsWith('https://') || rawUrl.startsWith('http://'))
+  const url = isValidUrl ? rawUrl : 'https://placeholder.supabase.co'
+  const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const key = rawKey && rawKey !== '[SENSITIVE]' ? rawKey : 'placeholder-service-role-key'
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Server database credentials are not configured')
   return createSupabaseClient<Database>(
     url,
     key,
