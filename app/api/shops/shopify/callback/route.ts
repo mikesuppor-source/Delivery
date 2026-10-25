@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       }, { status: 500 })
     }
 
-    // 1. Exchange temporary code for permanent access token
+    // 1. Exchange temporary code for expiring access token & refresh token
     const tokenRes = await fetch(`https://${cleanShop}/admin/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
         client_id: clientId,
         client_secret: clientSecret,
         code,
+        expiring: '1',
       }),
     })
 
@@ -48,6 +49,13 @@ export async function GET(req: NextRequest) {
     if (!accessToken) {
       return NextResponse.json({ error: 'No access token received from Shopify' }, { status: 400 })
     }
+
+    // Persist expiring token with refresh token and expiry timestamp
+    const storedToken = JSON.stringify({
+      access_token: accessToken,
+      refresh_token: tokenData.refresh_token || null,
+      expires_at: Date.now() + ((tokenData.expires_in || 3600) - 120) * 1000,
+    })
 
     // 2. Fetch store info from Shopify
     let storeName = cleanShop.split('.')[0]
@@ -104,7 +112,7 @@ export async function GET(req: NextRequest) {
           workspace_id: ws?.id,
           name: storeName,
           shopify_domain: cleanShop,
-          shopify_access_token: accessToken,
+          shopify_access_token: storedToken,
           api_key: generatedKey,
           phone: storePhone,
           active: true,
@@ -127,7 +135,7 @@ export async function GET(req: NextRequest) {
       await serviceClient
         .from('shops')
         .update({
-          shopify_access_token: accessToken,
+          shopify_access_token: storedToken,
           shopify_domain: cleanShop,
           api_key: apiKey,
         })

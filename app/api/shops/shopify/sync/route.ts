@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { formatLebanesePhone } from '@/lib/phone'
+import { getValidShopifyAccessToken } from '@/lib/shopify-auth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,13 +41,23 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // Ensure a valid, non-expired Shopify access token (auto-refreshes or upgrades if needed)
+    let validToken: string
+    try {
+      validToken = await getValidShopifyAccessToken(shop)
+    } catch (tokenErr) {
+      return NextResponse.json({
+        error: tokenErr instanceof Error ? tokenErr.message : 'Failed to obtain a valid Shopify access token',
+      }, { status: 400 })
+    }
+
     // Fetch existing orders from Shopify via REST API
     const shopifyRes = await fetch(
       `https://${shop.shopify_domain}/admin/api/2024-01/orders.json?status=any&limit=50`,
       {
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': shop.shopify_access_token,
+          'X-Shopify-Access-Token': validToken,
         },
       }
     )
@@ -55,6 +66,7 @@ export async function POST(req: NextRequest) {
       const errText = await shopifyRes.text()
       return NextResponse.json({
         error: `Shopify API returned error (${shopifyRes.status}): ${errText.slice(0, 200)}`,
+        reauthUrl: `/api/shops/shopify/auth?shop=${encodeURIComponent(shop.shopify_domain)}`,
       }, { status: 400 })
     }
 

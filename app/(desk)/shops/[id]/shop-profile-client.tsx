@@ -126,7 +126,15 @@ export function ShopProfileClient({
         body: JSON.stringify({ shopId: shop.id }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to sync Shopify orders')
+      if (!res.ok) {
+        if (data.reauthUrl) {
+          if (confirm(`${data.error}\n\nWould you like to re-authorize Cedar Delivery now to upgrade your token with Shopify?`)) {
+            window.location.href = data.reauthUrl
+            return
+          }
+        }
+        throw new Error(data.error || 'Failed to sync Shopify orders')
+      }
 
       alert(data.message || `Successfully synced ${data.importedCount || 0} order(s)!`)
       window.location.reload()
