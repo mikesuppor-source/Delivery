@@ -116,6 +116,7 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
   const [selectedCameraId, setSelectedCameraId] = useState<string>('')
 
   const scannerRef = useRef<unknown>(null)
+  const stoppingPromiseRef = useRef<Promise<void> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const isProcessingRef = useRef(false)
 
@@ -258,134 +259,222 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
 
   // Camera Scanner Lifecycle
   useEffect(() => {
-    let html5QrCode: any = null
     let isCancelled = false
+    let origCreateElement: typeof document.createElement | null = null
 
-    if (isScanning) {
+    async function startScanner() {
+      if (!isScanning) return
       setCameraError(null)
 
-      // Dynamic import to prevent SSR issues
-      import('html5-qrcode').then(async ({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
-        if (isCancelled) return
-        const scannerElement = document.getElementById('qr-reader')
-        if (!scannerElement) return
-
+      // Wait for any previous scanner instance to stop completely before starting a new track
+      if (stoppingPromiseRef.current) {
         try {
-          // Formats to support (Shipping parcels: Code 128 barcodes + QR codes)
-          const formatsToSupport = [
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.UPC_A,
-          ]
-
-          html5QrCode = new Html5Qrcode('qr-reader', {
-            formatsToSupport,
-            verbose: false,
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true,
-            },
-          })
-          scannerRef.current = html5QrCode
-
-          // Default camera config: use environment (rear) camera unless user explicitly picked a specific ID
-          const cameraConfig = selectedCameraId
-            ? selectedCameraId
-            : { facingMode: 'environment' }
-
-          await html5QrCode.start(
-            cameraConfig,
-            {
-              fps: 15,
-              qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-                const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
-                const edge = Math.floor(minEdge * 0.75)
-                const width = Math.max(160, Math.min(Math.floor(edge * 1.3), Math.max(160, viewfinderWidth - 24)))
-                const height = Math.max(100, Math.min(Math.floor(edge * 0.8), Math.max(100, viewfinderHeight - 24)))
-                return { width, height }
-              },
-            },
-            (decodedText: string) => {
-              processCode(decodedText)
-            },
-            () => {
-              // Frame scan error, ignore
-            }
-          )
-
-          if (isCancelled) {
-            html5QrCode.stop().catch((e: unknown) => { void e }).finally(() => {
-              html5QrCode.clear()
-            })
-            return
-          }
-
-          // Force video element to play inline on mobile WebKit / iOS Safari
-          setTimeout(() => {
-            const video = document.querySelector('#qr-reader video') as HTMLVideoElement | null
-            if (video) {
-              video.setAttribute('playsinline', 'true')
-              video.setAttribute('webkit-playsinline', 'true')
-              video.muted = true
-              if (video.paused) {
-                video.play().catch((e: unknown) => { void e })
-              }
-            }
-          }, 300)
-
-          // Enumerate cameras in the background to populate the switcher dropdown (without auto-selecting)
-          Html5Qrcode.getCameras().then((cameras) => {
-            if (cameras && cameras.length > 0 && !isCancelled) {
-              setAvailableCameras(
-                cameras.map((c) => ({
-                  id: c.id,
-                  label: c.label || `Camera (${c.id.slice(0, 6)})`,
-                }))
-              )
-            }
-          }).catch((e: unknown) => { void e })
-
-        } catch (err: unknown) {
-          if (!isCancelled) {
-            setCameraError(
-              err instanceof Error
-                ? err.message
-                : 'Could not access device camera. Please check browser permissions and ensure no other app is using it.'
-            )
-            setIsScanning(false)
-          }
+          await stoppingPromiseRef.current
+        } catch (e: unknown) {
+          void e
         }
-      }).catch((err: unknown) => {
-        if (!isCancelled) {
-          setCameraError(err instanceof Error ? err.message : 'Failed to load camera library')
-          setIsScanning(false)
-        }
-      })
-    } else if (scannerRef.current) {
+      }
+
+      // Stop any lingering media stream tracks on the DOM element
       try {
-        const instance = scannerRef.current as { stop: () => Promise<void>; clear: () => void }
-        instance.stop().catch((e: unknown) => { void e }).finally(() => {
-          instance.clear()
-          scannerRef.current = null
-        })
+        const existingVideo = document.querySelector('#qr-reader video') as HTMLVideoElement | null
+        if (existingVideo && existingVideo.srcObject) {
+          const stream = existingVideo.srcObject as MediaStream
+          stream.getTracks().forEach((t) => t.stop())
+          existingVideo.srcObject = null
+        }
       } catch (e: unknown) {
         void e
       }
+
+      if (isCancelled) return
+
+      try {
+        // Critical iOS Safari fix: Intercept document.createElement so every video element created by
+        // Html5Qrcode has playsinline and webkit-playsinline attributes BEFORE play() is triggered.
+        origCreateElement = document.createElement.bind(document)
+        document.createElement = function <K extends keyof HTMLElementTagNameMap>(
+          tagName: K,
+          options?: ElementCreationOptions
+        ): HTMLElementTagNameMap[K] {
+          const el = origCreateElement!(tagName, options)
+          if (typeof tagName === 'string' && tagName.toLowerCase() === 'video') {
+            const video = el as unknown as HTMLVideoElement
+            video.setAttribute('playsinline', 'true')
+            video.setAttribute('webkit-playsinline', 'true')
+            video.setAttribute('muted', 'true')
+            video.setAttribute('autoplay', 'true')
+            video.muted = true
+            video.playsInline = true
+            video.autoplay = true
+            video.style.background = 'transparent'
+
+            const onReady = () => {
+              video.setAttribute('playsinline', 'true')
+              video.setAttribute('webkit-playsinline', 'true')
+              video.muted = true
+              video.style.background = 'transparent'
+              if (video.paused && video.srcObject) {
+                video.play().catch(() => {})
+              }
+              // Dispatch "playing" event to wake up html5-qrcode's setupUi callback
+              setTimeout(() => {
+                if (!video.paused || video.currentTime > 0) {
+                  video.dispatchEvent(new Event('playing'))
+                }
+              }, 120)
+            }
+
+            video.addEventListener('loadedmetadata', onReady)
+            video.addEventListener('loadeddata', onReady)
+            video.addEventListener('canplay', onReady)
+          }
+          return el
+        }
+
+        // Dynamic import to prevent SSR issues
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
+        if (isCancelled) return
+
+        const scannerElement = document.getElementById('qr-reader')
+        if (!scannerElement) return
+
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.UPC_A,
+        ]
+
+        // useBarCodeDetectorIfSupported: false ensures tested ZXing engine is used everywhere
+        // and avoids experimental BarcodeDetector hanging on iOS 17/18 Safari
+        const html5QrCode = new Html5Qrcode('qr-reader', {
+          formatsToSupport,
+          verbose: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: false,
+          },
+        })
+        scannerRef.current = html5QrCode
+
+        // Default camera config: use environment (rear) camera unless user explicitly picked a specific ID
+        const cameraConfig = selectedCameraId
+          ? selectedCameraId
+          : { facingMode: 'environment' }
+
+        await html5QrCode.start(
+          cameraConfig,
+          {
+            fps: 15,
+            qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+              const edge = Math.floor(minEdge * 0.75)
+              const width = Math.max(160, Math.min(Math.floor(edge * 1.3), Math.max(160, viewfinderWidth - 24)))
+              const height = Math.max(100, Math.min(Math.floor(edge * 0.8), Math.max(100, viewfinderHeight - 24)))
+              return { width, height }
+            },
+          },
+          (decodedText: string) => {
+            processCode(decodedText)
+          },
+          () => {
+            // Frame scan failure, ignore
+          }
+        )
+
+        if (isCancelled) {
+          html5QrCode.stop().catch((e: unknown) => { void e }).finally(() => {
+            html5QrCode.clear()
+          })
+          return
+        }
+
+        // Ensure video element attributes and start playback on mobile WebKit / iOS Safari
+        const enforceVideoPlay = () => {
+          const video = document.querySelector('#qr-reader video') as HTMLVideoElement | null
+          if (video) {
+            video.setAttribute('playsinline', 'true')
+            video.setAttribute('webkit-playsinline', 'true')
+            video.muted = true
+            video.style.background = 'transparent'
+            video.style.objectFit = 'cover'
+            video.style.display = 'block'
+            if (video.paused) {
+              video.play().catch(() => {})
+            }
+          }
+        }
+
+        enforceVideoPlay()
+        setTimeout(enforceVideoPlay, 100)
+        setTimeout(enforceVideoPlay, 350)
+
+        // On iOS Safari, a fast pause/resume flushes the WebKit video layer buffer to eliminate black screens
+        setTimeout(() => {
+          if (html5QrCode && typeof html5QrCode.pause === 'function' && typeof html5QrCode.resume === 'function') {
+            try {
+              html5QrCode.pause(false)
+              setTimeout(() => {
+                try {
+                  html5QrCode.resume()
+                } catch (e: unknown) { void e }
+              }, 80)
+            } catch (e: unknown) { void e }
+          }
+        }, 450)
+
+        // Enumerate cameras in the background to populate the switcher dropdown (without auto-selecting)
+        Html5Qrcode.getCameras().then((cameras) => {
+          if (cameras && cameras.length > 0 && !isCancelled) {
+            setAvailableCameras(
+              cameras.map((c) => ({
+                id: c.id,
+                label: c.label || `Camera (${c.id.slice(0, 6)})`,
+              }))
+            )
+          }
+        }).catch((e: unknown) => { void e })
+
+      } catch (err: unknown) {
+        if (!isCancelled) {
+          setCameraError(
+            err instanceof Error
+              ? err.message
+              : 'Could not access device camera. Please check browser permissions and ensure no other app is using it.'
+          )
+          setIsScanning(false)
+        }
+      } finally {
+        if (origCreateElement) {
+          document.createElement = origCreateElement
+        }
+      }
+    }
+
+    if (isScanning) {
+      startScanner()
+    } else if (scannerRef.current) {
+      const instance = scannerRef.current as { stop: () => Promise<void>; clear: () => void }
+      scannerRef.current = null
+      stoppingPromiseRef.current = instance.stop().catch((e: unknown) => { void e }).finally(() => {
+        instance.clear()
+        stoppingPromiseRef.current = null
+      })
     }
 
     return () => {
       isCancelled = true
+      if (origCreateElement) {
+        document.createElement = origCreateElement
+      }
       if (scannerRef.current) {
-        try {
-          const instance = scannerRef.current as { stop: () => Promise<void>; clear: () => void }
-          instance.stop().catch((e: unknown) => { void e }).finally(() => {
-            instance.clear()
-            scannerRef.current = null
-          })
-        } catch (e: unknown) {
-          void e
-        }
+        const instance = scannerRef.current as { stop: () => Promise<void>; clear: () => void }
+        scannerRef.current = null
+        stoppingPromiseRef.current = instance.stop().catch((e: unknown) => { void e }).finally(() => {
+          instance.clear()
+          stoppingPromiseRef.current = null
+        })
       }
     }
   }, [isScanning, selectedCameraId])
@@ -520,7 +609,7 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
             </div>
           )}
 
-          {/* Video element styling for responsive mobile camera streaming */}
+          {/* Video element styling for responsive mobile camera streaming (iOS Safari & Android) */}
           <style
             dangerouslySetInnerHTML={{
               __html: `
@@ -528,17 +617,19 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
                   width: 100% !important;
                   border: none !important;
                   position: relative !important;
-                  background: #0a0f1d !important;
+                  background: transparent !important;
                 }
                 #qr-reader video {
                   width: 100% !important;
-                  height: auto !important;
+                  height: 100% !important;
                   min-height: 280px !important;
-                  max-height: 440px !important;
+                  max-height: 480px !important;
                   object-fit: cover !important;
                   border-radius: 10px !important;
                   display: block !important;
-                  background: #0a0f1d !important;
+                  background: transparent !important;
+                  -webkit-transform: translateZ(0);
+                  transform: translateZ(0);
                 }
                 #qr-reader__scan_region {
                   position: relative !important;
@@ -547,13 +638,28 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
                   display: flex !important;
                   align-items: center !important;
                   justify-content: center !important;
-                  background: #0a0f1d !important;
+                  background: transparent !important;
+                }
+                #qr-reader__scan_region video {
+                  width: 100% !important;
+                  height: 100% !important;
+                  min-height: 280px !important;
+                  max-height: 480px !important;
+                  object-fit: cover !important;
+                  border-radius: 10px !important;
+                  display: block !important;
+                  background: transparent !important;
+                  -webkit-transform: translateZ(0);
+                  transform: translateZ(0);
                 }
                 #qr-reader__dashboard {
                   display: none !important;
                 }
                 #qr-reader__scan_region img {
                   display: none !important;
+                }
+                #qr-shaded-region {
+                  border-color: rgba(0, 0, 0, 0.45) !important;
                 }
               `,
             }}
