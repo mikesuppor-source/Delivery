@@ -4,7 +4,10 @@ export async function allRows<T extends {data: unknown[] | null;error: unknown}>
  query.order('id')
  for(let start=0;;){
   const result=await query.range(start,start+499)
-  if(result.error)throw new Error('Unable to load complete report')
+  if(result.error){
+   console.error('allRows database query failed:', result.error)
+   throw new Error('Unable to load complete report: ' + ((result.error as any)?.message || JSON.stringify(result.error)))
+  }
   const batch=result.data||[]
   rows.push(...batch)
   if(batch.length===0)return {...result,data:rows} as T
