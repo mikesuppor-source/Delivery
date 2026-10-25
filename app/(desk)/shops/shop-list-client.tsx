@@ -17,6 +17,7 @@ interface Shop {
   active: boolean
   balance_usd: number
   created_at: string
+  shopify_domain?: string | null
 }
 
 interface ShopListClientProps {
@@ -116,23 +117,44 @@ export function ShopListClient({ shops: initialShops, workspaceId, userRole }: S
               {shops.map(shop => (
                 <tr key={shop.id}>
                   <td>
-                    <Link
-                      href={`/shops/${shop.id}`}
-                      style={{
-                        fontWeight: 700,
-                        color: 'var(--brand)',
-                        textDecoration: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                      title="View Shop Profile & Statement"
-                    >
-                      <span>{shop.name}</span>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </Link>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <Link
+                        href={`/shops/${shop.id}`}
+                        style={{
+                          fontWeight: 700,
+                          color: 'var(--brand)',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                        title="View Shop Profile & Statement"
+                      >
+                        <span>{shop.name}</span>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </Link>
+                      {shop.shopify_domain && (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: 4,
+                            background: '#ecfdf5',
+                            color: '#059669',
+                            border: '1px solid #a7f3d0',
+                          }}
+                          title={`Shopify Store: ${shop.shopify_domain}`}
+                        >
+                          🛍️ Shopify
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td>
                     {shop.phone ? (

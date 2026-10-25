@@ -115,6 +115,27 @@ export function ShopProfileClient({
   const [editActive, setEditActive] = useState(shop.active)
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState('')
+  const [syncingShopify, setSyncingShopify] = useState(false)
+
+  async function handleSyncShopifyOrders() {
+    setSyncingShopify(true)
+    try {
+      const res = await fetch('/api/shops/shopify/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shopId: shop.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to sync Shopify orders')
+
+      alert(data.message || `Successfully synced ${data.importedCount || 0} order(s)!`)
+      window.location.reload()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error syncing Shopify orders')
+    } finally {
+      setSyncingShopify(false)
+    }
+  }
 
   const canManage = userRole === 'owner' || userRole === 'manager'
 
@@ -397,13 +418,42 @@ export function ShopProfileClient({
             </div>
 
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>
                   {shop.name}
                 </h1>
                 <span className={`badge ${shop.active ? 'badge-delivered' : 'badge-returned'}`}>
                   {shop.active ? 'Active Partner Store' : 'Inactive'}
                 </span>
+                {shop.shopify_domain && (
+                  <a
+                    href={`https://${shop.shopify_domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '3px 10px',
+                      borderRadius: 6,
+                      background: '#ecfdf5',
+                      color: '#047857',
+                      border: '1px solid #a7f3d0',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                    }}
+                    title={`Shopify Store: https://${shop.shopify_domain}`}
+                  >
+                    <ShopifyIcon size={14} />
+                    <span>🛍️ Shopify: {shop.shopify_domain}</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </a>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
@@ -501,6 +551,40 @@ export function ShopProfileClient({
                   <ShopifyIcon size={15} />
                   <span>Shopify Store</span>
                 </button>
+
+                {shop.shopify_domain && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleSyncShopifyOrders}
+                    disabled={syncingShopify}
+                    title="Fetch and sync existing orders from Shopify store"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#ecfdf5',
+                      borderColor: '#86efac',
+                      color: '#166534',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      style={{ animation: syncingShopify ? 'spin 1s linear infinite' : 'none' }}
+                    >
+                      <polyline points="23 4 23 10 17 10" />
+                      <polyline points="1 20 1 14 7 14" />
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                    </svg>
+                    <span>{syncingShopify ? 'Syncing Shopify…' : 'Sync Orders from Shopify'}</span>
+                  </button>
+                )}
 
                 <button
                   type="button"

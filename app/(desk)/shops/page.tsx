@@ -17,7 +17,7 @@ export default async function ShopsPage() {
 
   const { data: shops } = await supabase
     .from('shops')
-    .select('id, name, phone, address, active, balance_usd, created_at')
+    .select('id, name, phone, address, active, balance_usd, created_at, shopify_domain')
     .eq('workspace_id', member.workspace_id)
     .order('name')
 

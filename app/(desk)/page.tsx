@@ -51,7 +51,7 @@ export default async function OverviewPage() {
 
     supabase
       .from('shops')
-      .select('id, name, balance_usd')
+      .select('id, name, balance_usd, shopify_domain')
       .eq('workspace_id', workspace.id)
       .eq('active', true),
 
@@ -83,7 +83,9 @@ export default async function OverviewPage() {
     const shopDelivered = shopOrders.filter(o => o.status === 'delivered')
     const fees = shopDelivered.reduce((s, o) => s + Number(o.delivery_fee_usd || 0), 0)
     return {
+      id: shop.id,
       name: shop.name,
+      shopifyDomain: shop.shopify_domain,
       totalOrders: shopOrders.length,
       deliveredOrders: shopDelivered.length,
       fees,
@@ -222,7 +224,30 @@ export default async function OverviewPage() {
                     }}
                   >
                     <div>
-                      <strong style={{ fontSize: 13, display: 'block' }}>{shop.name}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Link href={`/shops/${shop.id}`} style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)', textDecoration: 'none' }}>
+                          {shop.name}
+                        </Link>
+                        {shop.shopifyDomain && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              background: '#ecfdf5',
+                              color: '#059669',
+                              border: '1px solid #a7f3d0',
+                            }}
+                            title={`Shopify Store: ${shop.shopifyDomain}`}
+                          >
+                            🛍️ Shopify
+                          </span>
+                        )}
+                      </div>
                       <small style={{ color: 'var(--muted)', fontSize: 11 }}>
                         {shop.deliveredOrders} / {shop.totalOrders} delivered
                       </small>
