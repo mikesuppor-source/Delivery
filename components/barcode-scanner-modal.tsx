@@ -90,10 +90,10 @@ export function BarcodeScannerModal({
   const [targetDriverId, setTargetDriverId] = useState('')
   const [soundEnabled, setSoundEnabled] = useState(true)
 
-  // Camera video refs
+  // Camera scanner refs
   const [cameraActive, setCameraActive] = useState(false)
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
+  const scannerRef = useRef<unknown>(null)
+  const stoppingPromiseRef = useRef<Promise<void> | null>(null)
   const scanInputRef = useRef<HTMLInputElement | null>(null)
 
   // Auto focus input on modal open
@@ -111,10 +111,22 @@ export function BarcodeScannerModal({
     }
   }, [isOpen])
 
-  function stopCamera() {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
-      streamRef.current = null
+  async function stopCamera() {
+    if (scannerRef.current) {
+      const scanner = scannerRef.current as { isScanning?: boolean; stop: () => Promise<void>; clear: () => Promise<void> }
+      scannerRef.current = null
+      const p = (async () => {
+        try {
+          if (scanner.isScanning) {
+            await scanner.stop()
+          }
+          await scanner.clear()
+        } catch (e: unknown) {
+          void e
+        }
+      })()
+      stoppingPromiseRef.current = p
+      await p
     }
     setCameraActive(false)
   }
@@ -122,42 +134,55 @@ export function BarcodeScannerModal({
   async function startCamera() {
     try {
       setErrorMessage('')
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
-      }
       setCameraActive(true)
 
-      // Start BarcodeDetector loop if supported by browser
-      if ('BarcodeDetector' in window) {
-        const barcodeDetector = new (window as any).BarcodeDetector({
-          formats: ['code_128', 'qr_code', 'ean_13', 'upc_a'],
-        })
+      // Allow React to mount the #modal-qr-reader container
+      await new Promise(r => setTimeout(r, 60))
 
-        const interval = setInterval(async () => {
-          if (!videoRef.current || !streamRef.current) {
-            clearInterval(interval)
-            return
-          }
-          try {
-            const barcodes = await barcodeDetector.detect(videoRef.current)
-            if (barcodes.length > 0) {
-              const code = barcodes[0].rawValue
-              if (code) {
-                handleProcessScan(code)
-                clearInterval(interval)
-                stopCamera()
-              }
-            }
-          } catch {
-            // detection frame skip
-          }
-        }, 300)
+      if (stoppingPromiseRef.current) {
+        try {
+          await stoppingPromiseRef.current
+        } catch (e: unknown) {
+          void e
+        }
       }
+
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
+      const container = document.getElementById('modal-qr-reader')
+      if (!container) return
+
+      const html5QrCode = new Html5Qrcode('modal-qr-reader', {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.UPC_A,
+        ],
+        verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: false,
+        },
+      })
+      scannerRef.current = html5QrCode
+
+      await html5QrCode.start(
+        { facingMode: 'environment' },
+        {
+          fps: 15,
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            return {
+              width: Math.floor(Math.min(viewfinderWidth * 0.85, 300)),
+              height: Math.floor(Math.min(viewfinderHeight * 0.55, 140)),
+            }
+          },
+        },
+        (decodedText: string) => {
+          handleProcessScan(decodedText)
+          stopCamera()
+        },
+        () => {}
+      )
     } catch {
       setErrorMessage('Could not access camera. Please allow camera permissions or use laser / keyboard input.')
       stopCamera()
@@ -277,6 +302,16 @@ export function BarcodeScannerModal({
                 Audio Feedback
               </label>
 
+              <Link
+                href="/scan"
+                target="_blank"
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 11, padding: '3px 8px', color: 'var(--brand)' }}
+                title="Open dedicated mobile camera scanner in full screen"
+              >
+                Full Scanner ↗
+              </Link>
+
               <button
                 type="button"
                 onClick={cameraActive ? stopCamera : startCamera}
@@ -290,21 +325,26 @@ export function BarcodeScannerModal({
 
           {/* Camera Viewfinder */}
           {cameraActive && (
-            <div style={{ position: 'relative', width: '100%', maxHeight: 220, overflow: 'hidden', borderRadius: 8, marginBottom: 12, background: '#000' }}>
-              <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} playsInline muted />
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  width: '75%',
-                  height: 90,
-                  border: '2px dashed #22c55e',
-                  borderRadius: 6,
-                  pointerEvents: 'none',
-                }}
-              />
+            <div style={{ position: 'relative', width: '100%', minHeight: 220, borderRadius: 8, overflow: 'hidden', marginBottom: 12, background: '#000' }}>
+              <div id="modal-qr-reader" style={{ width: '100%', minHeight: 220 }} />
+              <style dangerouslySetInnerHTML={{ __html: `
+                #modal-qr-reader {
+                  border: none !important;
+                }
+                #modal-qr-reader video {
+                  object-fit: cover !important;
+                  width: 100% !important;
+                  max-height: 220px !important;
+                  background: transparent !important;
+                  -webkit-transform: translateZ(0);
+                }
+                #modal-qr-reader__scan_region {
+                  background: transparent !important;
+                }
+                #modal-qr-reader__dashboard {
+                  display: none !important;
+                }
+              `}} />
             </div>
           )}
 
