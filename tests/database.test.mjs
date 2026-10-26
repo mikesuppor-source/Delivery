@@ -55,6 +55,16 @@ test('migrations, isolation, atomic accounting, and idempotency',async t=>{
   await assert.rejects(db.query('delete from orders where id=$1',[order]),/permanent deletion/)
   await assert.rejects(db.query("update orders set status='cancelled' where id=$1",[order]),/Only pending/)
  })
+ await t.test('owner deletion succeeds when authorized session flag is active',async()=>{
+  const testOrder = id(11)
+  await db.query("insert into orders(id,workspace_id,shop_id,usd_to_lbp_rate,collection_usd) values($1,$2,$3,100000,50)",[testOrder,a,shop])
+  await assert.rejects(db.query('delete from orders where id=$1',[testOrder]),/permanent deletion/)
+  await db.exec("select set_allow_owner_delete(true)")
+  await db.query('delete from order_events where order_id=$1',[testOrder])
+  await db.query('delete from orders where id=$1',[testOrder])
+  await db.exec("select set_allow_owner_delete(false)")
+  assert.equal((await db.query('select count(*) from orders where id=$1',[testOrder])).rows[0].count, 0)
+ })
  await t.test('shopify identity is unique and cancellation preserves records',async()=>{
   await db.query("insert into orders(workspace_id,shop_id,usd_to_lbp_rate,shopify_order_id) values($1,$2,100000,'external-1')",[a,shop])
   await assert.rejects(db.query("insert into orders(workspace_id,shop_id,usd_to_lbp_rate,shopify_order_id) values($1,$2,100000,'external-1')",[a,shop]),/duplicate/)

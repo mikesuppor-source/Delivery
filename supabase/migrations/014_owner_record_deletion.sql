@@ -4,6 +4,17 @@
 -- ============================================================
 
 -- 1. Update guard_order_change() to allow deletion when app.allow_owner_delete is active
+create or replace function public.set_allow_owner_delete(p_allow boolean)
+returns boolean language plpgsql as $_$
+begin
+  if p_allow then
+    perform set_config('app.allow_owner_delete', 'true', false);
+  else
+    perform set_config('app.allow_owner_delete', 'false', false);
+  end if;
+  return true;
+end $_$;
+
 create or replace function public.guard_order_change() returns trigger language plpgsql
 set search_path=public,pg_temp as $_$
 begin
@@ -29,42 +40,15 @@ begin
  return new;
 end $_$;
 
--- 2. Atomic procedure for Owner to permanently delete orders and related entries
-create or replace function public.owner_delete_orders(p_workspace_id uuid, p_order_ids uuid[])
-returns integer language plpgsql security definer
-set search_path=public,pg_temp as $_$
-declare
-  v_count integer;
-begin
-  -- Authorize deletion for this transaction
-  perform set_config('app.allow_owner_delete', 'true', true);
+-- 2. Foreign Key Cascades & Nullification on Order Deletion
+do $$ begin
+  alter table public.order_events drop constraint if exists order_events_order_id_fkey;
+  alter table public.order_events add constraint order_events_order_id_fkey foreign key (order_id) references public.orders(id) on delete cascade;
 
-  -- 1. Remove order tracking events
-  delete from public.order_events
-  where workspace_id = p_workspace_id and order_id = any(p_order_ids);
+  alter table public.order_attachments drop constraint if exists order_attachments_order_id_fkey;
+  alter table public.order_attachments add constraint order_attachments_order_id_fkey foreign key (order_id) references public.orders(id) on delete cascade;
 
-  -- 2. Remove attachments
-  delete from public.order_attachments
-  where order_id = any(p_order_ids);
-
-  -- 3. Unlink financial ledger entries to preserve accounting history without foreign key lock
-  update public.money_ledger
-  set order_id = null
-  where workspace_id = p_workspace_id and order_id = any(p_order_ids);
-
-  -- 4. Unlink settlements
-  update public.settlements
-  set order_id = null
-  where workspace_id = p_workspace_id and order_id = any(p_order_ids);
-
-  -- 5. Delete the order records
-  delete from public.orders
-  where workspace_id = p_workspace_id and id = any(p_order_ids);
-
-  get diagnostics v_count = row_count;
-
-  -- Reset authorization
-  perform set_config('app.allow_owner_delete', 'false', true);
-
-  return v_count;
-end $_$;
+  alter table public.money_ledger drop constraint if exists money_ledger_order_id_fkey;
+  alter table public.money_ledger add constraint money_ledger_order_id_fkey foreign key (order_id) references public.orders(id) on delete set null;
+exception when others then null;
+end $$;
