@@ -173,7 +173,7 @@ export function OrderReceiptSlip({
               borderColor: qrMode === 'tracking_url' ? 'var(--brand)' : 'var(--line)',
             }}
           >
-            📱 Live Customer Tracking URL
+            Live Customer Tracking URL
           </button>
           <button
             type="button"
@@ -407,7 +407,7 @@ export function OrderReceiptSlip({
               letterSpacing: '0.8px',
             }}
           >
-            <span>⚠️ FRAGILE / قابل للكسر — HANDLE WITH EXTREME CARE</span>
+            <span>FRAGILE / قابل للكسر — HANDLE WITH EXTREME CARE</span>
           </div>
         )}
 
@@ -430,7 +430,7 @@ export function OrderReceiptSlip({
               letterSpacing: '0.5px',
             }}
           >
-            <span>🔄 REPLACEMENT / تبديل — (COLLECT OLD ITEM FIRST)</span>
+            <span>REPLACEMENT / تبديل — (COLLECT OLD ITEM FIRST)</span>
           </div>
         )}
 
@@ -453,7 +453,7 @@ export function OrderReceiptSlip({
               letterSpacing: '0.5px',
             }}
           >
-            <span>📦 RETURN PICKUP / استلام مرتجع — (COLLECT FROM RECIPIENT)</span>
+            <span>RETURN PICKUP / استلام مرتجع — (COLLECT FROM RECIPIENT)</span>
           </div>
         )}
 
@@ -469,7 +469,7 @@ export function OrderReceiptSlip({
             </div>
             {order.shop?.phone && (
               <div style={{ fontSize: 11.5, color: '#374151', marginTop: 2 }}>
-                📞 {order.shop.phone}
+                Phone: {order.shop.phone}
               </div>
             )}
           </div>

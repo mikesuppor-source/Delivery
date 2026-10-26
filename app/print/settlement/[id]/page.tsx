@@ -174,7 +174,7 @@ export default async function SettlementPrintPage({ params, searchParams }: Sett
                   justifyContent: 'center',
                 }}
               >
-                🌲
+                C
               </div>
               <div>
                 <h1 style={{ fontSize: 20, fontWeight: 900, margin: 0, letterSpacing: '-0.3px', color: '#047857' }}>

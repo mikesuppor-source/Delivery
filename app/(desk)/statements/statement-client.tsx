@@ -338,7 +338,7 @@ export function StatementClient({
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}
             title="Download delivered orders ledger as CSV spreadsheet"
           >
-            <span>📥 Export Statement CSV</span>
+            <span>Export Statement CSV</span>
           </button>
         </div>
         <div className="table-wrap">
@@ -448,7 +448,7 @@ export function StatementClient({
                   <td><small style={{ color: '#38bdf8' }}>{req.amount_lbp > 0 ? formatLBP(req.amount_lbp) : '—'}</small></td>
                   <td>
                     <span className="badge" style={{ textTransform: 'uppercase', fontSize: 11 }}>
-                      {req.method === 'whish' ? '🟣 Whish Money' : req.method === 'omt' ? '🟡 OMT Cash' : req.method === 'cash_office' ? '🏢 Office Cash' : req.method}
+                      {req.method === 'whish' ? 'Whish Money' : req.method === 'omt' ? 'OMT Cash' : req.method === 'cash_office' ? 'Office Cash' : req.method}
                     </span>
                   </td>
                   <td>

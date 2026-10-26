@@ -21,11 +21,11 @@ interface DeliveryFailModalProps {
 }
 
 const PRESET_REASONS = [
-  { id: 'no_answer', label: '📞 Customer Not Answering', ar: 'لم يرد على الاتصال' },
-  { id: 'postponed', label: '📅 Rescheduled to Tomorrow', ar: 'تأجيل الاستلام إلى الغد' },
-  { id: 'refused', label: '🚫 Refused / Canceled by Customer', ar: 'رفض الاستلام أو إلغاء الطلب' },
-  { id: 'wrong_address', label: '📍 Wrong Address or Unreachable', ar: 'عنوان خاطئ أو تعذر الوصول' },
-  { id: 'no_change', label: '💵 No Change Available ($100 bill)', ar: 'عدم توفر فكة أو صرف' },
+  { id: 'no_answer', label: 'Customer Not Answering', ar: 'لم يرد على الاتصال' },
+  { id: 'postponed', label: 'Rescheduled to Tomorrow', ar: 'تأجيل الاستلام إلى الغد' },
+  { id: 'refused', label: 'Refused / Canceled by Customer', ar: 'رفض الاستلام أو إلغاء الطلب' },
+  { id: 'wrong_address', label: 'Wrong Address or Unreachable', ar: 'عنوان خاطئ أو تعذر الوصول' },
+  { id: 'no_change', label: 'No Change Available ($100 bill)', ar: 'عدم توفر فكة أو صرف' },
 ]
 
 export function DeliveryFailModal({
@@ -192,7 +192,7 @@ export function DeliveryFailModal({
                   cursor: 'pointer',
                 }}
               >
-                🔄 Keep in Run Sheet (Try Tomorrow)
+                Keep in Run Sheet (Try Tomorrow)
               </button>
 
               <button

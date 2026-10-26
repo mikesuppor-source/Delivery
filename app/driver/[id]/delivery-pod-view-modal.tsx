@@ -90,7 +90,7 @@ export function DeliveryPodViewModal({ order, onClose }: DeliveryPodViewModalPro
           {order.pod_signature ? (
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8', marginBottom: 6 }}>
-                ✍️ Customer Touch Signature
+                Customer Touch Signature
               </div>
               <div
                 style={{
@@ -120,7 +120,7 @@ export function DeliveryPodViewModal({ order, onClose }: DeliveryPodViewModalPro
           {order.pod_photo && (
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8', marginBottom: 6 }}>
-                📸 Handover / Doorstep Photo
+                Handover / Doorstep Photo
               </div>
               <div
                 style={{
@@ -141,7 +141,7 @@ export function DeliveryPodViewModal({ order, onClose }: DeliveryPodViewModalPro
           {/* LBP Collection Note if any */}
           {order.pod_collected_lbp ? (
             <div style={{ background: '#1e293b', padding: '8px 12px', borderRadius: 8, fontSize: 12, color: '#cbd5e1' }}>
-              💵 Lebanese Pounds Paid: <strong>{Number(order.pod_collected_lbp).toLocaleString()} LBP</strong>
+              Lebanese Pounds Paid: <strong>{Number(order.pod_collected_lbp).toLocaleString()} LBP</strong>
             </div>
           ) : null}
 

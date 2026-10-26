@@ -218,28 +218,28 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
               <h1 className="track-code-value">{order.code}</h1>
               {order.service_type === 'replacement' && (
                 <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
-                  🔄 Exchange / Replacement
+                  Exchange / Replacement
                 </span>
               )}
               {order.service_type === 'pickup' && (
                 <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: '#ede9fe', color: '#6b21a8', border: '1px solid #ddd6fe' }}>
-                  📦 Return Pickup
+                  Return Pickup
                 </span>
               )}
               {order.is_breakable && (
                 <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' }}>
-                  ⚠️ Fragile
+                  Fragile
                 </span>
               )}
             </div>
             {order.service_type === 'replacement' && (
               <p style={{ margin: '4px 0 0', fontSize: 12, color: '#b45309', fontWeight: 600 }}>
-                💡 Note: This is an exchange order. Please have the item you are returning ready for the courier.
+                Note: This is an exchange order. Please have the item you are returning ready for the courier.
               </p>
             )}
             {order.service_type === 'pickup' && (
               <p style={{ margin: '4px 0 0', fontSize: 12, color: '#7e22ce', fontWeight: 600 }}>
-                💡 Note: This is a reverse pickup order. The driver will arrive to collect the package from your address.
+                Note: This is a reverse pickup order. The driver will arrive to collect the package from your address.
               </p>
             )}
           </div>
@@ -467,7 +467,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
                 className="btn btn-secondary btn-sm"
                 style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
               >
-                <span>📞 Call Courier ({order.driver.name})</span>
+                <span>Call Courier ({order.driver.name})</span>
               </a>
             ) : (
               <a
@@ -479,7 +479,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
                 className="btn btn-secondary btn-sm"
                 style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
               >
-                <span>💬 Contact Dispatch Office</span>
+                <span>Contact Dispatch Office</span>
               </a>
             )}
           </div>

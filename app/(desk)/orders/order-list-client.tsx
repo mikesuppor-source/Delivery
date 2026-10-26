@@ -775,7 +775,6 @@ export function OrderListClient({
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               title="Automatically assign unassigned pending orders to their designated area courier"
             >
-              <span>⚡</span>
               <span>{autoAssigning ? 'Auto-Dispatching…' : 'Auto-Assign by Area'}</span>
             </button>
           )}
@@ -834,7 +833,7 @@ export function OrderListClient({
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}
             title={soundEnabled ? 'Live Order Audio Alerts: Active (Click to mute)' : 'Live Order Audio Alerts: Muted (Click to enable)'}
           >
-            <span>{soundEnabled ? '🔔 Sound On' : '🔕 Muted'}</span>
+            <span>{soundEnabled ? 'Sound On' : 'Muted'}</span>
           </button>
 
           {canManage && (
@@ -903,7 +902,7 @@ export function OrderListClient({
           {/* Preset Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginRight: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-              📅 Timeframe:
+              Timeframe:
             </span>
             {[
               { id: 'all', label: 'All Time' },
@@ -1071,7 +1070,7 @@ export function OrderListClient({
                             }}
                             title="Replacement / Exchange Item (Driver collects old item)"
                           >
-                            🔄 Swap
+                            Swap
                           </span>
                         )}
                         {order.service_type === 'pickup' && (
@@ -1090,7 +1089,7 @@ export function OrderListClient({
                             }}
                             title="Return Pickup from Customer"
                           >
-                            📦 Pickup
+                            Pickup
                           </span>
                         )}
                         {order.is_breakable && (
@@ -1109,7 +1108,7 @@ export function OrderListClient({
                             }}
                             title="Fragile / Breakable Content"
                           >
-                            ⚠️ Fragile
+                            Fragile
                           </span>
                         )}
                         {order.weight_kg && order.weight_kg > 1 && (
@@ -1125,7 +1124,7 @@ export function OrderListClient({
                             }}
                             title="Package Weight"
                           >
-                            ⚖️ {order.weight_kg}kg
+                            {order.weight_kg}kg
                           </span>
                         )}
                         {order.carrier_tracking_code && (
@@ -1141,7 +1140,7 @@ export function OrderListClient({
                             }}
                             title={`External Carrier Tracking: ${order.carrier_name || 'Octopus'}`}
                           >
-                            🚚 {order.carrier_tracking_code}
+                            {order.carrier_tracking_code}
                           </span>
                         )}
                         {order.shopify_order_number && (
@@ -1335,7 +1334,7 @@ export function OrderListClient({
                               }}
                               title="Assign driver now"
                             >
-                              <option value="">👉 Assign Driver…</option>
+                              <option value="">Assign Driver…</option>
                               {drivers.map(d => (
                                 <option key={d.id} value={d.id}>
                                   {d.name}
@@ -1962,9 +1961,9 @@ export function OrderListClient({
                 value={editServiceType}
                 onChange={e => setEditServiceType(e.target.value as 'delivery' | 'replacement' | 'pickup')}
               >
-                <option value="delivery">🚚 Standard Delivery</option>
-                <option value="replacement">🔄 Replacement / Exchange (تبديل)</option>
-                <option value="pickup">📦 Return Pickup (استلام مرتجع)</option>
+                <option value="delivery">Standard Delivery</option>
+                <option value="replacement">Replacement / Exchange (تبديل)</option>
+                <option value="pickup">Return Pickup (استلام مرتجع)</option>
               </select>
             </div>
 
@@ -1988,7 +1987,7 @@ export function OrderListClient({
                   style={{ width: 18, height: 18, accentColor: '#dc2626' }}
                 />
                 <span style={{ fontWeight: 700, color: editIsBreakable ? '#dc2626' : 'var(--text)' }}>
-                  ⚠️ Fragile / Breakable (قابل للكسر)
+                  Fragile / Breakable (قابل للكسر)
                 </span>
               </label>
             </div>
@@ -2013,7 +2012,7 @@ export function OrderListClient({
                     <div key={evt.id || idx} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '4px 0', borderBottom: idx < orderEvents.length - 1 ? '1px dashed var(--line)' : 'none' }}>
                       <span style={{ color: 'var(--brand)', fontWeight: 700 }}>•</span>
                       <span style={{ color: 'var(--text)' }}>
-                        {evt.old_status ? `${evt.old_status} ➔ ${evt.new_status}` : `Order created as ${evt.new_status}`}
+                        {evt.old_status ? `${evt.old_status} -> ${evt.new_status}` : `Order created as ${evt.new_status}`}
                       </span>
                       <small style={{ color: 'var(--muted)', marginLeft: 'auto' }}>
                         {formatDate(evt.created_at)}
@@ -2139,7 +2138,7 @@ export function OrderListClient({
                       style={{ fontSize: 11, padding: '2px 8px', color: '#dc2626' }}
                       title="Clear custom code (auto-generate upon creation)"
                     >
-                      ✕ Clear
+                      Clear
                     </button>
                   )}
                 </div>
@@ -2210,7 +2209,7 @@ export function OrderListClient({
                     textAlign: 'left',
                   }}
                 >
-                  🚚 Fee Added to Customer (كلفة التوصيل على الزبون)
+                  Fee Added to Customer (كلفة التوصيل على الزبون)
                   <div style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--muted)', marginTop: 2 }}>
                     Customer pays Net (${modalNetItemNum}) + Fee (${modalFeeUsdNum}) = <strong>${modalCodUsd} COD</strong>. Shop gets full <strong>${modalNetItemNum}</strong>.
                   </div>
@@ -2232,7 +2231,7 @@ export function OrderListClient({
                     textAlign: 'left',
                   }}
                 >
-                  🎁 Free Delivery / Shop Pays (توصيل مجاني - على المتجر)
+                  Free Delivery / Shop Pays (توصيل مجاني - على المتجر)
                   <div style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--muted)', marginTop: 2 }}>
                     Customer pays only goods (${modalNetItemNum}). Fee deducted from shop payout (Shop gets <strong>${modalShopNetUsd}</strong>).
                   </div>
@@ -2242,7 +2241,7 @@ export function OrderListClient({
 
             <div className="field">
               <label style={{ fontWeight: 700, color: '#0f172a' }}>
-                📦 Net Item Price / سعر البضاعة (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                Net Item Price / سعر البضاعة (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input
                 type="number"
@@ -2260,7 +2259,7 @@ export function OrderListClient({
 
             <div className="field">
               <label style={{ fontWeight: 700, color: '#0f172a' }}>
-                🚚 Delivery Fee / كلفة التوصيل (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                Delivery Fee / كلفة التوصيل (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input
                 type="number"
@@ -2278,7 +2277,7 @@ export function OrderListClient({
 
             <div className="field">
               <label style={{ fontWeight: 700, color: '#166534' }}>
-                💵 Total COD to Collect (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                Total COD to Collect (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <div style={{ padding: '8px 12px', background: '#ecfdf5', border: '1.5px solid #86efac', borderRadius: 6 }}>
                 <span style={{ fontSize: 16, fontWeight: 800, color: '#166534' }}>{formatUSD(modalCodUsd)}</span>
@@ -2290,7 +2289,7 @@ export function OrderListClient({
 
             <div className="field">
               <label style={{ fontWeight: 700, color: '#0f172a' }}>
-                🚴 Courier Pay / Driver Commission (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                Courier Pay / Driver Commission (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input
                 type="number"
@@ -2330,11 +2329,11 @@ export function OrderListClient({
                 <span style={{ color: '#4ade80' }}>Total COD:</span> <strong style={{ color: '#4ade80' }}>{formatUSD(modalCodUsd)}</strong>
               </div>
               <div>
-                <span style={{ color: '#38bdf8' }}>🏪 Shop Net:</span> <strong style={{ color: '#4ade80' }}>{formatUSD(modalShopNetUsd)}</strong>
+                <span style={{ color: '#38bdf8' }}>Shop Net:</span> <strong style={{ color: '#4ade80' }}>{formatUSD(modalShopNetUsd)}</strong>
                 <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                <span style={{ color: '#94a3b8' }}>🚴 Courier:</span> <strong style={{ color: '#facc15' }}>{formatUSD(modalDriverPayNum)}</strong>
+                <span style={{ color: '#94a3b8' }}>Courier:</span> <strong style={{ color: '#facc15' }}>{formatUSD(modalDriverPayNum)}</strong>
                 <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                <span style={{ color: '#94a3b8' }}>📈 Margin:</span> <strong style={{ color: '#60a5fa' }}>{formatUSD(modalCompanyMarginUsd)}</strong>
+                <span style={{ color: '#94a3b8' }}>Margin:</span> <strong style={{ color: '#60a5fa' }}>{formatUSD(modalCompanyMarginUsd)}</strong>
               </div>
             </div>
 
@@ -2376,7 +2375,7 @@ export function OrderListClient({
               >
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}>
-                    👥 Repeat Customer Detected: {phoneMatchedCustomer.name}
+                    Repeat Customer: {phoneMatchedCustomer.name}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                     {phoneMatchedCustomer.orders_count || 1} past orders · {phoneMatchedCustomer.address || 'Address on file'}
@@ -2393,7 +2392,7 @@ export function OrderListClient({
                     setPhoneMatchedCustomer(null)
                   }}
                 >
-                  ⚡ Auto-Fill Details
+                  Auto-Fill Details
                 </button>
               </div>
             )}
@@ -2420,7 +2419,7 @@ export function OrderListClient({
                     textAlign: 'center',
                   }}
                 >
-                  🚚 Delivery
+                  Delivery
                 </button>
                 <button
                   type="button"
@@ -2438,7 +2437,7 @@ export function OrderListClient({
                     textAlign: 'center',
                   }}
                 >
-                  🔄 Replacement (تبديل)
+                  Replacement (تبديل)
                 </button>
                 <button
                   type="button"
@@ -2456,7 +2455,7 @@ export function OrderListClient({
                     textAlign: 'center',
                   }}
                 >
-                  📦 Return Pickup (مرتجع)
+                  Return Pickup (مرتجع)
                 </button>
               </div>
             </div>
@@ -2481,7 +2480,7 @@ export function OrderListClient({
                   style={{ width: 18, height: 18, accentColor: '#dc2626' }}
                 />
                 <span style={{ fontWeight: 700, color: isBreakable ? '#dc2626' : 'var(--text)' }}>
-                  ⚠️ Fragile / Breakable (قابل للكسر)
+                  Fragile / Breakable (قابل للكسر)
                 </span>
               </label>
               <small style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>

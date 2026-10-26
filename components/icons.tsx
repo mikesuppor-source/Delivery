@@ -381,6 +381,25 @@ export function SearchIcon({ size = 14, className, style, color = 'currentColor'
   )
 }
 
+export function NavigationIcon({ size = 14, className, style, color = 'currentColor' }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }}
+    >
+      <polygon points="3 11 22 2 13 21 11 13 3 11" />
+    </svg>
+  )
+}
+
 export function PhoneIcon({ size = 14, className, style, color = 'currentColor' }: IconProps) {
   return (
     <svg

@@ -19,6 +19,7 @@ import {
   CheckIcon,
   SearchIcon,
   PhoneIcon,
+  NavigationIcon,
 } from '@/components/icons'
 import { DeliveryPodModal } from './delivery-pod-modal'
 import { DeliveryFailModal } from './delivery-fail-modal'
@@ -379,7 +380,7 @@ export function DriverRunSheetClient({
           pod_collected_lbp: extraData?.podCollectedLbp !== undefined ? extraData.podCollectedLbp : o.pod_collected_lbp,
         } : o))
       )
-      showNotification('success', `⚡ Saved offline! Will sync automatically when connection restores.`)
+      showNotification('success', `Saved offline! Will sync automatically when connection restores.`)
       setUpdatingId(null)
       return
     }
@@ -437,7 +438,7 @@ export function DriverRunSheetClient({
             pod_collected_lbp: extraData?.podCollectedLbp !== undefined ? extraData.podCollectedLbp : o.pod_collected_lbp,
           } : o))
         )
-        showNotification('success', `⚡ Network drop detected: Saved locally! Will sync when connection restores.`)
+        showNotification('success', `Network drop detected: Saved locally! Will sync when connection restores.`)
       } else {
         showNotification('error', err instanceof Error ? err.message : 'Error updating status')
         throw err
@@ -573,7 +574,6 @@ export function DriverRunSheetClient({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>{!isOnline ? '📡' : '⚡'}</span>
               <span>
                 {!isOnline ? (
                   <>
@@ -924,7 +924,6 @@ export function DriverRunSheetClient({
                             gap: 3,
                           }}
                         >
-                          <span>⚡</span>
                           <span>Pending Sync</span>
                         </span>
                       )}
@@ -975,7 +974,6 @@ export function DriverRunSheetClient({
                         marginBottom: 10,
                       }}
                     >
-                      <span style={{ fontSize: 14 }}>🔄</span>
                       <div>
                         <div>REPLACEMENT / تبديل</div>
                         <div style={{ fontSize: 11, fontWeight: 500, color: '#fde68a' }}>
@@ -1001,7 +999,6 @@ export function DriverRunSheetClient({
                         marginBottom: 10,
                       }}
                     >
-                      <span style={{ fontSize: 14 }}>📦</span>
                       <div>
                         <div>RETURN PICKUP / استلام مرتجع</div>
                         <div style={{ fontSize: 11, fontWeight: 500, color: '#d8b4fe' }}>
@@ -1042,17 +1039,17 @@ export function DriverRunSheetClient({
                           }}
                           title="Fragile / Breakable Content"
                         >
-                          ⚠️ FRAGILE / كسر
+                          FRAGILE / كسر
                         </span>
                       )}
                       {order.weight_kg && order.weight_kg > 1 && (
                         <span style={{ fontSize: 10.5, fontWeight: 700, color: '#cbd5e1', background: '#334155', padding: '1px 6px', borderRadius: 4 }}>
-                          ⚖️ {order.weight_kg}kg
+                          {order.weight_kg}kg
                         </span>
                       )}
                       {parsedLoc.isCoords && (
                         <span style={{ fontSize: 10.5, fontWeight: 700, color: '#34d399', background: '#064e3b', padding: '1px 6px', borderRadius: 4 }}>
-                          📍 GPS Pin
+                          GPS Pin
                         </span>
                       )}
                     </div>
@@ -1063,7 +1060,7 @@ export function DriverRunSheetClient({
 
                     {order.notes && (
                       <div style={{ fontSize: 11, color: '#fde047', background: 'rgba(253, 224, 71, 0.1)', padding: '4px 8px', borderRadius: 6, marginTop: 6, border: '1px solid rgba(253, 224, 71, 0.2)' }}>
-                        📝 Note: {order.notes}
+                        Note: {order.notes}
                       </div>
                     )}
                   </div>
@@ -1128,7 +1125,7 @@ export function DriverRunSheetClient({
                       }}
                       title="Navigate with Waze"
                     >
-                      <span>🚙</span>
+                      <NavigationIcon size={12} color="#ffffff" />
                       <span>Waze</span>
                     </a>
 
@@ -1200,7 +1197,7 @@ export function DriverRunSheetClient({
                           gap: 2,
                         }}
                       >
-                        <span>💬</span>
+                        <WhatsAppIcon size={12} color="#64748b" />
                         <span>No Tel</span>
                       </div>
                     )}
@@ -1244,7 +1241,7 @@ export function DriverRunSheetClient({
                           gap: 2,
                         }}
                       >
-                        <span>📞</span>
+                        <PhoneIcon size={12} color="#64748b" />
                         <span>No Tel</span>
                       </div>
                     )}
@@ -1278,7 +1275,7 @@ export function DriverRunSheetClient({
                         title="Request location pin on WhatsApp"
                       >
                         <WhatsAppIcon size={12} color="#4ade80" />
-                        <span>📍 Ask Pin</span>
+                        <span>Ask Pin</span>
                       </a>
 
                       <a
@@ -1305,7 +1302,7 @@ export function DriverRunSheetClient({
                         }}
                         title="Notify customer you have arrived"
                       >
-                        <span>🚪 I'm Outside</span>
+                        <span>I'm Outside</span>
                       </a>
                     </div>
                   )}
@@ -1409,7 +1406,7 @@ export function DriverRunSheetClient({
                                 cursor: 'pointer',
                               }}
                             >
-                              ✍️ View POD
+                              View POD
                             </button>
                           )}
                         </div>

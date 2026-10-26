@@ -445,7 +445,7 @@ export function ShopProfileClient({
                     title={`Shopify Store: https://${shop.shopify_domain}`}
                   >
                     <ShopifyIcon size={14} />
-                    <span>🛍️ Shopify: {shop.shopify_domain}</span>
+                    <span>Shopify: {shop.shopify_domain}</span>
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                       <polyline points="15 3 21 3 21 9" />
@@ -1060,7 +1060,7 @@ export function ShopProfileClient({
                 transition: 'all .15s',
               }}
             >
-              Printable Statement 📄
+              Printable Statement
             </button>
           </div>
 
@@ -1374,11 +1374,11 @@ export function ShopProfileClient({
                     <td>
                       {Number(item.amount_usd) < 0 ? (
                         <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>
-                          📥 Cash Received from Merchant (Shop → Desk)
+                          Cash Received from Merchant (Shop → Desk)
                         </span>
                       ) : (
                         <span className="badge badge-delivered">
-                          💸 Cash Payout to Merchant (Desk → {shop.name})
+                          Cash Payout to Merchant (Desk → {shop.name})
                         </span>
                       )}
                     </td>
@@ -1641,7 +1641,7 @@ export function ShopProfileClient({
                 }}
               >
                 <div style={{ fontSize: 12, fontWeight: 700, color: settlementDirection === 'payout_to_shop' ? 'var(--brand)' : 'var(--text)' }}>
-                  💸 Pay Merchant (Desk → Shop)
+                  Pay Merchant (Desk → Shop)
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                   We give cash to store (clears positive balance)
@@ -1665,7 +1665,7 @@ export function ShopProfileClient({
                 }}
               >
                 <div style={{ fontSize: 12, fontWeight: 700, color: settlementDirection === 'collection_from_shop' ? '#0284c7' : 'var(--text)' }}>
-                  📥 Collect from Merchant (Shop → Desk)
+                  Collect from Merchant (Shop → Desk)
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                   Store pays cash to company (settles negative debt)

@@ -248,7 +248,7 @@ export default async function OverviewPage() {
                             }}
                             title={`Shopify Store: ${shop.shopifyDomain}`}
                           >
-                            🛍️ Shopify
+                            Shopify
                           </span>
                         )}
                       </div>

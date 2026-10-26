@@ -200,10 +200,8 @@ export function AreaListClient({
                 title="Automatically assign all unassigned orders to their area courier"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                {autoAssigning ? (
+                {autoAssigning && (
                   <RefreshIcon size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <span>⚡</span>
                 )}
                 <span>{autoAssigning ? 'Auto-Assigning…' : 'Auto-Assign Pending Orders'}</span>
               </button>

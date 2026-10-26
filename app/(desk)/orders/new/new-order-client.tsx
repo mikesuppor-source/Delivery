@@ -301,15 +301,12 @@ export function NewOrderClient({
             gap: 12,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 20 }}>✅</span>
-            <div>
-              <strong style={{ color: 'var(--brand)', fontSize: 14 }}>
-                Order #{createdOrderCode} created successfully!
-              </strong>
-              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
-                Waybill barcode and tracking link are active. Form is cleared and ready for the next parcel.
-              </div>
+          <div>
+            <strong style={{ color: 'var(--brand)', fontSize: 14 }}>
+              Order #{createdOrderCode} created successfully
+            </strong>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
+              Waybill barcode and tracking link are active. Form is cleared and ready for the next parcel.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -319,7 +316,7 @@ export function NewOrderClient({
               className="btn btn-ghost btn-sm"
               style={{ fontSize: 12, borderColor: 'var(--brand)', color: 'var(--brand)' }}
             >
-              🖨️ Print Waybill Slip
+              Print Waybill Slip
             </Link>
             <Link
               href={`/track/${createdOrderCode}`}
@@ -327,7 +324,7 @@ export function NewOrderClient({
               className="btn btn-ghost btn-sm"
               style={{ fontSize: 12 }}
             >
-              🔍 Public Tracking View
+              Public Tracking View
             </Link>
           </div>
         </div>
@@ -362,14 +359,11 @@ export function NewOrderClient({
             boxShadow: 'var(--shadow)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
-            <span style={{ fontSize: 18 }}>📍</span>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                1. Customer & Delivery Destination
-              </h3>
-              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Who is receiving the parcel and where should the courier deliver it?</span>
-            </div>
+          <div style={{ marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+              1. Customer & Delivery Destination
+            </h3>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Who is receiving the parcel and where should the courier deliver it?</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
@@ -440,7 +434,7 @@ export function NewOrderClient({
             >
               <div>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1d4ed8' }}>
-                  👥 Repeat Customer Detected: {phoneMatchedCustomer.name}
+                  Repeat Customer: {phoneMatchedCustomer.name}
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
                   {phoneMatchedCustomer.orders_count || 1} past orders · {phoneMatchedCustomer.address || 'Address on file'}
@@ -457,7 +451,7 @@ export function NewOrderClient({
                   setPhoneMatchedCustomer(null)
                 }}
               >
-                ⚡ Auto-Fill Details
+                Auto-Fill Details
               </button>
             </div>
           )}
@@ -561,14 +555,11 @@ export function NewOrderClient({
             boxShadow: 'var(--shadow)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
-            <span style={{ fontSize: 18 }}>📦</span>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                2. Merchant & Package Specifications
-              </h3>
-              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Sender store, waybill tracking code, service type, and courier handling</span>
-            </div>
+          <div style={{ marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+              2. Merchant & Package Specifications
+            </h3>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Sender store, waybill tracking code, service type, and courier handling</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
@@ -629,7 +620,7 @@ export function NewOrderClient({
                       onClick={() => setCustomCode('')}
                       style={{ fontSize: 10.5, padding: '2px 8px', color: '#dc2626' }}
                     >
-                      ✕
+                      Clear
                     </button>
                   )}
                 </div>
@@ -682,7 +673,7 @@ export function NewOrderClient({
                 }}
                 style={{ fontSize: 11, padding: '3px 10px', borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 600 }}
               >
-                ⚡ Apply $2 Return Pickup Preset
+                Apply $2 Return Pickup Preset
               </button>
             </div>
 
@@ -704,7 +695,7 @@ export function NewOrderClient({
                   transition: 'all 0.15s ease',
                 }}
               >
-                🚚 Standard Delivery
+                Standard Delivery
                 <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>توصيل طلب عادي</div>
               </button>
 
@@ -725,7 +716,7 @@ export function NewOrderClient({
                   transition: 'all 0.15s ease',
                 }}
               >
-                🔄 Replacement
+                Replacement
                 <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>تبديل بضاعة</div>
               </button>
 
@@ -746,7 +737,7 @@ export function NewOrderClient({
                   transition: 'all 0.15s ease',
                 }}
               >
-                📦 Return Pickup
+                Return Pickup
                 <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>استرجاع مرتجع</div>
               </button>
             </div>
@@ -776,7 +767,7 @@ export function NewOrderClient({
                 />
                 <div>
                   <span style={{ fontSize: 13, fontWeight: 700, color: isBreakable ? '#ea580c' : 'var(--text)' }}>
-                    ⚠️ Fragile / Breakable (قابل للكسر)
+                    Fragile / Breakable (قابل للكسر)
                   </span>
                   <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11 }}>
                     Prints prominent fragile warning on thermal AWB label
@@ -811,19 +802,16 @@ export function NewOrderClient({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 20 }}>💵</span>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--text)' }}>
-                  3. Cash Collection & Financial Settlement
-                </h3>
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  COD cash collection at doorstep and automatic merchant/courier splits
-                </span>
-              </div>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--text)' }}>
+                3. Cash Collection & Financial Settlement
+              </h3>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                COD cash collection at doorstep and automatic merchant/courier splits
+              </span>
             </div>
             <div style={{ fontSize: 12, background: 'var(--bg)', padding: '4px 10px', borderRadius: 6, fontWeight: 600, color: 'var(--brand)' }}>
-              💱 1 USD = {rate.toLocaleString()} LBP
+              Rate: 1 USD = {rate.toLocaleString()} LBP
             </div>
           </div>
 
@@ -856,10 +844,9 @@ export function NewOrderClient({
                   transition: 'all 0.15s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 13.5 }}>
-                  <span>🚚</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 800, fontSize: 13.5 }}>
                   <span>Delivery Fee Added to Customer (كلفة التوصيل على الزبون)</span>
-                  {pricingMode === 'added' && <span style={{ marginLeft: 'auto', color: '#2563eb' }}>✓ Active</span>}
+                  {pricingMode === 'added' && <span style={{ color: '#2563eb', fontSize: 12, fontWeight: 700 }}>[Active]</span>}
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
                   <strong>Standard E-commerce:</strong> Delivery fee is added on top of the goods. Customer pays Total COD at door ($25 Net + $3 Fee = <strong>$28.00</strong>). Shop receives full <strong>$25.00</strong>.
@@ -881,10 +868,9 @@ export function NewOrderClient({
                   transition: 'all 0.15s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 13.5 }}>
-                  <span>🎁</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 800, fontSize: 13.5 }}>
                   <span>Free Delivery / Shop Pays (توصيل مجاني - كلفة التوصيل على المتجر)</span>
-                  {pricingMode === 'free_delivery' && <span style={{ marginLeft: 'auto', color: '#059669' }}>✓ Active</span>}
+                  {pricingMode === 'free_delivery' && <span style={{ color: '#059669', fontSize: 12, fontWeight: 700 }}>[Active]</span>}
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
                   <strong>Free Shipping Promo:</strong> Customer only pays the goods price ($25.00). Delivery fee is deducted from shop payout (Shop receives <strong>$22.00</strong>).
@@ -906,7 +892,7 @@ export function NewOrderClient({
               }}
             >
               <label htmlFor="net-item-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
-                📦 Net Item Price / سعر البضاعة (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                Net Item Price / سعر البضاعة (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
                 صافي قيمة البضاعة المستحقة للمتجر
@@ -937,7 +923,7 @@ export function NewOrderClient({
               }}
             >
               <label htmlFor="delivery-fee-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
-                🚚 Delivery Fee / كلفة التوصيل (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                Delivery Fee / كلفة التوصيل (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
                 كلفة التوصيل للمنطقة ({currentArea?.name || 'Area Tariff'})
@@ -969,7 +955,7 @@ export function NewOrderClient({
               }}
             >
               <label htmlFor="total-cod-display" style={{ color: '#166534', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
-                💵 Total COD to Collect at Doorstep <span style={{ color: 'var(--danger)' }}>*</span>
+                Total COD to Collect at Doorstep <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <div style={{ fontSize: 11, color: '#15803d', fontWeight: 600, marginBottom: 6 }}>
                 المبلغ المطلوب تحصيله من الزبون عند الاستلام
@@ -996,7 +982,7 @@ export function NewOrderClient({
               }}
             >
               <label htmlFor="driver-pay-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
-                🚴 Courier Pay / أجرة السائق (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                Courier Pay / أجرة السائق (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
                 أجرة الدليفري ({currentDriver?.name || 'Assigned Courier'})
@@ -1033,7 +1019,7 @@ export function NewOrderClient({
                 Live Accounting & Settlement Breakdown / كشف الحساب الفوري
               </span>
               <span style={{ fontSize: 12, color: '#38bdf8', fontWeight: 600 }}>
-                {pricingMode === 'added' ? '🚚 Delivery Added to Customer' : '🎁 Free Delivery (Shop Pays)'}
+                {pricingMode === 'added' ? 'Delivery Added to Customer' : 'Free Delivery (Shop Pays)'}
               </span>
             </div>
 
@@ -1041,7 +1027,7 @@ export function NewOrderClient({
               {/* Box A: Net Item Price */}
               <div>
                 <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
-                  📦 Net Goods Price (سعر البضاعة):
+                  Net Goods Price (سعر البضاعة):
                 </span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: '#ffffff' }}>
                   {formatUSD(netItemNum)}
@@ -1054,7 +1040,7 @@ export function NewOrderClient({
               {/* Box B: Delivery Fee */}
               <div>
                 <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
-                  {pricingMode === 'added' ? '➕ Delivery Fee (Paid by Customer):' : '➖ Delivery Fee (Absorbed by Shop):'}
+                  {pricingMode === 'added' ? 'Delivery Fee (Paid by Customer):' : 'Delivery Fee (Absorbed by Shop):'}
                 </span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: pricingMode === 'added' ? '#38bdf8' : '#f87171' }}>
                   {pricingMode === 'added' ? `+ ${formatUSD(feeUsdNum)}` : `- ${formatUSD(feeUsdNum)}`}
@@ -1067,7 +1053,7 @@ export function NewOrderClient({
               {/* Box C: Total Collected at Doorstep */}
               <div style={{ borderLeft: '1px solid #334155', paddingLeft: 16 }}>
                 <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 700, display: 'block' }}>
-                  💵 Collected at Doorstep (COD):
+                  Collected at Doorstep (COD):
                 </span>
                 <span style={{ fontSize: 22, fontWeight: 900, color: '#4ade80' }}>
                   {formatUSD(codUsdNum)}
@@ -1080,7 +1066,7 @@ export function NewOrderClient({
               {/* Box D: Shop Net Payout */}
               <div style={{ borderLeft: '1px solid #334155', paddingLeft: 16 }}>
                 <span style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700, display: 'block' }}>
-                  🏪 Net Payout to {currentShop?.name || 'Shop'}:
+                  Net Payout to {currentShop?.name || 'Shop'}:
                 </span>
                 <span style={{ fontSize: 22, fontWeight: 900, color: shopNetUsd >= 0 ? '#4ade80' : '#f87171' }}>
                   {formatUSD(shopNetUsd)}
@@ -1093,7 +1079,7 @@ export function NewOrderClient({
               {/* Box E: Courier Pay */}
               <div>
                 <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
-                  🚴 Courier Pay to {currentDriver?.name || 'Driver'}:
+                  Courier Pay to {currentDriver?.name || 'Driver'}:
                 </span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: '#facc15' }}>
                   {formatUSD(driverPayNum)}
@@ -1106,7 +1092,7 @@ export function NewOrderClient({
               {/* Box F: Company Margin */}
               <div>
                 <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
-                  📈 Company Margin:
+                  Company Margin:
                 </span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: companyMarginUsd >= 0 ? '#60a5fa' : '#f87171' }}>
                   {formatUSD(companyMarginUsd)}

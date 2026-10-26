@@ -151,7 +151,7 @@ export function ShopListClient({ shops: initialShops, workspaceId, userRole }: S
                           }}
                           title={`Shopify Store: ${shop.shopify_domain}`}
                         >
-                          🛍️ Shopify
+                          Shopify
                         </span>
                       )}
                     </div>

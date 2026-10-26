@@ -590,7 +590,7 @@ export function PortalClient({
             }}
             title="Import orders from Shopify CSV or Excel export"
           >
-            <span>📥 Bulk Import CSV</span>
+            <span>Bulk Import CSV</span>
           </button>
 
           <button
@@ -608,7 +608,7 @@ export function PortalClient({
             }}
             title="Download CSV / Excel template for batch importing orders"
           >
-            <span>📥 Download Template</span>
+            <span>Download Template</span>
           </button>
 
           <button
@@ -667,7 +667,7 @@ export function PortalClient({
               color: '#047857',
             }}
           >
-            <span>💸 Request Payout / Cash-Out</span>
+            <span>Request Payout / Cash-Out</span>
           </button>
         </div>
 
@@ -749,7 +749,7 @@ export function PortalClient({
               style={{ fontSize: 12, padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
               title="Download orders as CSV spreadsheet"
             >
-              <span>📥 Export CSV</span>
+              <span>Export CSV</span>
             </button>
             <div style={{ minWidth: 220, maxWidth: 320, width: '100%' }}>
               <input
@@ -781,7 +781,7 @@ export function PortalClient({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontWeight: 800, color: 'var(--brand)', fontSize: 13 }}>
-                ✓ {selectedOrderIds.length} {selectedOrderIds.length === 1 ? 'order' : 'orders'} selected
+                {selectedOrderIds.length} {selectedOrderIds.length === 1 ? 'order' : 'orders'} selected
               </span>
               <button
                 type="button"
@@ -799,7 +799,7 @@ export function PortalClient({
                 className="btn btn-secondary btn-sm"
                 style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
               >
-                📥 Export Selected ({selectedOrderIds.length})
+                Export Selected ({selectedOrderIds.length})
               </button>
               <button
                 type="button"
@@ -906,17 +906,17 @@ export function PortalClient({
                         </button>
                         {order.service_type === 'replacement' && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(217,119,6,0.15)', color: '#b45309', border: '1px solid rgba(217,119,6,0.3)', marginLeft: 6 }}>
-                            🔄 Swap
+                            Swap
                           </span>
                         )}
                         {order.service_type === 'pickup' && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', marginLeft: 6 }}>
-                            📦 Pickup
+                            Pickup
                           </span>
                         )}
                         {order.is_breakable && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(220,38,38,0.12)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.25)', marginLeft: 4 }}>
-                            ⚠️ Fragile
+                            Fragile
                           </span>
                         )}
                         {order.shopify_order_number && (
@@ -1023,7 +1023,6 @@ export function PortalClient({
                             style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                             title="Inspect full order status and milestone progression"
                           >
-                            <span>🔍</span>
                             <span>Status</span>
                           </button>
 
@@ -1154,7 +1153,7 @@ export function PortalClient({
               >
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}>
-                    👥 Repeat Customer Detected: {phoneMatchedCustomer.name}
+                    Repeat Customer Detected: {phoneMatchedCustomer.name}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                     {phoneMatchedCustomer.orders_count || 1} past orders · {phoneMatchedCustomer.address || 'Address on file'}
@@ -1171,7 +1170,7 @@ export function PortalClient({
                     setPhoneMatchedCustomer(null)
                   }}
                 >
-                  ⚡ Auto-Fill Details
+                  Auto-Fill Details
                 </button>
               </div>
             )}
@@ -1199,7 +1198,7 @@ export function PortalClient({
                   textAlign: 'center',
                 }}
               >
-                🚚 Delivery
+                Delivery
               </button>
               <button
                 type="button"
@@ -1217,7 +1216,7 @@ export function PortalClient({
                   textAlign: 'center',
                 }}
               >
-                🔄 Replacement
+                Replacement
               </button>
               <button
                 type="button"
@@ -1235,7 +1234,7 @@ export function PortalClient({
                   textAlign: 'center',
                 }}
               >
-                📦 Return Pickup
+                Return Pickup
               </button>
             </div>
           </div>
@@ -1264,7 +1263,7 @@ export function PortalClient({
                   style={{ width: 18, height: 18, accentColor: '#dc2626' }}
                 />
                 <span style={{ fontSize: 12, fontWeight: 700, color: isBreakable ? '#dc2626' : 'var(--text)' }}>
-                  ⚠️ Fragile / كسر
+                  Fragile / كسر
                 </span>
               </label>
             </div>
@@ -1322,7 +1321,7 @@ export function PortalClient({
                   textAlign: 'left',
                 }}
               >
-                🚚 Added to Customer
+                Added to Customer
                 <small style={{ display: 'block', fontSize: 10.5, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>
                   Fee added on top. You get full goods price.
                 </small>
@@ -1344,7 +1343,7 @@ export function PortalClient({
                   textAlign: 'left',
                 }}
               >
-                🎁 Free Delivery (Shop Pays)
+                Free Delivery (Shop Pays)
                 <small style={{ display: 'block', fontSize: 10.5, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>
                   You absorb the shipping fee as a promo.
                 </small>
@@ -1406,13 +1405,13 @@ export function PortalClient({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--muted)' }}>📦 Net Goods Price (سعر البضاعة):</span>
+              <span style={{ color: 'var(--muted)' }}>Net Goods Price (سعر البضاعة):</span>
               <strong>{formatUSD(netGoodsUSD)} <small style={{ fontWeight: 400 }}>({formatLBP(netGoodsLBP)})</small></strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--muted)' }}>
-                {feePayerMode === 'customer' ? '🚚 Delivery Fee (Paid by Customer):' : '🚚 Delivery Fee (Paid by Shop):'}
+                {feePayerMode === 'customer' ? 'Delivery Fee (Paid by Customer):' : 'Delivery Fee (Paid by Shop):'}
               </span>
               <span style={{ color: feePayerMode === 'customer' ? '#2563eb' : '#dc2626', fontWeight: 600 }}>
                 {feePayerMode === 'customer' ? `+${formatUSD(deliveryFeeUSD)}` : `-${formatUSD(deliveryFeeUSD)}`}
@@ -1421,14 +1420,14 @@ export function PortalClient({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.6)', padding: '6px 10px', borderRadius: 6 }}>
-              <span style={{ color: '#166534', fontWeight: 700 }}>💵 Total to Collect from Customer at Door:</span>
+              <span style={{ color: '#166534', fontWeight: 700 }}>Total to Collect from Customer at Door:</span>
               <strong style={{ color: '#166534', fontSize: 14 }}>
                 {formatUSD(codUSD)} <small style={{ fontWeight: 600 }}>({formatLBP(codLBP)})</small>
               </strong>
             </div>
 
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, color: 'var(--text)' }}>🏪 Net Money You Will Receive:</span>
+              <span style={{ fontWeight: 700, color: 'var(--text)' }}>Net Money You Will Receive:</span>
               <strong style={{ fontSize: 15, color: '#047857' }}>
                 {formatUSD(netPayoutUSD)}
                 <small style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--muted)', textAlign: 'right' }}>
@@ -1496,7 +1495,7 @@ export function PortalClient({
         <Modal
           isOpen={!!confirmedOrder}
           onClose={() => setConfirmedOrder(null)}
-          title="🎉 Order Registered Successfully!"
+          title="Order Registered Successfully"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18, textAlign: 'center' }}>
             <div
@@ -1521,7 +1520,7 @@ export function PortalClient({
                 <div style={{ background: 'var(--surface)', padding: '10px', borderRadius: 6, border: '1px solid var(--line)' }}>
                   <span style={{ color: 'var(--muted)', display: 'block', fontSize: 11 }}>Recipient:</span>
                   <strong>{confirmedOrder.recipient_name}</strong>
-                  <span style={{ display: 'block', color: 'var(--muted)', fontSize: 11 }}>📞 {confirmedOrder.recipient_phone}</span>
+                  <span style={{ display: 'block', color: 'var(--muted)', fontSize: 11 }}>Phone: {confirmedOrder.recipient_phone}</span>
                 </div>
                 <div style={{ background: 'var(--surface)', padding: '10px', borderRadius: 6, border: '1px solid var(--line)' }}>
                   <span style={{ color: 'var(--muted)', display: 'block', fontSize: 11 }}>Destination:</span>
@@ -1918,7 +1917,7 @@ export function PortalClient({
                     className="btn btn-ghost btn-sm"
                     style={{ color: '#d97706', border: '1px solid #fde68a', fontSize: 12 }}
                   >
-                    {isCancelling ? 'Cancelling…' : '✕ Cancel Pickup'}
+                    {isCancelling ? 'Cancelling…' : 'Cancel Pickup'}
                   </button>
                 )}
 
@@ -2047,10 +2046,10 @@ export function PortalClient({
                   onChange={e => setCashoutMethod(e.target.value as any)}
                   style={{ width: '100%', fontSize: 13 }}
                 >
-                  <option value="whish">📱 Whish Money (Instant App Transfer)</option>
-                  <option value="omt">🏢 OMT (Cash Collection Point across Lebanon)</option>
-                  <option value="cash_office">💵 Cash Pickup at Dispatch Desk / Office</option>
-                  <option value="bank_transfer">🏦 Bank Transfer (Direct Lebanese IBAN)</option>
+                  <option value="whish">Whish Money (Instant App Transfer)</option>
+                  <option value="omt">OMT (Cash Collection Point across Lebanon)</option>
+                  <option value="cash_office">Cash Pickup at Dispatch Desk / Office</option>
+                  <option value="bank_transfer">Bank Transfer (Direct Lebanese IBAN)</option>
                 </select>
               </div>
 

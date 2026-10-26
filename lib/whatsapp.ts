@@ -66,15 +66,15 @@ export function getCustomerOrderWhatsAppUrl(order: {
   if (!order.customerPhone) return '#'
   const baseUrl = getBaseUrl()
   const customer = order.customerName?.trim() || 'Customer'
-  let msg = `Hello ${customer} 👋\n\nThis is Cedar Delivery Desk regarding your order *#${order.orderCode}*`
+  let msg = `Hello ${customer},\n\nThis is Cedar Delivery Desk regarding your order *#${order.orderCode}*`
   if (order.shopName) msg += ` from *${order.shopName}*`
   if (order.driverName) msg += ` handled by courier *${order.driverName}*`
   msg += `.\n\n`
   if (order.collectionUsd > 0) {
-    msg += `💵 *COD to Collect:* ${formatUSD(order.collectionUsd)}\n`
+    msg += `*COD to Collect:* ${formatUSD(order.collectionUsd)}\n`
   }
-  msg += `📦 *Live Tracking:* ${baseUrl}/track/${order.trackingToken || order.orderCode}\n\n`
-  msg += `Please reply with your delivery instructions or live location pin 📍. Thank you! 🌲`
+  msg += `*Live Tracking:* ${baseUrl}/track/${order.trackingToken || order.orderCode}\n\n`
+  msg += `Please reply with your delivery instructions or live location pin. Thank you!`
   return getWhatsAppUrl(order.customerPhone, msg)
 }
 
@@ -102,49 +102,49 @@ export function buildCustomerOrderMessage(order: {
 
   // Out for delivery specific template
   if (order.status === 'picked_up' && order.driver?.name) {
-    let msg = `Marhaba ${customer} 👋\n\n`
-    msg += `🚚 Your order *${order.code}* from *${shopName}* is *OUT FOR DELIVERY* today with courier *${order.driver.name}*`
+    let msg = `Marhaba ${customer},\n\n`
+    msg += `Your order *${order.code}* from *${shopName}* is *OUT FOR DELIVERY* today with courier *${order.driver.name}*`
     if (order.driver.phone) msg += ` (${order.driver.phone})`
     msg += `.\n\n`
     if (colUSD > 0) {
-      msg += `💵 *COD to Pay:* ${formatUSD(colUSD)} (~ ${formatLBP(colLBP)})\n`
+      msg += `*COD to Pay:* ${formatUSD(colUSD)} (~ ${formatLBP(colLBP)})\n`
     }
     if (order.recipient_address) {
-      msg += `📍 *Destination:* ${order.recipient_address}\n`
+      msg += `*Destination:* ${order.recipient_address}\n`
     }
-    msg += `📦 *Live Tracking:* ${baseUrl}/track/${order.tracking_token || order.code}\n\n`
-    msg += `The courier will contact you shortly before arrival. Thank you! 🌲`
+    msg += `*Live Tracking:* ${baseUrl}/track/${order.tracking_token || order.code}\n\n`
+    msg += `The courier will contact you shortly before arrival. Thank you!`
     return msg
   }
 
   // Delivered notification template
   if (order.status === 'delivered') {
-    let msg = `Hello ${customer} 👋\n\n`
-    msg += `✅ Your package *${order.code}* from *${shopName}* has been *DELIVERED* successfully.\n\n`
+    let msg = `Hello ${customer},\n\n`
+    msg += `Your package *${order.code}* from *${shopName}* has been *DELIVERED* successfully.\n\n`
     if (colUSD > 0) {
-      msg += `💵 *Amount Collected:* ${formatUSD(colUSD)}\n`
+      msg += `*Amount Collected:* ${formatUSD(colUSD)}\n`
     }
-    msg += `📦 *Delivery Receipt:* ${baseUrl}/track/${order.tracking_token || order.code}\n\n`
-    msg += `Thank you for trusting Cedar Delivery! 🌲`
+    msg += `*Delivery Receipt:* ${baseUrl}/track/${order.tracking_token || order.code}\n\n`
+    msg += `Thank you for choosing Cedar Delivery!`
     return msg
   }
 
-  let msg = `Hello ${customer} 👋\n\n`
+  let msg = `Hello ${customer},\n\n`
   msg += `This is *Cedar Delivery Desk* regarding your delivery order *${order.code}* from *${shopName}*.\n\n`
 
   if (colUSD > 0) {
-    msg += `💵 *Amount to Collect:* ${formatUSD(colUSD)} (~ ${formatLBP(colLBP)})\n`
+    msg += `*Amount to Collect:* ${formatUSD(colUSD)} (~ ${formatLBP(colLBP)})\n`
   } else {
-    msg += `💵 *Amount to Collect:* Prepaid / $0.00\n`
+    msg += `*Amount to Collect:* Prepaid / $0.00\n`
   }
 
   if (order.recipient_address) {
-    msg += `📍 *Delivery Address:* ${order.recipient_address}\n`
+    msg += `*Delivery Address:* ${order.recipient_address}\n`
   }
 
-  msg += `📦 *Track Package:* ${baseUrl}/track/${order.tracking_token || order.code}\n`
+  msg += `*Track Package:* ${baseUrl}/track/${order.tracking_token || order.code}\n`
 
-  msg += `\nPlease reply with your live location pin 📍 or let us know if you are available to receive your order today.\n\nThank you! 🌲`
+  msg += `\nPlease reply with your live location pin or let us know if you are available to receive your order today.\n\nThank you!`
   return msg
 }
 
@@ -170,22 +170,22 @@ export function buildDriverDispatchMessage(order: {
   const colLBP = usdToLbp(colUSD, rate)
   const driverPay = Number(order.driver_pay_usd) || 0
 
-  let msg = `🚚 *NEW DISPATCH — ORDER ${order.code}*\n`
+  let msg = `*NEW DISPATCH — ORDER ${order.code}*\n`
   msg += `─────────────────────────\n`
-  msg += `🏪 *Store:* ${shopName}${order.shop?.phone ? ' (' + order.shop.phone + ')' : ''}\n`
-  msg += `👤 *Customer:* ${order.recipient_name || 'N/A'}\n`
+  msg += `*Store:* ${shopName}${order.shop?.phone ? ' (' + order.shop.phone + ')' : ''}\n`
+  msg += `*Customer:* ${order.recipient_name || 'N/A'}\n`
   if (order.recipient_phone) {
-    msg += `📞 *Phone:* ${order.recipient_phone}\n`
+    msg += `*Phone:* ${order.recipient_phone}\n`
   }
   if (order.area?.name) {
-    msg += `🗺️ *Zone:* ${order.area.name}\n`
+    msg += `*Zone:* ${order.area.name}\n`
   }
   if (order.recipient_address) {
-    msg += `📍 *Address:* ${order.recipient_address}\n`
+    msg += `*Address:* ${order.recipient_address}\n`
   }
-  msg += `💵 *Cash to Collect:* ${formatUSD(colUSD)} (${formatLBP(colLBP)})\n`
+  msg += `*Cash to Collect:* ${formatUSD(colUSD)} (${formatLBP(colLBP)})\n`
   if (driverPay > 0) {
-    msg += `⭐ *Your Commission:* ${formatUSD(driverPay)}\n`
+    msg += `*Your Commission:* ${formatUSD(driverPay)}\n`
   }
   msg += `─────────────────────────\n`
   msg += `Please confirm pickup when ready.`

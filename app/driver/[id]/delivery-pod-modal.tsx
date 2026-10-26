@@ -296,7 +296,7 @@ export function DeliveryPodModal({
           {/* Mixed Cash Split Inputs (USD / LBP) */}
           <div style={{ background: '#1e293b', borderRadius: 10, padding: 12, border: '1px solid #334155' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>
-              💵 Cash Received Breakdown (Mixed Currency)
+              Cash Received Breakdown (Mixed Currency)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
@@ -349,7 +349,6 @@ export function DeliveryPodModal({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>✍️</span>
                 <span>Customer Signature (Digital POD)</span>
               </label>
               {hasSignature && (
