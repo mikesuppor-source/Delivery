@@ -13,7 +13,7 @@ export function Topbar({ usdToLbp }: TopbarProps) {
 
   return (
     <div className="topbar">
-      <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--muted)' }}>
+      <span suppressHydrationWarning style={{ marginRight: 'auto', fontSize: 12, color: 'var(--muted)' }}>
         {today.toUpperCase()}
       </span>
       <div className="rate-pill">

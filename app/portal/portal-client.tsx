@@ -257,9 +257,17 @@ export function PortalClient({
 
   async function handleDeleteOrders(targetIds: string[], codesLabel?: string) {
     if (targetIds.length === 0) return
-    const msg = targetIds.length === 1
+    const pendingOrders = orders.filter(o => targetIds.includes(o.id) && o.status === 'pending')
+    if (pendingOrders.length === 0) {
+      alert('Only pending orders can be cancelled. Dispatched, delivered, or already cancelled orders cannot be cancelled.')
+      return
+    }
+    const finalTargetIds = pendingOrders.map(o => o.id)
+    const msg = finalTargetIds.length === 1
       ? `Are you sure you want to cancel order ${codesLabel || ''}? The order will be cancelled with balances voided.`
-      : `Are you sure you want to cancel these ${targetIds.length} pending orders?`
+      : targetIds.length > finalTargetIds.length
+      ? `Notice: Only ${finalTargetIds.length} of the ${targetIds.length} selected orders are pending. Are you sure you want to cancel these ${finalTargetIds.length} pending orders?`
+      : `Are you sure you want to cancel these ${finalTargetIds.length} pending orders?`
 
     if (!window.confirm(msg)) {
       return
@@ -270,7 +278,7 @@ export function PortalClient({
       const res = await fetch('/api/portal/orders', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderIds: targetIds }),
+        body: JSON.stringify({ orderIds: finalTargetIds }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -279,13 +287,13 @@ export function PortalClient({
 
       setOrders(prev =>
         prev.map(o =>
-          targetIds.includes(o.id)
+          finalTargetIds.includes(o.id)
             ? { ...o, status: 'cancelled', collection_usd: 0 }
             : o
         )
       )
-      setSelectedOrderIds(prev => prev.filter(id => !targetIds.includes(id)))
-      if (inspectingOrder && targetIds.includes(inspectingOrder.id)) {
+      setSelectedOrderIds(prev => prev.filter(id => !finalTargetIds.includes(id)))
+      if (inspectingOrder && finalTargetIds.includes(inspectingOrder.id)) {
         setInspectingOrder(prev => (prev ? { ...prev, status: 'cancelled', collection_usd: 0 } : null))
       }
     } catch (err: unknown) {
@@ -1048,16 +1056,18 @@ export function PortalClient({
                             Track ↗
                           </Link>
 
-                          <button
-                            type="button"
-                            disabled={isDeleting}
-                            onClick={() => handleDeleteOrders([order.id], `#${order.code}`)}
-                            className="btn btn-ghost btn-sm"
-                            style={{ padding: '4px 7px', fontSize: 11, color: '#dc2626' }}
-                            title={`Cancel pending order #${order.code}`}
-                          >
-                            <TrashIcon size={12} color="#dc2626" />
-                          </button>
+                          {order.status === 'pending' && (
+                            <button
+                              type="button"
+                              disabled={isDeleting}
+                              onClick={() => handleDeleteOrders([order.id], `#${order.code}`)}
+                              className="btn btn-ghost btn-sm"
+                              style={{ padding: '4px 7px', fontSize: 11, color: '#dc2626' }}
+                              title={`Cancel pending order #${order.code}`}
+                            >
+                              <TrashIcon size={12} color="#dc2626" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1842,17 +1852,19 @@ export function PortalClient({
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  disabled={isDeleting}
-                  onClick={() => handleDeleteOrders([inspectingOrder.id], `#${inspectingOrder.code}`)}
-                  className="btn btn-ghost btn-sm"
-                  style={{ color: '#dc2626', border: '1px solid #fecaca', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
-                  title="Cancel this pending order and void fees"
-                >
-                  <TrashIcon size={13} color="#dc2626" />
-                  <span>{isDeleting ? 'Cancelling…' : 'Cancel Order'}</span>
-                </button>
+                {inspectingOrder.status === 'pending' && (
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => handleDeleteOrders([inspectingOrder.id], `#${inspectingOrder.code}`)}
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: '#dc2626', border: '1px solid #fecaca', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                    title="Cancel this pending order and void fees"
+                  >
+                    <TrashIcon size={13} color="#dc2626" />
+                    <span>{isDeleting ? 'Cancelling…' : 'Cancel Order'}</span>
+                  </button>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: 8 }}>

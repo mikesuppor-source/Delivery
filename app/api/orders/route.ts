@@ -81,10 +81,39 @@ export const PATCH = api(async req => {
 })
 export const DELETE = api(async req => {
   const body=await req.json()
-  const {db,workspaceId}=await workspaceAccess(body.workspaceId)
+  const {db,workspaceId}=await workspaceAccess(body.workspaceId,['owner','manager'])
   const selected=ids(body.orderIds || [body.orderId])
   const orders=checked(await db.from('orders').select('id,status').in('id',selected).eq('workspace_id',workspaceId))
-  if(orders.length!==selected.length || orders.some(o=>o.status!=='pending')) throw new ApiError(409,'Only pending orders can be cancelled. Completed records are retained.')
-  const cancelled=checked(await db.from('orders').update({status:'cancelled'}).in('id',selected).eq('workspace_id',workspaceId).eq('status','pending').select('id'))
-  return NextResponse.json({success:true,deletedIds:cancelled.map(o=>o.id),message:'Pending orders cancelled; records retained.'})
+  if (orders.length !== selected.length) throw new ApiError(404, 'One or more orders not found')
+
+  // Delivered or returned orders cannot be cancelled due to completed delivery accounting
+  const completed = orders.filter(o => o.status === 'delivered' || o.status === 'returned')
+  if (completed.length > 0) {
+    throw new ApiError(409, 'Completed or delivered orders cannot be cancelled because accounting records are finalised.')
+  }
+
+  // Filter out orders that are already cancelled
+  const toProcess = orders.filter(o => o.status !== 'cancelled')
+  if (toProcess.length === 0) {
+    return NextResponse.json({ success: true, deletedIds: selected, message: 'Orders are already cancelled.' })
+  }
+
+  // Transition pre-delivery orders (assigned, failed, pending) cleanly through pending to void driver allocation
+  const nonPending = toProcess.filter(o => o.status !== 'pending')
+  if (nonPending.length > 0) {
+    const nonPendingIds = nonPending.map(o => o.id)
+    checked(await db.from('orders').update({ status: 'pending', driver_id: null }).in('id', nonPendingIds).eq('workspace_id', workspaceId))
+  }
+
+  // Cancel orders - database trigger automatically zeroes balances and logs audit event
+  const targetIds = toProcess.map(o => o.id)
+  const cancelled = checked(
+    await db.from('orders').update({ status: 'cancelled' }).in('id', targetIds).eq('workspace_id', workspaceId).select('id')
+  )
+
+  return NextResponse.json({
+    success: true,
+    deletedIds: cancelled.map(o => o.id),
+    message: 'Orders cancelled; balances voided and audit records retained.',
+  })
 })

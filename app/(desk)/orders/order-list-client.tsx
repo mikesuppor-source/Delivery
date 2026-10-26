@@ -1417,7 +1417,7 @@ export function OrderListClient({
 
                     {/* Date */}
                     <td>
-                      <small>{new Date(order.created_at).toLocaleDateString('en-GB')}</small>
+                      <small suppressHydrationWarning>{new Date(order.created_at).toLocaleDateString('en-GB')}</small>
                     </td>
 
                     {/* Actions: Slip, Edit & Track */}
@@ -1458,7 +1458,7 @@ export function OrderListClient({
                         >
                           Track
                         </Link>
-                        {canManage && (
+                        {canManage && order.status !== 'cancelled' && (
                           <button
                             type="button"
                             className="btn btn-ghost"
@@ -1641,14 +1641,13 @@ export function OrderListClient({
                 alignItems: 'center',
                 gap: 5,
               }}
-              title="Cancel selected pending orders"
+              title="Cancel selected orders"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
-              <span>Cancel Selected</span>
-              Delete ({selectedOrderIds.length})
+              <span>Cancel Selected ({selectedOrderIds.length})</span>
             </button>
           </div>
         </div>
@@ -2033,7 +2032,7 @@ export function OrderListClient({
           {editError && <p className="error-msg" style={{ marginTop: 12 }}>{editError}</p>}
 
           <div className="form-actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            {canManage && editingOrder && (
+            {canManage && editingOrder && editingOrder.status === 'pending' && (
               <button
                 type="button"
                 className="btn btn-ghost"
