@@ -2176,7 +2176,9 @@ export function OrderListClient({
             </div>
 
             <div className="field">
-              <label>Cash Collection (USD)</label>
+              <label style={{ fontWeight: 700, color: '#0f172a' }}>
+                💵 Total COD to Collect at Doorstep (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
               <input
                 type="number"
                 step="0.5"
@@ -2184,11 +2186,17 @@ export function OrderListClient({
                 value={collectionUsd}
                 onChange={e => setCollectionUsd(e.target.value)}
                 required
+                style={{ fontWeight: 700 }}
               />
+              <span style={{ fontSize: 11, color: '#0284c7', marginTop: 4 }}>
+                ≈ L.L. {(Number(collectionUsd) * rate).toLocaleString()} (@{rate.toLocaleString()})
+              </span>
             </div>
 
             <div className="field">
-              <label>Delivery Fee (USD)</label>
+              <label style={{ fontWeight: 700, color: '#0f172a' }}>
+                🚚 Delivery Fee Charged to Shop (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
               <input
                 type="number"
                 step="0.5"
@@ -2196,11 +2204,17 @@ export function OrderListClient({
                 value={deliveryFeeUsd}
                 onChange={e => setDeliveryFeeUsd(e.target.value)}
                 required
+                style={{ fontWeight: 700 }}
               />
+              <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                Fee deducted from merchant payout
+              </span>
             </div>
 
             <div className="field">
-              <label>Driver Pay (USD)</label>
+              <label style={{ fontWeight: 700, color: '#0f172a' }}>
+                🚴 Courier Pay / Driver Commission (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
               <input
                 type="number"
                 step="0.5"
@@ -2208,7 +2222,41 @@ export function OrderListClient({
                 value={driverPayUsd}
                 onChange={e => setDriverPayUsd(e.target.value)}
                 required
+                style={{ fontWeight: 700 }}
               />
+              <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                Courier run-sheet earning
+              </span>
+            </div>
+
+            {/* Live Settlement Breakdown */}
+            <div
+              className="field full"
+              style={{
+                background: '#0f172a',
+                color: '#ffffff',
+                padding: '12px 16px',
+                borderRadius: 10,
+                fontSize: 12,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              <div>
+                <span style={{ color: '#94a3b8' }}>Collected:</span> <strong>{formatUSD(Number(collectionUsd) || 0)}</strong>
+                <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
+                <span style={{ color: '#94a3b8' }}>Fee:</span> <strong style={{ color: '#f87171' }}>-{formatUSD(Number(deliveryFeeUsd) || 0)}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#38bdf8' }}>🏪 Shop Net:</span> <strong style={{ color: '#4ade80' }}>{formatUSD((Number(collectionUsd) || 0) - (Number(deliveryFeeUsd) || 0))}</strong>
+                <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
+                <span style={{ color: '#94a3b8' }}>🚴 Courier:</span> <strong style={{ color: '#facc15' }}>{formatUSD(Number(driverPayUsd) || 0)}</strong>
+                <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
+                <span style={{ color: '#94a3b8' }}>📈 Margin:</span> <strong style={{ color: '#60a5fa' }}>{formatUSD((Number(deliveryFeeUsd) || 0) - (Number(driverPayUsd) || 0))}</strong>
+              </div>
             </div>
 
             <div className="field full">

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { LocationHelper } from '@/components/location-helper'
 import { searchLebaneseTowns, type TownSearchResult } from '@/lib/lebanon-geo'
-import { formatUSD, formatLBP } from '@/lib/utils'
+import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/auth'
 
 interface Shop {
@@ -42,7 +42,7 @@ export function NewOrderClient({
   shops,
   drivers,
   areas,
-  userRole,
+  userRole: _userRole,
   rate,
 }: NewOrderClientProps) {
   const router = useRouter()
@@ -215,6 +215,10 @@ export function NewOrderClient({
   const shopNetUsd = codUsdNum - feeUsdNum
   const companyMarginUsd = feeUsdNum - driverPayNum
 
+  const currentShop = shops.find(s => s.id === shopId)
+  const currentDriver = drivers.find(d => d.id === driverId)
+  const currentArea = areas.find(a => a.id === areaId)
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 100 }}>
       {/* ─── Breadcrumbs & Header ────────────────────────────────────────── */}
@@ -239,7 +243,7 @@ export function NewOrderClient({
               Create New Delivery Order
             </h1>
             <p style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 4 }}>
-              Enter parcel information, customer CRM details, and courier assignment to generate a waybill.
+              Enter parcel information, customer destination, and cash collection breakdown to generate a waybill.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -335,426 +339,7 @@ export function NewOrderClient({
       {/* ─── Form Grid Cards ──────────────────────────────────────────────── */}
       <form onSubmit={e => { e.preventDefault(); submitOrder(false) }} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         
-        {/* ROW 1: Customer & Package Logistics */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: 24 }}>
-          
-          {/* CARD 1: Customer CRM & Destination */}
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1.5px solid var(--line)',
-              borderRadius: 16,
-              padding: '24px 22px',
-              boxShadow: 'var(--shadow)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
-              <span style={{ fontSize: 18 }}>👤</span>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                  Customer CRM & Destination
-                </h3>
-                <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Recipient contact and Lebanese geo-location</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Recipient Name */}
-              <div className="field">
-                <label htmlFor="recipient-name">
-                  Customer / Recipient Full Name <span style={{ color: 'var(--danger)' }}>*</span>
-                </label>
-                <input
-                  id="recipient-name"
-                  type="text"
-                  placeholder="e.g. Karim Haddad"
-                  value={recipientName}
-                  onChange={e => setRecipientName(e.target.value)}
-                  required
-                />
-              </div>
-
-              {/* Phone & Live CRM */}
-              <div className="field">
-                <label htmlFor="recipient-phone">
-                  Phone Number <span style={{ color: 'var(--muted)', fontSize: 11 }}>(Lebanese mobile format)</span>
-                </label>
-                <input
-                  id="recipient-phone"
-                  type="tel"
-                  placeholder="e.g. +961 70 123456"
-                  value={recipientPhone}
-                  onChange={e => setRecipientPhone(e.target.value)}
-                />
-              </div>
-
-              {phoneMatchedCustomer && (
-                <div
-                  style={{
-                    background: 'rgba(37, 99, 235, 0.08)',
-                    border: '1.5px solid rgba(37, 99, 235, 0.3)',
-                    borderRadius: 10,
-                    padding: '10px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1d4ed8' }}>
-                      👥 Repeat Customer Detected: {phoneMatchedCustomer.name}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
-                      {phoneMatchedCustomer.orders_count || 1} past orders · {phoneMatchedCustomer.address || 'Address on file'}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }}
-                    onClick={() => {
-                      if (phoneMatchedCustomer.name) setRecipientName(phoneMatchedCustomer.name)
-                      if (phoneMatchedCustomer.address) setRecipientAddress(phoneMatchedCustomer.address)
-                      if (phoneMatchedCustomer.notes && !notes) setNotes(phoneMatchedCustomer.notes)
-                      setPhoneMatchedCustomer(null)
-                    }}
-                  >
-                    ⚡ Auto-Fill
-                  </button>
-                </div>
-              )}
-
-              {/* Lebanese Administrative Town Hierarchy Search */}
-              <div className="field" style={{ position: 'relative' }}>
-                <label htmlFor="town-search">
-                  Lebanese Town & Region / البلدة والمنطقة <span style={{ color: 'var(--muted)', fontSize: 11 }}>(Arabic or English)</span>
-                </label>
-                <input
-                  id="town-search"
-                  type="text"
-                  placeholder="Search town (e.g. زحلة, Achrafieh, جرجوع, Batroun)..."
-                  value={townSearchQuery}
-                  onChange={e => {
-                    setTownSearchQuery(e.target.value)
-                    setDestinationTown(e.target.value)
-                  }}
-                  onFocus={() => {
-                    if (townSearchResults.length > 0) setIsTownDropdownOpen(true)
-                  }}
-                />
-
-                {isTownDropdownOpen && townSearchResults.length > 0 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      background: 'var(--surface)',
-                      border: '1.5px solid var(--line)',
-                      borderRadius: 8,
-                      boxShadow: 'var(--shadow-lg)',
-                      zIndex: 50,
-                      maxHeight: 220,
-                      overflowY: 'auto',
-                      marginTop: 4,
-                    }}
-                  >
-                    {townSearchResults.map((t, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => handleSelectTown(t)}
-                        style={{
-                          padding: '8px 12px',
-                          borderBottom: '1px solid var(--line)',
-                          cursor: 'pointer',
-                          fontSize: 12.5,
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <div style={{ fontWeight: 700, color: 'var(--text)' }}>
-                          {t.governorateAr} - {t.cazaAr} - {t.townAr}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                          {t.governorateEn} - {t.cazaEn} - {t.townEn}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* LocationHelper & Map Pin */}
-              <div className="field">
-                <LocationHelper
-                  id="new-order-address"
-                  address={recipientAddress}
-                  onAddressChange={setRecipientAddress}
-                  label="Detailed Delivery Address / Google Maps Pin"
-                  placeholder="e.g. Sassine Square, Bldg 14, 2nd Floor or paste Google Maps pin link"
-                  required
-                />
-              </div>
-
-              {/* Order Notes */}
-              <div className="field">
-                <label htmlFor="order-notes">Order Notes / Courier Handling Instructions</label>
-                <input
-                  id="order-notes"
-                  type="text"
-                  placeholder="e.g. Call 10 mins before arrival, fragile glass, leave with concierge"
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* CARD 2: Package Specifications & Logistics */}
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1.5px solid var(--line)',
-              borderRadius: 16,
-              padding: '24px 22px',
-              boxShadow: 'var(--shadow)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
-              <span style={{ fontSize: 18 }}>📦</span>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                  Package Specs & Service Type
-                </h3>
-                <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Logistics parameters, service options, and handling</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              
-              {/* Quick Preset for Retail Return / Refund */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  background: 'var(--bg)',
-                  borderRadius: 10,
-                  border: '1px solid var(--line)',
-                }}
-              >
-                <div>
-                  <strong style={{ fontSize: 12.5, display: 'block', color: 'var(--text)' }}>
-                    Retail Return / Refund Pickup?
-                  </strong>
-                  <small style={{ color: 'var(--muted)', fontSize: 11 }}>
-                    Automatically set fee to $2.00, customer COD to $0.00, and courier pay to $1.00
-                  </small>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setCollectionUsd('0')
-                    setDeliveryFeeUsd('2')
-                    setDriverPayUsd('1')
-                    setNotes('Retail return pickup ($2 fee)')
-                    setServiceType('pickup')
-                  }}
-                  style={{ fontSize: 11, padding: '4px 10px', borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 600 }}
-                >
-                  Apply $2 Preset
-                </button>
-              </div>
-
-              {/* Service Type Buttons */}
-              <div className="field">
-                <label style={{ fontWeight: 700, color: 'var(--brand)', marginBottom: 8, display: 'block' }}>
-                  Service Type / نوع الطلب
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                  <button
-                    type="button"
-                    onClick={() => setServiceType('delivery')}
-                    style={{
-                      padding: '10px 8px',
-                      borderRadius: 8,
-                      border: '1.5px solid',
-                      borderColor: serviceType === 'delivery' ? 'var(--brand)' : 'var(--line)',
-                      background: serviceType === 'delivery' ? 'var(--brand-light)' : 'var(--surface)',
-                      color: serviceType === 'delivery' ? 'var(--brand)' : 'var(--text)',
-                      fontWeight: serviceType === 'delivery' ? 700 : 500,
-                      fontSize: 12.5,
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    🚚 Delivery
-                    <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>توصيل قياسي</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setServiceType('replacement')}
-                    style={{
-                      padding: '10px 8px',
-                      borderRadius: 8,
-                      border: '1.5px solid',
-                      borderColor: serviceType === 'replacement' ? '#d97706' : 'var(--line)',
-                      background: serviceType === 'replacement' ? 'rgba(217, 119, 6, 0.12)' : 'var(--surface)',
-                      color: serviceType === 'replacement' ? '#b45309' : 'var(--text)',
-                      fontWeight: serviceType === 'replacement' ? 700 : 500,
-                      fontSize: 12.5,
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    🔄 Replacement
-                    <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>تبديل بضاعة</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setServiceType('pickup')}
-                    style={{
-                      padding: '10px 8px',
-                      borderRadius: 8,
-                      border: '1.5px solid',
-                      borderColor: serviceType === 'pickup' ? '#7c3aed' : 'var(--line)',
-                      background: serviceType === 'pickup' ? 'rgba(124, 58, 237, 0.12)' : 'var(--surface)',
-                      color: serviceType === 'pickup' ? '#7c3aed' : 'var(--text)',
-                      fontWeight: serviceType === 'pickup' ? 700 : 500,
-                      fontSize: 12.5,
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    📦 Return Pickup
-                    <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>استرجاع مرتجع</div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Weight & Fragile Checkbox */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div className="field">
-                  <label htmlFor="package-weight">Package Weight (KG)</label>
-                  <input
-                    id="package-weight"
-                    type="number"
-                    step="0.1"
-                    min="0.1"
-                    value={weightKg}
-                    onChange={e => setWeightKg(e.target.value)}
-                  />
-                </div>
-
-                <div className="field" style={{ justifyContent: 'center' }}>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: 0, height: '100%' }}>
-                    <input
-                      type="checkbox"
-                      checked={isBreakable}
-                      onChange={e => setIsBreakable(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: '#ea580c' }}
-                    />
-                    <div>
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: isBreakable ? '#ea580c' : 'var(--text)' }}>
-                        ⚠️ Fragile / Breakable (قابل للكسر)
-                      </span>
-                      <small style={{ color: 'var(--muted)', display: 'block', fontSize: 10.5 }}>
-                        Prints prominent warning banner on thermal AWB label
-                      </small>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {/* Carrier Tracking Code (Outsourcing) */}
-              <div className="field">
-                <label htmlFor="carrier-tracking">
-                  Carrier Tracking Code / 3PL Code <span style={{ color: 'var(--muted)', fontSize: 11 }}>(Optional outsourced logistics tracking)</span>
-                </label>
-                <input
-                  id="carrier-tracking"
-                  type="text"
-                  placeholder="e.g. OCT-98421, ARAMEX-4421, DHL-019"
-                  value={carrierTrackingCode}
-                  onChange={e => setCarrierTrackingCode(e.target.value)}
-                />
-              </div>
-
-              {/* Custom Waybill Code Generator */}
-              <div
-                style={{
-                  background: 'var(--bg)',
-                  padding: 14,
-                  borderRadius: 10,
-                  border: '1.5px solid var(--line)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <label style={{ margin: 0, fontWeight: 700, fontSize: 12.5, color: 'var(--text)' }}>
-                    Custom Tracking Code / Waybill # <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
-                  </label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => {
-                        const selectedShop = shops.find(s => s.id === shopId)
-                        const prefix = selectedShop ? selectedShop.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() : 'ORD'
-                        const randomNum = Math.floor(100 + Math.random() * 900)
-                        setCustomCode(`${prefix}-${randomNum}`)
-                      }}
-                      style={{ fontSize: 10.5, padding: '2px 8px' }}
-                      title="Generate code with shop prefix (e.g. ZARA-101)"
-                    >
-                      Shop Prefix
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => {
-                        const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase()
-                        setCustomCode(`CD-${randomHex}`)
-                      }}
-                      style={{ fontSize: 10.5, padding: '2px 8px' }}
-                      title="Generate standard Cedar CD-XXXX code"
-                    >
-                      Auto CD-XXXX
-                    </button>
-                    {customCode && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => setCustomCode('')}
-                        style={{ fontSize: 10.5, padding: '2px 8px', color: '#dc2626' }}
-                      >
-                        ✕ Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Leave empty for auto-generated tracking token, or type custom code"
-                  value={customCode}
-                  onChange={e => setCustomCode(e.target.value)}
-                  style={{ fontFamily: 'monospace', fontWeight: 600, letterSpacing: '0.5px' }}
-                />
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        {/* ROW 2: Financials, Pricing & Assignment */}
+        {/* ROW 1: Customer Destination & Geo (All Location & Contact together) */}
         <div
           style={{
             background: 'var(--surface)',
@@ -765,19 +350,220 @@ export function NewOrderClient({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
-            <span style={{ fontSize: 18 }}>💰</span>
+            <span style={{ fontSize: 18 }}>📍</span>
             <div>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                Merchant, Courier Assignment & Financials
+                1. Customer & Delivery Destination
               </h3>
-              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Shop source, courier pay, and COD collection amounts</span>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Who is receiving the parcel and where should the courier deliver it?</span>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+            {/* Recipient Name */}
+            <div className="field">
+              <label htmlFor="recipient-name">
+                Customer / Recipient Full Name <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <input
+                id="recipient-name"
+                type="text"
+                placeholder="e.g. Maya Haddad"
+                value={recipientName}
+                onChange={e => setRecipientName(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Phone & Live CRM */}
+            <div className="field">
+              <label htmlFor="recipient-phone">
+                Phone Number <span style={{ color: 'var(--muted)', fontSize: 11 }}>(e.g. +961 70 123456)</span>
+              </label>
+              <input
+                id="recipient-phone"
+                type="tel"
+                placeholder="e.g. +961 70 123456"
+                value={recipientPhone}
+                onChange={e => setRecipientPhone(e.target.value)}
+              />
+            </div>
+
+            {/* Delivery Area / Tariff Zone (Cleanly placed here in the Destination section!) */}
+            <div className="field">
+              <label htmlFor="area-id">
+                Delivery Area / Tariff Zone <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <select
+                id="area-id"
+                value={areaId}
+                onChange={e => handleAreaChange(e.target.value)}
+              >
+                {areas.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} — Standard Fee: ${Number(a.fee_usd).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                Selected zone sets standard delivery fee and driver commission
+              </span>
+            </div>
+          </div>
+
+          {phoneMatchedCustomer && (
+            <div
+              style={{
+                background: 'rgba(37, 99, 235, 0.08)',
+                border: '1.5px solid rgba(37, 99, 235, 0.3)',
+                borderRadius: 10,
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginTop: 14,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1d4ed8' }}>
+                  👥 Repeat Customer Detected: {phoneMatchedCustomer.name}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+                  {phoneMatchedCustomer.orders_count || 1} past orders · {phoneMatchedCustomer.address || 'Address on file'}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }}
+                onClick={() => {
+                  if (phoneMatchedCustomer.name) setRecipientName(phoneMatchedCustomer.name)
+                  if (phoneMatchedCustomer.address) setRecipientAddress(phoneMatchedCustomer.address)
+                  if (phoneMatchedCustomer.notes && !notes) setNotes(phoneMatchedCustomer.notes)
+                  setPhoneMatchedCustomer(null)
+                }}
+              >
+                ⚡ Auto-Fill Details
+              </button>
+            </div>
+          )}
+
+          {/* Lebanese Town Search & LocationHelper */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginTop: 16 }}>
+            {/* Lebanese Administrative Town Hierarchy Search */}
+            <div className="field" style={{ position: 'relative' }}>
+              <label htmlFor="town-search">
+                Lebanese Town & Region / البلدة والمنطقة <span style={{ color: 'var(--muted)', fontSize: 11 }}>(Arabic or English)</span>
+              </label>
+              <input
+                id="town-search"
+                type="text"
+                placeholder="Type to search town (e.g. زحلة, Sassine, بعبدا, Batroun)..."
+                value={townSearchQuery}
+                onChange={e => {
+                  setTownSearchQuery(e.target.value)
+                  setDestinationTown(e.target.value)
+                }}
+                onFocus={() => {
+                  if (townSearchResults.length > 0) setIsTownDropdownOpen(true)
+                }}
+              />
+
+              {isTownDropdownOpen && townSearchResults.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'var(--surface)',
+                    border: '1.5px solid var(--line)',
+                    borderRadius: 8,
+                    boxShadow: 'var(--shadow-lg)',
+                    zIndex: 50,
+                    maxHeight: 220,
+                    overflowY: 'auto',
+                    marginTop: 4,
+                  }}
+                >
+                  {townSearchResults.map((t, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelectTown(t)}
+                      style={{
+                        padding: '8px 12px',
+                        borderBottom: '1px solid var(--line)',
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div style={{ fontWeight: 700, color: 'var(--text)' }}>
+                        {t.governorateAr} - {t.cazaAr} - {t.townAr}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        {t.governorateEn} - {t.cazaEn} - {t.townEn}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* LocationHelper & Map Pin */}
+            <div className="field">
+              <LocationHelper
+                id="new-order-address"
+                address={recipientAddress}
+                onAddressChange={setRecipientAddress}
+                label="Detailed Delivery Address / Google Maps Pin"
+                placeholder="e.g. Sassine Square, Bldg 14, 2nd Floor or paste Google Maps pin"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="field" style={{ marginTop: 14 }}>
+            <label htmlFor="order-notes">Courier Delivery Instructions / Notes</label>
+            <input
+              id="order-notes"
+              type="text"
+              placeholder="e.g. Call 10 mins before arrival, fragile glass, leave with building concierge"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* ROW 2: Merchant, Waybill & Package Specifications */}
+        <div
+          style={{
+            background: 'var(--surface)',
+            border: '1.5px solid var(--line)',
+            borderRadius: 16,
+            padding: '24px 22px',
+            boxShadow: 'var(--shadow)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
+            <span style={{ fontSize: 18 }}>📦</span>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+                2. Merchant & Package Specifications
+              </h3>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Sender store, waybill tracking code, service type, and courier handling</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
             {/* Select Shop */}
             <div className="field">
-              <label htmlFor="shop-id">Select Shop / Client <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <label htmlFor="shop-id">
+                Select Shop / Merchant <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
               <select
                 id="shop-id"
                 value={shopId}
@@ -792,15 +578,68 @@ export function NewOrderClient({
               </select>
             </div>
 
+            {/* Custom Tracking Code / Waybill # */}
+            <div className="field">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <label htmlFor="custom-code" style={{ margin: 0 }}>
+                  Waybill Tracking Code <span style={{ color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      const prefix = currentShop ? currentShop.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() : 'ORD'
+                      const randomNum = Math.floor(100 + Math.random() * 900)
+                      setCustomCode(`${prefix}-${randomNum}`)
+                    }}
+                    style={{ fontSize: 10.5, padding: '2px 8px' }}
+                    title="Generate code with shop prefix (e.g. NIKE-101)"
+                  >
+                    Shop Prefix
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase()
+                      setCustomCode(`CD-${randomHex}`)
+                    }}
+                    style={{ fontSize: 10.5, padding: '2px 8px' }}
+                  >
+                    Auto CD-XXXX
+                  </button>
+                  {customCode && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setCustomCode('')}
+                      style={{ fontSize: 10.5, padding: '2px 8px', color: '#dc2626' }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+              <input
+                id="custom-code"
+                type="text"
+                placeholder="Leave blank for auto-generated tracking token"
+                value={customCode}
+                onChange={e => setCustomCode(e.target.value)}
+                style={{ fontFamily: 'monospace', fontWeight: 600 }}
+              />
+            </div>
+
             {/* Assign Driver */}
             <div className="field">
-              <label htmlFor="driver-id">Assign Courier (Optional)</label>
+              <label htmlFor="driver-id">Assign Courier / Driver (Optional)</label>
               <select
                 id="driver-id"
                 value={driverId}
                 onChange={e => setDriverId(e.target.value)}
               >
-                <option value="">Unassigned (Dispatch later)</option>
+                <option value="">Unassigned (Dispatch Later / Auto-Route)</option>
                 {drivers.map(d => (
                   <option key={d.id} value={d.id}>
                     {d.name} {d.phone ? `(${d.phone})` : ''}
@@ -808,28 +647,190 @@ export function NewOrderClient({
                 ))}
               </select>
             </div>
+          </div>
 
-            {/* Delivery Area */}
-            <div className="field">
-              <label htmlFor="area-id">Delivery Area / Tariff zone</label>
-              <select
-                id="area-id"
-                value={areaId}
-                onChange={e => handleAreaChange(e.target.value)}
+          {/* Service Type Selector */}
+          <div style={{ marginTop: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ fontWeight: 700, color: 'var(--brand)', margin: 0 }}>
+                Service Type / نوع الطلب
+              </label>
+              {/* Quick Preset for Retail Return / Refund */}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setCollectionUsd('0')
+                  setDeliveryFeeUsd('2')
+                  setDriverPayUsd('1')
+                  setNotes('Retail return pickup ($2 fee)')
+                  setServiceType('pickup')
+                }}
+                style={{ fontSize: 11, padding: '3px 10px', borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 600 }}
               >
-                {areas.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} (${Number(a.fee_usd).toFixed(2)})
-                  </option>
-                ))}
-              </select>
+                ⚡ Apply $2 Return Pickup Preset
+              </button>
             </div>
 
-            {/* Cash Collection (USD) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setServiceType('delivery')}
+                style={{
+                  padding: '12px 10px',
+                  borderRadius: 10,
+                  border: '1.5px solid',
+                  borderColor: serviceType === 'delivery' ? 'var(--brand)' : 'var(--line)',
+                  background: serviceType === 'delivery' ? 'var(--brand-light)' : 'var(--surface)',
+                  color: serviceType === 'delivery' ? 'var(--brand)' : 'var(--text)',
+                  fontWeight: serviceType === 'delivery' ? 700 : 500,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                🚚 Standard Delivery
+                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>توصيل طلب عادي</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setServiceType('replacement')}
+                style={{
+                  padding: '12px 10px',
+                  borderRadius: 10,
+                  border: '1.5px solid',
+                  borderColor: serviceType === 'replacement' ? '#d97706' : 'var(--line)',
+                  background: serviceType === 'replacement' ? 'rgba(217, 119, 6, 0.12)' : 'var(--surface)',
+                  color: serviceType === 'replacement' ? '#b45309' : 'var(--text)',
+                  fontWeight: serviceType === 'replacement' ? 700 : 500,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                🔄 Replacement
+                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>تبديل بضاعة</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setServiceType('pickup')}
+                style={{
+                  padding: '12px 10px',
+                  borderRadius: 10,
+                  border: '1.5px solid',
+                  borderColor: serviceType === 'pickup' ? '#7c3aed' : 'var(--line)',
+                  background: serviceType === 'pickup' ? 'rgba(124, 58, 237, 0.12)' : 'var(--surface)',
+                  color: serviceType === 'pickup' ? '#7c3aed' : 'var(--text)',
+                  fontWeight: serviceType === 'pickup' ? 700 : 500,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                📦 Return Pickup
+                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>استرجاع مرتجع</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Physical Attributes */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginTop: 18 }}>
             <div className="field">
-              <label htmlFor="collection-usd">
-                COD Collection (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+              <label htmlFor="package-weight">Package Weight (KG)</label>
+              <input
+                id="package-weight"
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={weightKg}
+                onChange={e => setWeightKg(e.target.value)}
+              />
+            </div>
+
+            <div className="field" style={{ justifyContent: 'center' }}>
+              <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, margin: 0, height: '100%', padding: '8px 12px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--line)' }}>
+                <input
+                  type="checkbox"
+                  checked={isBreakable}
+                  onChange={e => setIsBreakable(e.target.checked)}
+                  style={{ width: 20, height: 20, accentColor: '#ea580c' }}
+                />
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: isBreakable ? '#ea580c' : 'var(--text)' }}>
+                    ⚠️ Fragile / Breakable (قابل للكسر)
+                  </span>
+                  <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11 }}>
+                    Prints prominent fragile warning on thermal AWB label
+                  </small>
+                </div>
               </label>
+            </div>
+
+            <div className="field">
+              <label htmlFor="carrier-tracking">
+                3PL Carrier Tracking Code <span style={{ color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
+              </label>
+              <input
+                id="carrier-tracking"
+                type="text"
+                placeholder="e.g. OCT-8942, ARAMEX-4421, DHL-019"
+                value={carrierTrackingCode}
+                onChange={e => setCarrierTrackingCode(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 3: Financials & Cash on Delivery (COD) Breakdown */}
+        <div
+          style={{
+            background: 'var(--surface)',
+            border: '2px solid #3b82f6',
+            borderRadius: 16,
+            padding: '24px 22px',
+            boxShadow: '0 8px 30px rgba(59, 130, 246, 0.08)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 20 }}>💵</span>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--text)' }}>
+                  3. Cash Collection & Financial Settlement
+                </h3>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  COD cash collection at doorstep and automatic merchant/courier splits
+                </span>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, background: 'var(--bg)', padding: '4px 10px', borderRadius: 6, fontWeight: 600, color: 'var(--brand)' }}>
+              💱 1 USD = {rate.toLocaleString()} LBP
+            </div>
+          </div>
+
+          {/* 3 Core Financial Inputs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
+            {/* Input 1: Total COD to Collect at Doorstep */}
+            <div
+              className="field"
+              style={{
+                background: '#f8fafc',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 12,
+                padding: '14px',
+              }}
+            >
+              <label htmlFor="collection-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
+                💵 Total COD to Collect at Doorstep (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+                المبلغ الإجمالي المطلوب تحصيله من الزبون عند الاستلام
+              </div>
               <input
                 id="collection-usd"
                 type="number"
@@ -838,15 +839,29 @@ export function NewOrderClient({
                 value={collectionUsd}
                 onChange={e => setCollectionUsd(e.target.value)}
                 required
+                style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}
               />
-              <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                ≈ L.L. {codLbpApprox.toLocaleString('en-US', { maximumFractionDigits: 0 })} (@{rate.toLocaleString()})
-              </span>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#0284c7', marginTop: 6 }}>
+                ≈ L.L. {codLbpApprox.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              </div>
             </div>
 
-            {/* Delivery Fee (USD) */}
-            <div className="field">
-              <label htmlFor="delivery-fee-usd">Delivery Fee (USD) <span style={{ color: 'var(--danger)' }}>*</span></label>
+            {/* Input 2: Delivery Fee Charged to Shop */}
+            <div
+              className="field"
+              style={{
+                background: '#f8fafc',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 12,
+                padding: '14px',
+              }}
+            >
+              <label htmlFor="delivery-fee-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
+                🚚 Delivery Fee Charged to Shop (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+                كلفة التوصيل التي تخصمها الشركة من حساب المتجر ({currentArea?.name || 'Area Tariff'})
+              </div>
               <input
                 id="delivery-fee-usd"
                 type="number"
@@ -855,12 +870,29 @@ export function NewOrderClient({
                 value={deliveryFeeUsd}
                 onChange={e => setDeliveryFeeUsd(e.target.value)}
                 required
+                style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}
               />
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                Default: ${currentArea?.fee_usd || 3} based on {currentArea?.name || 'Area'}
+              </div>
             </div>
 
-            {/* Driver Pay (USD) */}
-            <div className="field">
-              <label htmlFor="driver-pay-usd">Courier Pay (USD) <span style={{ color: 'var(--danger)' }}>*</span></label>
+            {/* Input 3: Courier Pay / Commission */}
+            <div
+              className="field"
+              style={{
+                background: '#f8fafc',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 12,
+                padding: '14px',
+              }}
+            >
+              <label htmlFor="driver-pay-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
+                🚴 Courier Pay / Driver Commission (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+                المبلغ المستحق للدليفري ({currentDriver?.name || 'Assigned Courier'})
+              </div>
               <input
                 id="driver-pay-usd"
                 type="number"
@@ -869,53 +901,94 @@ export function NewOrderClient({
                 value={driverPayUsd}
                 onChange={e => setDriverPayUsd(e.target.value)}
                 required
+                style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}
               />
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                Courier net earnings per delivery
+              </div>
             </div>
           </div>
 
-          {/* Real-Time Financial Settlement Preview */}
+          {/* ─── LIVE FINANCIAL SETTLEMENT BREAKDOWN RECEIPT ─── */}
           <div
             style={{
-              marginTop: 18,
-              padding: '12px 18px',
-              background: 'var(--bg)',
-              borderRadius: 12,
-              border: '1px solid var(--line)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 12,
+              marginTop: 20,
+              padding: '18px 22px',
+              background: '#090d16',
+              color: '#ffffff',
+              borderRadius: 14,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
             }}
           >
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              <div>
-                <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Customer Pays (COD)
-                </span>
-                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>
-                  {formatUSD(codUsdNum)}
-                </div>
-              </div>
-              <div>
-                <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Shop Net Settlement
-                </span>
-                <div style={{ fontSize: 15, fontWeight: 800, color: shopNetUsd >= 0 ? 'var(--brand)' : 'var(--danger)' }}>
-                  {formatUSD(shopNetUsd)}
-                </div>
-              </div>
-              <div>
-                <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Company Margin
-                </span>
-                <div style={{ fontSize: 15, fontWeight: 800, color: companyMarginUsd >= 0 ? '#15803d' : 'var(--danger)' }}>
-                  {formatUSD(companyMarginUsd)}
-                </div>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #1e293b', paddingBottom: 8 }}>
+              <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8', fontWeight: 800 }}>
+                Live Accounting & Settlement Breakdown
+              </span>
+              <span style={{ fontSize: 12, color: '#38bdf8', fontWeight: 600 }}>
+                Automatic Calculation
+              </span>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Rates dynamically bound to workspace <strong>{workspaceName}</strong>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 18 }}>
+              <div>
+                <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
+                  💵 Collected at Doorstep:
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#ffffff' }}>
+                  {formatUSD(codUsdNum)}
+                </span>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  ≈ L.L. {codLbpApprox.toLocaleString()}
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
+                  ➖ Delivery Fee to {currentShop?.name || 'Shop'}:
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#f87171' }}>
+                  - {formatUSD(feeUsdNum)}
+                </span>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  Service fee deducted
+                </div>
+              </div>
+
+              <div style={{ borderLeft: '1px solid #334155', paddingLeft: 16 }}>
+                <span style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700, display: 'block' }}>
+                  🏪 Net Payout to {currentShop?.name || 'Shop'}:
+                </span>
+                <span style={{ fontSize: 22, fontWeight: 900, color: shopNetUsd >= 0 ? '#4ade80' : '#f87171' }}>
+                  {formatUSD(shopNetUsd)}
+                </span>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                  (Owed in Shop Settlement)
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
+                  🚴 Courier Pay to {currentDriver?.name || 'Driver'}:
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#facc15' }}>
+                  {formatUSD(driverPayNum)}
+                </span>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  (Driver Run Sheet Pay)
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
+                  📈 Company Net Profit:
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: companyMarginUsd >= 0 ? '#60a5fa' : '#f87171' }}>
+                  {formatUSD(companyMarginUsd)}
+                </span>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  (Fee $ {feeUsdNum} - Pay $ {driverPayNum})
+                </div>
+              </div>
             </div>
           </div>
         </div>
