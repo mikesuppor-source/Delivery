@@ -21,6 +21,13 @@ export const POST=api(async req=>{
  if(!code)throw new ApiError(400,'Invalid order code')
  const order=checked(await db.from('orders').insert({workspace_id:shop.workspace_id,shop_id:shop.id,area_id:area.id,code,status:'pending',
   usd_to_lbp_rate:ws.usd_to_lbp,collection_usd:money(body.collectionUsd,'collection'),delivery_fee_usd:area.fee_usd,driver_pay_usd:1,
+  service_type:(body.serviceType === 'replacement' || body.serviceType === 'pickup') ? body.serviceType : 'delivery',
+  weight_kg:Math.max(0.1, Number(body.weightKg) || 1.0),
+  is_breakable:Boolean(body.isBreakable),
+  payment_method:textField(body.paymentMethod, 'payment method', 40) || 'cash_usd',
+  destination_governorate:textField(body.destinationGovernorate, 'governorate', 100),
+  destination_caza:textField(body.destinationCaza, 'caza', 100),
+  destination_town:textField(body.destinationTown, 'town', 100),
   recipient_name:textField(body.recipientName,'recipient',200,true),recipient_phone:formatLebanesePhone(phone),
   recipient_address:textField(body.recipientAddress,'address',1000,true),notes:textField(body.notes,'notes',4000),created_by:user.id
  }).select(ORDER_SELECT).single())

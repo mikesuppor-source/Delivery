@@ -14,10 +14,23 @@ export const POST=api(async req=>{
  for(const item of body.orders){
   const area=matchArea(areas,[item.areaName,item.city])
   const fee=area?Number(area.fee_usd):3
+  const rawType = String(item.serviceType || item.type || '').toLowerCase()
+  const serviceType: 'delivery' | 'replacement' | 'pickup' = rawType.includes('replace') || rawType.includes('تبديل')
+    ? 'replacement'
+    : (rawType.includes('pickup') || rawType.includes('مرتجع') || rawType.includes('استلام') ? 'pickup' : 'delivery')
+  const isBreakable = Boolean(item.isBreakable ?? item.breakable ?? (item.fragile === true || item.fragile === '1' || item.breakable === 0 || item.breakable === '0'))
+
   rows.push({workspace_id:workspaceId,shop_id:body.shopId,status:'pending' as const,
    code:item.code?formatOrderCode(textField(item.code,'code',60,true)):await generateUniqueOrderCode(db),
    area_id:area?.id||null,collection_usd:money(item.collectionUsd??item.amount,'collection'),
    delivery_fee_usd:fee,driver_pay_usd:Math.max(1,fee-1),usd_to_lbp_rate:ws.usd_to_lbp,
+   service_type:serviceType,
+   weight_kg:Math.max(0.1, Number(item.weightKg || item.weight) || 1.0),
+   is_breakable:isBreakable,
+   carrier_tracking_code:textField(item.carrierTrackingCode || item.octopusCode || item.trackingCode, 'carrier tracking code', 100),
+   destination_governorate:textField(item.governorate, 'governorate', 100),
+   destination_caza:textField(item.caza, 'caza', 100),
+   destination_town:textField(item.town, 'town', 100),
    recipient_name:textField(item.recipientName||item.name,'recipient',200,true),
    recipient_phone:textField(item.recipientPhone||item.phone,'phone',40,true),
    recipient_address:textField(item.recipientAddress||item.address,'address',1000,true),

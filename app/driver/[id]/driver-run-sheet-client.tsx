@@ -15,10 +15,8 @@ import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import {
   TruckIcon,
-  MapPinIcon,
   PackageIcon,
   CheckIcon,
-  RefreshIcon,
   SearchIcon,
   PhoneIcon,
 } from '@/components/icons'
@@ -31,6 +29,10 @@ export interface DriverRunSheetOrder {
   code: string
   tracking_token?: string
   status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'failed' | 'returned'
+  service_type?: 'delivery' | 'replacement' | 'pickup'
+  weight_kg?: number
+  is_breakable?: boolean
+  carrier_tracking_code?: string | null
   collection_usd: number
   delivery_fee_usd: number
   driver_pay_usd: number
@@ -956,6 +958,59 @@ export function DriverRunSheetClient({
                     </div>
                   </div>
 
+                  {/* Special Service Type Alert for Courier */}
+                  {order.service_type === 'replacement' && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '1px solid #f59e0b',
+                        color: '#fef08a',
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <span style={{ fontSize: 14 }}>🔄</span>
+                      <div>
+                        <div>REPLACEMENT / تبديل</div>
+                        <div style={{ fontSize: 11, fontWeight: 500, color: '#fde68a' }}>
+                          Collect old item from customer before handing over this parcel!
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {order.service_type === 'pickup' && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: 'rgba(168, 85, 247, 0.15)',
+                        border: '1px solid #a855f7',
+                        color: '#e9d5ff',
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <span style={{ fontSize: 14 }}>📦</span>
+                      <div>
+                        <div>RETURN PICKUP / استلام مرتجع</div>
+                        <div style={{ fontSize: 11, fontWeight: 500, color: '#d8b4fe' }}>
+                          Pick up package from client and return to hub/merchant.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Customer & Merchant Info */}
                   <div style={{ marginBottom: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -967,11 +1022,32 @@ export function DriverRunSheetClient({
                       </span>
                     </div>
 
-                    {/* Area & Address */}
+                    {/* Area & Address & Badges */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                       {order.area && (
                         <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', background: '#172554', padding: '1px 6px', borderRadius: 4 }}>
                           {order.area.name}
+                        </span>
+                      )}
+                      {order.is_breakable && (
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            color: '#fca5a5',
+                            background: '#7f1d1d',
+                            padding: '1px 6px',
+                            borderRadius: 4,
+                            border: '1px solid #dc2626',
+                          }}
+                          title="Fragile / Breakable Content"
+                        >
+                          ⚠️ FRAGILE / كسر
+                        </span>
+                      )}
+                      {order.weight_kg && order.weight_kg > 1 && (
+                        <span style={{ fontSize: 10.5, fontWeight: 700, color: '#cbd5e1', background: '#334155', padding: '1px 6px', borderRadius: 4 }}>
+                          ⚖️ {order.weight_kg}kg
                         </span>
                       )}
                       {parsedLoc.isCoords && (

@@ -36,6 +36,15 @@ export const POST = api(async req => {
     collection_usd:money(body.collectionUsd,'collection'),delivery_fee_usd:money(body.deliveryFeeUsd,'delivery fee'),
     driver_pay_usd:money(body.driverPayUsd,'driver pay'),recipient_name:textField(body.recipientName,'recipient',200),
     recipient_phone:textField(body.recipientPhone,'phone',40),recipient_address:textField(body.recipientAddress,'address',1000),
+    service_type:(body.serviceType === 'replacement' || body.serviceType === 'pickup') ? body.serviceType : 'delivery',
+    weight_kg:Math.max(0.1, Number(body.weightKg) || 1.0),
+    is_breakable:Boolean(body.isBreakable),
+    payment_method:textField(body.paymentMethod, 'payment method', 40) || 'cash_usd',
+    carrier_name:textField(body.carrierName, 'carrier name', 100),
+    carrier_tracking_code:textField(body.carrierTrackingCode, 'carrier tracking code', 100),
+    destination_governorate:textField(body.destinationGovernorate, 'governorate', 100),
+    destination_caza:textField(body.destinationCaza, 'caza', 100),
+    destination_town:textField(body.destinationTown, 'town', 100),
     notes:textField(body.notes,'notes',4000),created_by:user.id
   }).select(ORDER_SELECT).single())
   return NextResponse.json({success:true,order})

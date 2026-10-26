@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Modal } from '@/components/modal'
 import { formatUSD, formatLBP, usdToLbp, formatDate } from '@/lib/utils'
 
@@ -80,6 +80,54 @@ export function StatementClient({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
+
+  // Merchant Cashout / Payout Requests state
+  const [cashoutRequests, setCashoutRequests] = useState<Array<{
+    id: string
+    amount_usd: number
+    amount_lbp: number
+    method: string
+    account_details: string
+    status: string
+    created_at: string
+    notes?: string | null
+    shop: { id: string; name: string; phone?: string | null } | null
+  }>>([])
+  const [cashoutLoading, setCashoutLoading] = useState(false)
+
+  // Fetch pending merchant payout requests
+  useEffect(() => {
+    fetch(`/api/admin/cashout?workspaceId=${workspaceId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d && Array.isArray(d.requests)) {
+          setCashoutRequests(d.requests)
+        }
+      })
+      .catch(() => {})
+  }, [workspaceId])
+
+  async function handleCashoutAction(requestId: string, action: 'mark_paid' | 'reject') {
+    setCashoutLoading(true)
+    try {
+      const res = await fetch('/api/admin/cashout', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, workspaceId, action }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update payout request')
+
+      setCashoutRequests(prev =>
+        prev.map(r => (r.id === requestId ? { ...r, status: action === 'mark_paid' ? 'paid' : 'rejected' } : r))
+      )
+      showToast(data.message || 'Payout request updated!')
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error processing request')
+    } finally {
+      setCashoutLoading(false)
+    }
+  }
 
   function showToast(msg: string) {
     setToast(msg)
@@ -358,6 +406,110 @@ export function StatementClient({
             <div className="empty">
               <h3>No delivered orders yet</h3>
               <p>Once orders are marked delivered, they will appear on this statement ledger.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── MERCHANT CASHOUT / PAYOUT REQUESTS ─── */}
+      <div className="panel" style={{ marginTop: 24 }}>
+        <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <h2>Merchant Payout Requests (طلب سحب أرباح)</h2>
+            <small>Pending and processed cash withdrawal requests submitted by merchants via portal</small>
+          </div>
+          <span className="badge" style={{ background: 'var(--primary-subtle)', color: 'var(--primary)', fontWeight: 600 }}>
+            {cashoutRequests.filter(r => r.status === 'pending').length} Pending
+          </span>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Merchant</th>
+                <th>Amount ($ USD)</th>
+                <th>Amount (LBP)</th>
+                <th>Method</th>
+                <th>Account Details</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cashoutRequests.map(req => (
+                <tr key={req.id}>
+                  <td><small>{formatDate(req.created_at)}</small></td>
+                  <td>
+                    <strong>{req.shop?.name || 'Unknown'}</strong>
+                    {req.shop?.phone && <div><small>{req.shop.phone}</small></div>}
+                  </td>
+                  <td><strong style={{ color: '#10b981' }}>{formatUSD(req.amount_usd)}</strong></td>
+                  <td><small style={{ color: '#38bdf8' }}>{req.amount_lbp > 0 ? formatLBP(req.amount_lbp) : '—'}</small></td>
+                  <td>
+                    <span className="badge" style={{ textTransform: 'uppercase', fontSize: 11 }}>
+                      {req.method === 'whish' ? '🟣 Whish Money' : req.method === 'omt' ? '🟡 OMT Cash' : req.method === 'cash_office' ? '🏢 Office Cash' : req.method}
+                    </span>
+                  </td>
+                  <td>
+                    <code style={{ fontSize: 12 }}>{req.account_details}</code>
+                    {req.notes && <div style={{ fontSize: 11, color: 'var(--muted)' }}>Note: {req.notes}</div>}
+                  </td>
+                  <td>
+                    <span
+                      className="badge"
+                      style={{
+                        background:
+                          req.status === 'paid'
+                            ? '#dcfce7'
+                            : req.status === 'rejected'
+                            ? '#fee2e2'
+                            : '#fef3c7',
+                        color:
+                          req.status === 'paid'
+                            ? '#166534'
+                            : req.status === 'rejected'
+                            ? '#991b1b'
+                            : '#92400e',
+                      }}
+                    >
+                      {req.status.toUpperCase()}
+                    </span>
+                  </td>
+                  <td>
+                    {req.status === 'pending' ? (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          disabled={cashoutLoading}
+                          onClick={() => handleCashoutAction(req.id, 'mark_paid')}
+                          title="Pay merchant and settle ledger balance"
+                        >
+                          Mark Paid
+                        </button>
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          style={{ color: '#ef4444' }}
+                          disabled={cashoutLoading}
+                          onClick={() => handleCashoutAction(req.id, 'reject')}
+                          title="Reject request"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <small style={{ color: 'var(--muted)' }}>Resolved</small>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {cashoutRequests.length === 0 && (
+            <div className="empty">
+              <h3>No payout requests</h3>
+              <p>When merchants request cash payouts from their portal, they will appear here for processing.</p>
             </div>
           )}
         </div>

@@ -23,6 +23,20 @@ export function orderPatch(body: Record<string, unknown>, order: Record<string, 
       if (body[input] !== undefined) updates[column] = textField(body[input],input,1000)
     for (const [input,column] of Object.entries({collectionUsd:'collection_usd',deliveryFeeUsd:'delivery_fee_usd',driverPayUsd:'driver_pay_usd'}))
       if (body[input] !== undefined) updates[column] = money(body[input],input)
+    if (body.serviceType !== undefined) {
+      const validTypes = ['delivery', 'replacement', 'pickup']
+      if (typeof body.serviceType === 'string' && validTypes.includes(body.serviceType)) {
+        updates.service_type = body.serviceType as Database['public']['Enums']['order_service_type']
+      }
+    }
+    if (body.weightKg !== undefined) updates.weight_kg = Math.max(0.1, Math.round(Number(body.weightKg) * 100) / 100 || 1.0)
+    if (body.isBreakable !== undefined) updates.is_breakable = Boolean(body.isBreakable)
+    if (body.paymentMethod !== undefined) updates.payment_method = textField(body.paymentMethod, 'payment method', 40)
+    if (body.carrierName !== undefined) updates.carrier_name = textField(body.carrierName, 'carrier name', 100)
+    if (body.carrierTrackingCode !== undefined) updates.carrier_tracking_code = textField(body.carrierTrackingCode, 'carrier tracking code', 100)
+    if (body.destinationGovernorate !== undefined) updates.destination_governorate = textField(body.destinationGovernorate, 'governorate', 100)
+    if (body.destinationCaza !== undefined) updates.destination_caza = textField(body.destinationCaza, 'caza', 100)
+    if (body.destinationTown !== undefined) updates.destination_town = textField(body.destinationTown, 'town', 100)
     if (body.driverId !== undefined) {
       updates.driver_id = body.driverId || null
       if (order.status === 'pending' && body.driverId && !body.status) updates.status='assigned'

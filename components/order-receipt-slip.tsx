@@ -13,6 +13,14 @@ import { getGoogleMapsDirectionsUrl, formatDisplayAddress, parseLocation } from 
 export interface ReceiptOrder {
   id: string
   code: string
+  service_type?: 'delivery' | 'replacement' | 'pickup'
+  weight_kg?: number
+  is_breakable?: boolean
+  carrier_name?: string | null
+  carrier_tracking_code?: string | null
+  destination_governorate?: string | null
+  destination_caza?: string | null
+  destination_town?: string | null
   tracking_token?: string
   status: string
   collection_usd: number
@@ -379,6 +387,76 @@ export function OrderReceiptSlip({
           </div>
         </div>
 
+        {/* ─── Special Service Type & Fragile Banners ─── */}
+        {order.is_breakable && (
+          <div
+            style={{
+              background: '#fee2e2',
+              color: '#991b1b',
+              border: '2px dashed #dc2626',
+              borderRadius: 6,
+              padding: '6px 12px',
+              margin: '12px 0 6px 0',
+              fontWeight: 900,
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.8px',
+            }}
+          >
+            <span>⚠️ FRAGILE / قابل للكسر — HANDLE WITH EXTREME CARE</span>
+          </div>
+        )}
+
+        {order.service_type === 'replacement' && (
+          <div
+            style={{
+              background: '#fef3c7',
+              color: '#92400e',
+              border: '2px solid #d97706',
+              borderRadius: 6,
+              padding: '6px 12px',
+              margin: '6px 0',
+              fontWeight: 900,
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            <span>🔄 REPLACEMENT / تبديل — (COLLECT OLD ITEM FIRST)</span>
+          </div>
+        )}
+
+        {order.service_type === 'pickup' && (
+          <div
+            style={{
+              background: '#ede9fe',
+              color: '#5b21b6',
+              border: '2px solid #7c3aed',
+              borderRadius: 6,
+              padding: '6px 12px',
+              margin: '6px 0',
+              fontWeight: 900,
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            <span>📦 RETURN PICKUP / استلام مرتجع — (COLLECT FROM RECIPIENT)</span>
+          </div>
+        )}
+
         {/* Sender & Recipient Box */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, margin: '16px 0', padding: 12, background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' }}>
           {/* Sender */}
@@ -422,6 +500,21 @@ export function OrderReceiptSlip({
                 Area: {order.area.name}
               </div>
             )}
+            {order.destination_town && (
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#4b5563', marginTop: 2 }}>
+                Dest: {[order.destination_governorate, order.destination_caza, order.destination_town].filter(Boolean).join(' - ')}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', background: '#e5e7eb', borderRadius: 4, color: '#374151' }}>
+                Weight: {order.weight_kg || 1} KG
+              </span>
+              {order.carrier_tracking_code && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', background: '#dbeafe', borderRadius: 4, color: '#1d4ed8' }}>
+                  {order.carrier_name || 'Carrier'}: {order.carrier_tracking_code}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

@@ -22,6 +22,14 @@ interface Order {
   code: string
   tracking_token?: string
   status: OrderStatus
+  service_type?: 'delivery' | 'replacement' | 'pickup'
+  weight_kg?: number
+  is_breakable?: boolean
+  carrier_name?: string | null
+  carrier_tracking_code?: string | null
+  destination_governorate?: string | null
+  destination_caza?: string | null
+  destination_town?: string | null
   collection_usd: number
   delivery_fee_usd: number
   driver_pay_usd: number
@@ -183,6 +191,18 @@ export function OrderListClient({
   const [recipientPhone, setRecipientPhone] = useState('')
   const [recipientAddress, setRecipientAddress] = useState('')
   const [notes, setNotes] = useState('')
+  const [serviceType, setServiceType] = useState<'delivery' | 'replacement' | 'pickup'>('delivery')
+  const [weightKg, setWeightKg] = useState('1')
+  const [isBreakable, setIsBreakable] = useState(false)
+  const [carrierTrackingCode, setCarrierTrackingCode] = useState('')
+  const [destinationTown, setDestinationTown] = useState('')
+  const [phoneMatchedCustomer, setPhoneMatchedCustomer] = useState<{
+    name: string
+    address: string
+    notes?: string | null
+    orders_count?: number
+    town?: string | null
+  } | null>(null)
 
   // Driver Required Alert Modal (when changing status without a driver)
   const [isDriverRequiredModalOpen, setIsDriverRequiredModalOpen] = useState(false)
@@ -205,9 +225,36 @@ export function OrderListClient({
   const [editRecipientPhone, setEditRecipientPhone] = useState('')
   const [editRecipientAddress, setEditRecipientAddress] = useState('')
   const [editNotes, setEditNotes] = useState('')
+  const [editServiceType, setEditServiceType] = useState<'delivery' | 'replacement' | 'pickup'>('delivery')
+  const [editWeightKg, setEditWeightKg] = useState('1')
+  const [editIsBreakable, setEditIsBreakable] = useState(false)
+  const [editCarrierTrackingCode, setEditCarrierTrackingCode] = useState('')
+  const [editDestinationTown, setEditDestinationTown] = useState('')
   const [editingSubmitting, setEditingSubmitting] = useState(false)
   const [editError, setEditError] = useState('')
   const [orderEvents, setOrderEvents] = useState<Array<{ id: string; old_status?: string | null; new_status: string; created_at: string }>>([])
+
+  // Live Phone CRM Customer Lookup
+  useEffect(() => {
+    const clean = recipientPhone.replace(/[^0-9+]/g, '')
+    if (clean.length < 6) {
+      setPhoneMatchedCustomer(null)
+      return
+    }
+    const timer = setTimeout(() => {
+      fetch(`/api/customers/lookup?phone=${encodeURIComponent(clean)}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d && d.customer) {
+            setPhoneMatchedCustomer(d.customer)
+          } else {
+            setPhoneMatchedCustomer(null)
+          }
+        })
+        .catch(() => setPhoneMatchedCustomer(null))
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [recipientPhone])
 
   const canManage = userRole === 'owner' || userRole === 'manager'
 
@@ -447,6 +494,11 @@ export function OrderListClient({
           recipientName,
           recipientPhone,
           recipientAddress,
+          serviceType,
+          weightKg: Number(weightKg) || 1.0,
+          isBreakable,
+          carrierTrackingCode: carrierTrackingCode.trim() || undefined,
+          destinationTown: destinationTown.trim() || undefined,
           notes,
         }),
       })
@@ -470,6 +522,12 @@ export function OrderListClient({
       setRecipientPhone('')
       setRecipientAddress('')
       setNotes('')
+      setServiceType('delivery')
+      setWeightKg('1')
+      setIsBreakable(false)
+      setCarrierTrackingCode('')
+      setDestinationTown('')
+      setPhoneMatchedCustomer(null)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error creating order')
     } finally {
@@ -597,6 +655,11 @@ export function OrderListClient({
     setEditRecipientPhone(order.recipient_phone || '')
     setEditRecipientAddress(order.recipient_address || '')
     setEditNotes(order.notes || '')
+    setEditServiceType(order.service_type || 'delivery')
+    setEditWeightKg(String(order.weight_kg || '1'))
+    setEditIsBreakable(Boolean(order.is_breakable))
+    setEditCarrierTrackingCode(order.carrier_tracking_code || '')
+    setEditDestinationTown(order.destination_town || '')
     setEditError('')
     setIsEditModalOpen(true)
 
@@ -634,6 +697,11 @@ export function OrderListClient({
           recipientName: editRecipientName,
           recipientPhone: editRecipientPhone,
           recipientAddress: editRecipientAddress,
+          serviceType: editServiceType,
+          weightKg: Number(editWeightKg) || 1.0,
+          isBreakable: editIsBreakable,
+          carrierTrackingCode: editCarrierTrackingCode.trim() || undefined,
+          destinationTown: editDestinationTown.trim() || undefined,
           notes: editNotes,
         }),
       })
@@ -993,6 +1061,95 @@ export function OrderListClient({
                         >
                           {order.code} ↗
                         </Link>
+                        {order.service_type === 'replacement' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 2,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              background: 'rgba(217, 119, 6, 0.15)',
+                              color: '#b45309',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              border: '1px solid rgba(217, 119, 6, 0.3)',
+                            }}
+                            title="Replacement / Exchange Item (Driver collects old item)"
+                          >
+                            🔄 Swap
+                          </span>
+                        )}
+                        {order.service_type === 'pickup' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 2,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              background: 'rgba(124, 58, 237, 0.15)',
+                              color: '#7c3aed',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              border: '1px solid rgba(124, 58, 237, 0.3)',
+                            }}
+                            title="Return Pickup from Customer"
+                          >
+                            📦 Pickup
+                          </span>
+                        )}
+                        {order.is_breakable && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 2,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              background: 'rgba(220, 38, 38, 0.12)',
+                              color: '#dc2626',
+                              padding: '1px 5px',
+                              borderRadius: 4,
+                              border: '1px solid rgba(220, 38, 38, 0.25)',
+                            }}
+                            title="Fragile / Breakable Content"
+                          >
+                            ⚠️ Fragile
+                          </span>
+                        )}
+                        {order.weight_kg && order.weight_kg > 1 && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: 'var(--muted)',
+                              padding: '1px 4px',
+                              background: 'var(--bg)',
+                              borderRadius: 4,
+                              border: '1px solid var(--line)',
+                            }}
+                            title="Package Weight"
+                          >
+                            ⚖️ {order.weight_kg}kg
+                          </span>
+                        )}
+                        {order.carrier_tracking_code && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: '#2563eb',
+                              background: 'rgba(37, 99, 235, 0.1)',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              border: '1px solid rgba(37, 99, 235, 0.25)',
+                            }}
+                            title={`External Carrier Tracking: ${order.carrier_name || 'Octopus'}`}
+                          >
+                            🚚 {order.carrier_tracking_code}
+                          </span>
+                        )}
                         {order.shopify_order_number && (
                           <span
                             style={{
@@ -1803,6 +1960,54 @@ export function OrderListClient({
               />
             </div>
 
+            {/* Service Type & Package Attributes */}
+            <div className="field">
+              <label>Service Type</label>
+              <select
+                value={editServiceType}
+                onChange={e => setEditServiceType(e.target.value as 'delivery' | 'replacement' | 'pickup')}
+              >
+                <option value="delivery">🚚 Standard Delivery</option>
+                <option value="replacement">🔄 Replacement / Exchange (تبديل)</option>
+                <option value="pickup">📦 Return Pickup (استلام مرتجع)</option>
+              </select>
+            </div>
+
+            <div className="field">
+              <label>Weight (KG)</label>
+              <input
+                type="number"
+                step="0.5"
+                min="0.1"
+                value={editWeightKg}
+                onChange={e => setEditWeightKg(e.target.value)}
+              />
+            </div>
+
+            <div className="field" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={editIsBreakable}
+                  onChange={e => setEditIsBreakable(e.target.checked)}
+                  style={{ width: 18, height: 18, accentColor: '#dc2626' }}
+                />
+                <span style={{ fontWeight: 700, color: editIsBreakable ? '#dc2626' : 'var(--text)' }}>
+                  ⚠️ Fragile / Breakable (قابل للكسر)
+                </span>
+              </label>
+            </div>
+
+            <div className="field">
+              <label>Carrier Tracking Code (3PL / Octopus Code)</label>
+              <input
+                type="text"
+                placeholder="e.g. 220222385920"
+                value={editCarrierTrackingCode}
+                onChange={e => setEditCarrierTrackingCode(e.target.value)}
+              />
+            </div>
+
             {orderEvents.length > 0 && (
               <div className="field full" style={{ marginTop: 8 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
@@ -2041,6 +2246,146 @@ export function OrderListClient({
                 placeholder="e.g. +961 70 123456"
                 value={recipientPhone}
                 onChange={e => setRecipientPhone(e.target.value)}
+              />
+            </div>
+
+            {phoneMatchedCustomer && (
+              <div
+                className="field full"
+                style={{
+                  background: 'rgba(37, 99, 235, 0.08)',
+                  border: '1.5px solid rgba(37, 99, 235, 0.3)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginTop: -4,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}>
+                    👥 Repeat Customer Detected: {phoneMatchedCustomer.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    {phoneMatchedCustomer.orders_count || 1} past orders · {phoneMatchedCustomer.address || 'Address on file'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }}
+                  onClick={() => {
+                    if (phoneMatchedCustomer.name) setRecipientName(phoneMatchedCustomer.name)
+                    if (phoneMatchedCustomer.address) setRecipientAddress(phoneMatchedCustomer.address)
+                    if (phoneMatchedCustomer.notes && !notes) setNotes(phoneMatchedCustomer.notes)
+                    setPhoneMatchedCustomer(null)
+                  }}
+                >
+                  ⚡ Auto-Fill Details
+                </button>
+              </div>
+            )}
+
+            {/* Service Type Selector */}
+            <div className="field full" style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }}>
+              <label style={{ fontWeight: 700, color: 'var(--brand)', marginBottom: 6, display: 'block' }}>
+                Service Type / نوع الطلب
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setServiceType('delivery')}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1.5px solid',
+                    borderColor: serviceType === 'delivery' ? 'var(--brand)' : 'var(--line)',
+                    background: serviceType === 'delivery' ? 'var(--brand-light)' : 'var(--surface)',
+                    color: serviceType === 'delivery' ? 'var(--brand)' : 'var(--text)',
+                    fontWeight: serviceType === 'delivery' ? 700 : 500,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  🚚 Delivery
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setServiceType('replacement')}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1.5px solid',
+                    borderColor: serviceType === 'replacement' ? '#d97706' : 'var(--line)',
+                    background: serviceType === 'replacement' ? 'rgba(217, 119, 6, 0.15)' : 'var(--surface)',
+                    color: serviceType === 'replacement' ? '#b45309' : 'var(--text)',
+                    fontWeight: serviceType === 'replacement' ? 700 : 500,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  🔄 Replacement (تبديل)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setServiceType('pickup')}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1.5px solid',
+                    borderColor: serviceType === 'pickup' ? '#7c3aed' : 'var(--line)',
+                    background: serviceType === 'pickup' ? 'rgba(124, 58, 237, 0.15)' : 'var(--surface)',
+                    color: serviceType === 'pickup' ? '#7c3aed' : 'var(--text)',
+                    fontWeight: serviceType === 'pickup' ? 700 : 500,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  📦 Return Pickup (مرتجع)
+                </button>
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Package Weight (KG)</label>
+              <input
+                type="number"
+                step="0.5"
+                min="0.1"
+                value={weightKg}
+                onChange={e => setWeightKg(e.target.value)}
+              />
+            </div>
+
+            <div className="field" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={isBreakable}
+                  onChange={e => setIsBreakable(e.target.checked)}
+                  style={{ width: 18, height: 18, accentColor: '#dc2626' }}
+                />
+                <span style={{ fontWeight: 700, color: isBreakable ? '#dc2626' : 'var(--text)' }}>
+                  ⚠️ Fragile / Breakable (قابل للكسر)
+                </span>
+              </label>
+              <small style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>
+                Prints a bold fragile warning banner on the thermal AWB label.
+              </small>
+            </div>
+
+            <div className="field full">
+              <label>Carrier Tracking Code (3PL / Octopus Code)</label>
+              <input
+                type="text"
+                placeholder="e.g. 220222385920 (Optional external courier tracking code)"
+                value={carrierTrackingCode}
+                onChange={e => setCarrierTrackingCode(e.target.value)}
               />
             </div>
 

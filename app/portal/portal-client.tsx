@@ -10,7 +10,7 @@ import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl } from '@/lib/maps'
 import { LocationHelper } from '@/components/location-helper'
 import { Modal } from '@/components/modal'
-import { TrashIcon, PrinterIcon, MapPinIcon } from '@/components/icons'
+import { TrashIcon, PrinterIcon } from '@/components/icons'
 import { ShopifyIcon } from '@/components/shopify-icon'
 import { ShopifyIntegrationModal } from '@/components/shopify-integration-modal'
 import { BulkOrderImportModal } from '@/components/bulk-order-import-modal'
@@ -38,6 +38,10 @@ interface PortalOrder {
   code: string
   tracking_token?: string
   status: OrderStatus
+  service_type?: 'delivery' | 'replacement' | 'pickup'
+  weight_kg?: number
+  is_breakable?: boolean
+  carrier_tracking_code?: string | null
   collection_usd: number
   delivery_fee_usd: number
   shop_balance_usd: number
@@ -85,6 +89,134 @@ export function PortalClient({
   const [rawAmount, setRawAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [customCode, setCustomCode] = useState('')
+  const [serviceType, setServiceType] = useState<'delivery' | 'replacement' | 'pickup'>('delivery')
+  const [weightKg, setWeightKg] = useState('1')
+  const [isBreakable, setIsBreakable] = useState(false)
+  const [phoneMatchedCustomer, setPhoneMatchedCustomer] = useState<{
+    name: string
+    address: string
+    notes?: string | null
+    orders_count?: number
+  } | null>(null)
+
+  // Cash-Out / Payout Request state
+  const [isCashoutModalOpen, setIsCashoutModalOpen] = useState(false)
+  const [cashoutAmountUsd, setCashoutAmountUsd] = useState('')
+  const [cashoutMethod, setCashoutMethod] = useState<'whish' | 'omt' | 'cash_office' | 'bank_transfer'>('whish')
+  const [cashoutAccountDetails, setCashoutAccountDetails] = useState('')
+  const [cashoutNotes, setCashoutNotes] = useState('')
+  const [cashoutAvailableUsd, setCashoutAvailableUsd] = useState(0)
+  const [cashoutAvailableLbp, setCashoutAvailableLbp] = useState(0)
+  const [cashoutSubmitting, setCashoutSubmitting] = useState(false)
+  const [cashoutError, setCashoutError] = useState('')
+  const [cashoutSuccess, setCashoutSuccess] = useState('')
+  const [cashoutHistory, setCashoutHistory] = useState<Array<{
+    id: string
+    amount_usd: number
+    amount_lbp: number
+    method: string
+    status: string
+    created_at: string
+    account_details: string
+  }>>([])
+
+  // Live Phone CRM Customer Lookup
+  React.useEffect(() => {
+    const clean = recipientPhone.replace(/[^0-9+]/g, '')
+    if (clean.length < 6) {
+      setPhoneMatchedCustomer(null)
+      return
+    }
+    const timer = setTimeout(() => {
+      fetch(`/api/customers/lookup?phone=${encodeURIComponent(clean)}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d && d.customer) {
+            setPhoneMatchedCustomer(d.customer)
+          } else {
+            setPhoneMatchedCustomer(null)
+          }
+        })
+        .catch(() => setPhoneMatchedCustomer(null))
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [recipientPhone])
+
+  function openCashoutModal() {
+    setCashoutError('')
+    setCashoutSuccess('')
+    setIsCashoutModalOpen(true)
+    fetch('/api/portal/cashout')
+      .then(r => r.json())
+      .then(d => {
+        if (d) {
+          setCashoutAvailableUsd(d.availableUsd || 0)
+          setCashoutAvailableLbp(d.availableLbp || 0)
+          setCashoutHistory(d.requests || [])
+          if (d.availableUsd > 0 && !cashoutAmountUsd) {
+            setCashoutAmountUsd(String(d.availableUsd))
+          }
+        }
+      })
+      .catch(() => {})
+  }
+
+  async function handleRequestCashout(e: React.FormEvent) {
+    e.preventDefault()
+    setCashoutError('')
+    setCashoutSuccess('')
+    const amt = parseFloat(cashoutAmountUsd) || 0
+    if (amt <= 0) {
+      setCashoutError('Please enter a valid payout amount greater than $0.00.')
+      return
+    }
+    if (!cashoutAccountDetails.trim()) {
+      setCashoutError('Please enter your transfer account details or recipient phone number.')
+      return
+    }
+
+    setCashoutSubmitting(true)
+    try {
+      const res = await fetch('/api/portal/cashout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amountUsd: amt,
+          method: cashoutMethod,
+          accountDetails: cashoutAccountDetails,
+          notes: cashoutNotes,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to submit payout request')
+      setCashoutSuccess(data.message || 'Payout request submitted!')
+      setCashoutNotes('')
+      // refresh
+      openCashoutModal()
+    } catch (err: unknown) {
+      setCashoutError(err instanceof Error ? err.message : 'Error submitting payout request')
+    } finally {
+      setCashoutSubmitting(false)
+    }
+  }
+
+  function handleDownloadTemplate() {
+    const csvContent =
+      '\uFEFF' +
+      'Recipient Name,Recipient Phone,City or Town,Full Address,COD Amount USD,Service Type,Fragile (1 or 0),Weight KG,Notes\n' +
+      'Maya Haddad,70123456,Achrafieh,"Sassine Square, Bldg 12, 3rd Floor",35,delivery,0,1,"Ring bell twice"\n' +
+      'Karim Zein,03987654,Zahle,"Main Highway near Hospital",50,replacement,1,2,"Exchange size M for L - collect old item"\n' +
+      'Sami Khoury,76554433,Tripoli,"Mina Port street, Bldg 4",0,pickup,0,1.5,"Return pickup from customer"'
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.setAttribute('download', 'cedar_orders_import_template.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -337,6 +469,9 @@ export function PortalClient({
           recipientAddress,
           areaId,
           collectionUsd: codUSD,
+          serviceType,
+          weightKg: Number(weightKg) || 1.0,
+          isBreakable,
           notes,
           code: customCode || null,
         }),
@@ -359,6 +494,10 @@ export function PortalClient({
       setRawAmount('')
       setNotes('')
       setCustomCode('')
+      setServiceType('delivery')
+      setWeightKg('1')
+      setIsBreakable(false)
+      setPhoneMatchedCustomer(null)
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : 'Error placing order')
     } finally {
@@ -442,6 +581,24 @@ export function PortalClient({
 
           <button
             type="button"
+            onClick={handleDownloadTemplate}
+            className="btn btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '11px 16px',
+              fontSize: 13,
+              fontWeight: 700,
+              borderRadius: 8,
+            }}
+            title="Download CSV / Excel template for batch importing orders"
+          >
+            <span>📥 Download Template</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               setFormError('')
               setIsModalOpen(true)
@@ -466,16 +623,38 @@ export function PortalClient({
 
       {/* Portfolio Financial & Operational Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-        <div style={{ background: 'var(--surface)', border: '1.5px solid var(--line)', borderRadius: 12, padding: '16px 18px' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-            Store Balance Owed
-          </span>
-          <div style={{ fontSize: 22, fontWeight: 900, color: Number(shop.balance_usd) >= 0 ? '#047857' : '#dc2626', marginTop: 4 }}>
-            {formatUSD(Number(shop.balance_usd) || 0)}
+        <div style={{ background: 'var(--surface)', border: '1.5px solid var(--line)', borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+              Store Balance Owed
+            </span>
+            <div style={{ fontSize: 22, fontWeight: 900, color: Number(shop.balance_usd) >= 0 ? '#047857' : '#dc2626', marginTop: 4 }}>
+              {formatUSD(Number(shop.balance_usd) || 0)}
+            </div>
+            <small style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
+              {formatLBP(usdToLbp(Number(shop.balance_usd) || 0, rate))}
+            </small>
           </div>
-          <small style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
-            {formatLBP(usdToLbp(Number(shop.balance_usd) || 0, rate))}
-          </small>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={openCashoutModal}
+            style={{
+              marginTop: 10,
+              fontSize: 11.5,
+              fontWeight: 700,
+              padding: '6px 10px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 5,
+              background: 'rgba(4, 120, 87, 0.08)',
+              borderColor: '#047857',
+              color: '#047857',
+            }}
+          >
+            <span>💸 Request Payout / Cash-Out</span>
+          </button>
         </div>
 
         <div style={{ background: 'var(--surface)', border: '1.5px solid var(--line)', borderRadius: 12, padding: '16px 18px' }}>
@@ -711,6 +890,21 @@ export function PortalClient({
                         >
                           #{order.code}
                         </button>
+                        {order.service_type === 'replacement' && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(217,119,6,0.15)', color: '#b45309', border: '1px solid rgba(217,119,6,0.3)', marginLeft: 6 }}>
+                            🔄 Swap
+                          </span>
+                        )}
+                        {order.service_type === 'pickup' && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', marginLeft: 6 }}>
+                            📦 Pickup
+                          </span>
+                        )}
+                        {order.is_breakable && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(220,38,38,0.12)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.25)', marginLeft: 4 }}>
+                            ⚠️ Fragile
+                          </span>
+                        )}
                         {order.shopify_order_number && (
                           <div style={{ marginTop: 2 }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, color: '#3f6212', background: '#ecfccb', padding: '1px 6px', borderRadius: 4, border: '1px solid #bef264' }}>
@@ -927,6 +1121,137 @@ export function PortalClient({
             <small style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 4 }}>
               Accepts Alfa & Touch mobile numbers (03, 70, 71, 76, 78, 79, 81) or Lebanese landlines.
             </small>
+
+            {phoneMatchedCustomer && (
+              <div
+                style={{
+                  background: 'rgba(37, 99, 235, 0.08)',
+                  border: '1.5px solid rgba(37, 99, 235, 0.3)',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginTop: 6,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}>
+                    👥 Repeat Customer Detected: {phoneMatchedCustomer.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    {phoneMatchedCustomer.orders_count || 1} past orders · {phoneMatchedCustomer.address || 'Address on file'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }}
+                  onClick={() => {
+                    if (phoneMatchedCustomer.name) setRecipientName(phoneMatchedCustomer.name)
+                    if (phoneMatchedCustomer.address) setRecipientAddress(phoneMatchedCustomer.address)
+                    if (phoneMatchedCustomer.notes && !notes) setNotes(phoneMatchedCustomer.notes)
+                    setPhoneMatchedCustomer(null)
+                  }}
+                >
+                  ⚡ Auto-Fill Details
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Service Type Selector */}
+          <div style={{ background: 'var(--bg)', padding: 12, borderRadius: 8, border: '1px solid var(--line)' }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 6, display: 'block' }}>
+              Service Type / نوع الخدمة
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setServiceType('delivery')}
+                style={{
+                  padding: '8px 6px',
+                  borderRadius: 6,
+                  border: '1.5px solid',
+                  borderColor: serviceType === 'delivery' ? 'var(--brand)' : 'var(--line)',
+                  background: serviceType === 'delivery' ? 'var(--brand-light)' : 'var(--surface)',
+                  color: serviceType === 'delivery' ? 'var(--brand)' : 'var(--text)',
+                  fontWeight: serviceType === 'delivery' ? 700 : 500,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                🚚 Delivery
+              </button>
+              <button
+                type="button"
+                onClick={() => setServiceType('replacement')}
+                style={{
+                  padding: '8px 6px',
+                  borderRadius: 6,
+                  border: '1.5px solid',
+                  borderColor: serviceType === 'replacement' ? '#d97706' : 'var(--line)',
+                  background: serviceType === 'replacement' ? 'rgba(217, 119, 6, 0.15)' : 'var(--surface)',
+                  color: serviceType === 'replacement' ? '#b45309' : 'var(--text)',
+                  fontWeight: serviceType === 'replacement' ? 700 : 500,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                🔄 Replacement
+              </button>
+              <button
+                type="button"
+                onClick={() => setServiceType('pickup')}
+                style={{
+                  padding: '8px 6px',
+                  borderRadius: 6,
+                  border: '1.5px solid',
+                  borderColor: serviceType === 'pickup' ? '#7c3aed' : 'var(--line)',
+                  background: serviceType === 'pickup' ? 'rgba(124, 58, 237, 0.15)' : 'var(--surface)',
+                  color: serviceType === 'pickup' ? '#7c3aed' : 'var(--text)',
+                  fontWeight: serviceType === 'pickup' ? 700 : 500,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                📦 Return Pickup
+              </button>
+            </div>
+          </div>
+
+          {/* Weight & Fragile Flag */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                Package Weight (KG)
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min="0.1"
+                value={weightKg}
+                onChange={e => setWeightKg(e.target.value)}
+                style={{ fontSize: 13 }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={isBreakable}
+                  onChange={e => setIsBreakable(e.target.checked)}
+                  style={{ width: 18, height: 18, accentColor: '#dc2626' }}
+                />
+                <span style={{ fontSize: 12, fontWeight: 700, color: isBreakable ? '#dc2626' : 'var(--text)' }}>
+                  ⚠️ Fragile / كسر
+                </span>
+              </label>
+            </div>
           </div>
 
           {/* Recipient Full Address with GPS Detection & Verification */}
@@ -1551,6 +1876,207 @@ export function PortalClient({
                 </Link>
               </div>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─── CASHOUT / PAYOUT REQUEST MODAL ─── */}
+      {isCashoutModalOpen && (
+        <Modal
+          isOpen={isCashoutModalOpen}
+          onClose={() => setIsCashoutModalOpen(false)}
+          title="Request Payout / Cash-Out"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Available Balance Header */}
+            <div
+              style={{
+                background: 'rgba(4, 120, 87, 0.08)',
+                border: '1.5px solid #047857',
+                borderRadius: 10,
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#047857', textTransform: 'uppercase' }}>
+                  Available Cash for Payout
+                </span>
+                <div style={{ fontSize: 24, fontWeight: 900, color: '#047857', marginTop: 2 }}>
+                  {formatUSD(cashoutAvailableUsd)}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>Equivalent in L.L.</span>
+                <strong style={{ fontSize: 16, color: 'var(--text)' }}>
+                  {formatLBP(cashoutAvailableLbp)}
+                </strong>
+              </div>
+            </div>
+
+            {cashoutSuccess && (
+              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '10px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600 }}>
+                ✓ {cashoutSuccess}
+              </div>
+            )}
+
+            {cashoutError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 12.5 }}>
+                {cashoutError}
+              </div>
+            )}
+
+            <form onSubmit={handleRequestCashout} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                  Withdrawal Amount (USD) *
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    max={cashoutAvailableUsd}
+                    value={cashoutAmountUsd}
+                    onChange={e => setCashoutAmountUsd(e.target.value)}
+                    placeholder="Enter amount to withdraw"
+                    required
+                    style={{ flex: 1, fontSize: 14, fontWeight: 700 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setCashoutAmountUsd(String(cashoutAvailableUsd))}
+                    style={{ fontSize: 11, padding: '0 12px' }}
+                  >
+                    Max All
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                  Payout Transfer Method *
+                </label>
+                <select
+                  value={cashoutMethod}
+                  onChange={e => setCashoutMethod(e.target.value as any)}
+                  style={{ width: '100%', fontSize: 13 }}
+                >
+                  <option value="whish">📱 Whish Money (Instant App Transfer)</option>
+                  <option value="omt">🏢 OMT (Cash Collection Point across Lebanon)</option>
+                  <option value="cash_office">💵 Cash Pickup at Dispatch Desk / Office</option>
+                  <option value="bank_transfer">🏦 Bank Transfer (Direct Lebanese IBAN)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                  Account Details / Recipient Phone *
+                </label>
+                <input
+                  type="text"
+                  value={cashoutAccountDetails}
+                  onChange={e => setCashoutAccountDetails(e.target.value)}
+                  placeholder="e.g. Whish Phone 70-123456 or Full Name as on Lebanese ID for OMT"
+                  required
+                  style={{ fontSize: 13 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                  Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={cashoutNotes}
+                  onChange={e => setCashoutNotes(e.target.value)}
+                  placeholder="Any special remarks or branch preference"
+                  style={{ fontSize: 13 }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setIsCashoutModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={cashoutSubmitting || cashoutAvailableUsd <= 0}
+                  className="btn btn-primary"
+                >
+                  {cashoutSubmitting ? 'Submitting…' : 'Submit Cash-Out Request'}
+                </button>
+              </div>
+            </form>
+
+            {/* Payout History */}
+            {cashoutHistory.length > 0 && (
+              <div style={{ marginTop: 12, borderTop: '1.5px solid var(--line)', paddingTop: 14 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, color: 'var(--text)' }}>
+                  Recent Payout Requests
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+                  {cashoutHistory.map(req => (
+                    <div
+                      key={req.id}
+                      style={{
+                        padding: '8px 12px',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--line)',
+                        borderRadius: 6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: 12,
+                      }}
+                    >
+                      <div>
+                        <strong>{formatUSD(Number(req.amount_usd))}</strong>
+                        <span style={{ color: 'var(--muted)', marginLeft: 6 }}>via {req.method.toUpperCase()}</span>
+                        <small style={{ display: 'block', color: 'var(--muted)', fontSize: 10.5 }}>
+                          {new Date(req.created_at).toLocaleDateString()} · {req.account_details}
+                        </small>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          textTransform: 'uppercase',
+                          padding: '2px 8px',
+                          borderRadius: 99,
+                          background:
+                            req.status === 'paid'
+                              ? '#dcfce7'
+                              : req.status === 'approved'
+                              ? '#dbeafe'
+                              : req.status === 'rejected'
+                              ? '#fee2e2'
+                              : '#fef3c7',
+                          color:
+                            req.status === 'paid'
+                              ? '#15803d'
+                              : req.status === 'approved'
+                              ? '#1d4ed8'
+                              : req.status === 'rejected'
+                              ? '#b91c1c'
+                              : '#b45309',
+                        }}
+                      >
+                        {req.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}

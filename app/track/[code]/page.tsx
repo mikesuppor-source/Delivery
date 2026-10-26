@@ -37,7 +37,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
         .from('orders')
         .select(`
           id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
-          recipient_name, recipient_phone, recipient_address,
+          recipient_name, recipient_phone, recipient_address, service_type, is_breakable, weight_kg, carrier_tracking_code,
           driver_id,
           shop:shop_id(name, phone),
           area:area_id(name),
@@ -56,7 +56,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
       .from('orders')
       .select(`
         id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
-        recipient_name, recipient_phone, recipient_address,
+        recipient_name, recipient_phone, recipient_address, service_type, is_breakable, weight_kg, carrier_tracking_code,
         driver_id,
         shop:shop_id(name, phone),
         area:area_id(name),
@@ -89,6 +89,10 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     recipient_name: string | null
     recipient_phone: string | null
     recipient_address: string | null
+    service_type?: 'delivery' | 'replacement' | 'pickup' | null
+    is_breakable?: boolean | null
+    weight_kg?: number | null
+    carrier_tracking_code?: string | null
     driver_id: string | null
     shop: { name: string; phone?: string | null } | null
     area: { name: string } | null
@@ -210,7 +214,34 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
         <div className="track-topbar">
           <div>
             <span className="track-code-label">Tracking Number</span>
-            <h1 className="track-code-value">{order.code}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <h1 className="track-code-value">{order.code}</h1>
+              {order.service_type === 'replacement' && (
+                <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                  🔄 Exchange / Replacement
+                </span>
+              )}
+              {order.service_type === 'pickup' && (
+                <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: '#ede9fe', color: '#6b21a8', border: '1px solid #ddd6fe' }}>
+                  📦 Return Pickup
+                </span>
+              )}
+              {order.is_breakable && (
+                <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' }}>
+                  ⚠️ Fragile
+                </span>
+              )}
+            </div>
+            {order.service_type === 'replacement' && (
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#b45309', fontWeight: 600 }}>
+                💡 Note: This is an exchange order. Please have the item you are returning ready for the courier.
+              </p>
+            )}
+            {order.service_type === 'pickup' && (
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#7e22ce', fontWeight: 600 }}>
+                💡 Note: This is a reverse pickup order. The driver will arrive to collect the package from your address.
+              </p>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Link

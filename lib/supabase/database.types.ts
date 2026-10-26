@@ -14,6 +14,125 @@ export type Database = {
   }
   public: {
     Tables: {
+      customers: {
+        Row: {
+          id: string
+          workspace_id: string
+          phone: string
+          name: string
+          governorate: string | null
+          caza: string | null
+          town: string | null
+          address: string | null
+          notes: string | null
+          orders_count: number
+          last_order_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          phone: string
+          name: string
+          governorate?: string | null
+          caza?: string | null
+          town?: string | null
+          address?: string | null
+          notes?: string | null
+          orders_count?: number
+          last_order_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          phone?: string
+          name?: string
+          governorate?: string | null
+          caza?: string | null
+          town?: string | null
+          address?: string | null
+          notes?: string | null
+          orders_count?: number
+          last_order_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      cashout_requests: {
+        Row: {
+          id: string
+          workspace_id: string
+          shop_id: string
+          amount_usd: number
+          amount_lbp: number
+          method: string
+          account_details: string
+          notes: string | null
+          status: Database["public"]["Enums"]["cashout_status"]
+          processed_by: string | null
+          processed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          shop_id: string
+          amount_usd?: number
+          amount_lbp?: number
+          method?: string
+          account_details: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["cashout_status"]
+          processed_by?: string | null
+          processed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          shop_id?: string
+          amount_usd?: number
+          amount_lbp?: number
+          method?: string
+          account_details?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["cashout_status"]
+          processed_by?: string | null
+          processed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashout_requests_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashout_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       shop_integrations: {
         Row: {
           shop_id: string
@@ -97,6 +216,15 @@ export type Database = {
           entity_type: string | null
           id: string
           workspace_id: string
+          service_type: Database["public"]["Enums"]["order_service_type"]
+          weight_kg: number
+          is_breakable: boolean
+          payment_method: string
+          carrier_name: string | null
+          carrier_tracking_code: string | null
+          destination_governorate: string | null
+          destination_caza: string | null
+          destination_town: string | null
         }
         Insert: {
           action: string
@@ -298,6 +426,15 @@ export type Database = {
           updated_at: string
           usd_to_lbp_rate: number
           workspace_id: string
+          service_type?: Database["public"]["Enums"]["order_service_type"]
+          weight_kg?: number
+          is_breakable?: boolean
+          payment_method?: string
+          carrier_name?: string | null
+          carrier_tracking_code?: string | null
+          destination_governorate?: string | null
+          destination_caza?: string | null
+          destination_town?: string | null
         }
         Insert: {
           tracking_token?: string
@@ -330,6 +467,15 @@ export type Database = {
           updated_at?: string
           usd_to_lbp_rate: number
           workspace_id: string
+          service_type?: Database["public"]["Enums"]["order_service_type"]
+          weight_kg?: number
+          is_breakable?: boolean
+          payment_method?: string
+          carrier_name?: string | null
+          carrier_tracking_code?: string | null
+          destination_governorate?: string | null
+          destination_caza?: string | null
+          destination_town?: string | null
         }
         Update: {
           tracking_token?: string
@@ -362,6 +508,15 @@ export type Database = {
           updated_at?: string
           usd_to_lbp_rate?: number
           workspace_id?: string
+          service_type?: Database["public"]["Enums"]["order_service_type"]
+          weight_kg?: number
+          is_breakable?: boolean
+          payment_method?: string
+          carrier_name?: string | null
+          carrier_tracking_code?: string | null
+          destination_governorate?: string | null
+          destination_caza?: string | null
+          destination_town?: string | null
         }
         Relationships: [
           {
@@ -603,6 +758,8 @@ export type Database = {
       }
     }
     Enums: {
+      cashout_status: "pending" | "approved" | "rejected" | "paid"
+      order_service_type: "delivery" | "replacement" | "pickup"
       order_status:
         | "pending"
         | "assigned"
