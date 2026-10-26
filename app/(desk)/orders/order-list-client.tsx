@@ -184,9 +184,10 @@ export function OrderListClient({
   const [shopId, setShopId] = useState(shops[0]?.id || '')
   const [driverId, setDriverId] = useState('')
   const [areaId, setAreaId] = useState(areas[0]?.id || '')
-  const [collectionUsd, setCollectionUsd] = useState('25')
+  const [netItemUsd, setNetItemUsd] = useState('25')
   const [deliveryFeeUsd, setDeliveryFeeUsd] = useState(String(areas[0]?.fee_usd || '3'))
   const [driverPayUsd, setDriverPayUsd] = useState('2')
+  const [pricingMode, setPricingMode] = useState<'added' | 'free_delivery'>('added')
   const [recipientName, setRecipientName] = useState('')
   const [recipientPhone, setRecipientPhone] = useState('')
   const [recipientAddress, setRecipientAddress] = useState('')
@@ -455,6 +456,15 @@ export function OrderListClient({
     }
   }
 
+  // Modal Financial Computations
+  const modalNetItemNum = Number(netItemUsd) || 0
+  const modalFeeUsdNum = Number(deliveryFeeUsd) || 0
+  const modalDriverPayNum = Number(driverPayUsd) || 0
+  const modalCodUsd = pricingMode === 'added' ? modalNetItemNum + modalFeeUsdNum : modalNetItemNum
+  const modalCodLbpApprox = modalCodUsd * rate
+  const modalShopNetUsd = modalCodUsd - modalFeeUsdNum
+  const modalCompanyMarginUsd = modalFeeUsdNum - modalDriverPayNum
+
   async function handleCreateOrder(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
@@ -470,9 +480,9 @@ export function OrderListClient({
           shopId: shopId || null,
           driverId: driverId || null,
           areaId: areaId || null,
-          collectionUsd: Number(collectionUsd),
-          deliveryFeeUsd: Number(deliveryFeeUsd),
-          driverPayUsd: Number(driverPayUsd),
+          collectionUsd: modalCodUsd,
+          deliveryFeeUsd: modalFeeUsdNum,
+          driverPayUsd: modalDriverPayNum,
           recipientName,
           recipientPhone,
           recipientAddress,
@@ -510,6 +520,8 @@ export function OrderListClient({
       setCarrierTrackingCode('')
       setDestinationTown('')
       setPhoneMatchedCustomer(null)
+      setNetItemUsd('25')
+      setPricingMode('added')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error creating order')
     } finally {
@@ -2074,9 +2086,10 @@ export function OrderListClient({
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={() => {
-                  setCollectionUsd('0')
+                  setNetItemUsd('0')
                   setDeliveryFeeUsd('2')
                   setDriverPayUsd('1')
+                  setPricingMode('added')
                   setNotes('Retail return pickup ($2 fee)')
                 }}
                 style={{ fontSize: 11, padding: '4px 10px', borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 600 }}
@@ -2175,27 +2188,79 @@ export function OrderListClient({
               </select>
             </div>
 
+            {/* Pricing Mode Selector */}
+            <div style={{ gridColumn: '1 / -1', background: 'var(--bg)', padding: 10, borderRadius: 8, border: '1px solid var(--line)' }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 6 }}>
+                Delivery Fee Allocation / احتساب كلفة التوصيل
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setPricingMode('added')}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1.5px solid',
+                    borderColor: pricingMode === 'added' ? '#2563eb' : 'var(--line)',
+                    background: pricingMode === 'added' ? 'rgba(37, 99, 235, 0.08)' : 'var(--surface)',
+                    color: pricingMode === 'added' ? '#1d4ed8' : 'var(--text)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  🚚 Fee Added to Customer (كلفة التوصيل على الزبون)
+                  <div style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--muted)', marginTop: 2 }}>
+                    Customer pays Net (${modalNetItemNum}) + Fee (${modalFeeUsdNum}) = <strong>${modalCodUsd} COD</strong>. Shop gets full <strong>${modalNetItemNum}</strong>.
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPricingMode('free_delivery')}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1.5px solid',
+                    borderColor: pricingMode === 'free_delivery' ? '#059669' : 'var(--line)',
+                    background: pricingMode === 'free_delivery' ? 'rgba(5, 150, 105, 0.08)' : 'var(--surface)',
+                    color: pricingMode === 'free_delivery' ? '#047857' : 'var(--text)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  🎁 Free Delivery / Shop Pays (توصيل مجاني - على المتجر)
+                  <div style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--muted)', marginTop: 2 }}>
+                    Customer pays only goods (${modalNetItemNum}). Fee deducted from shop payout (Shop gets <strong>${modalShopNetUsd}</strong>).
+                  </div>
+                </button>
+              </div>
+            </div>
+
             <div className="field">
               <label style={{ fontWeight: 700, color: '#0f172a' }}>
-                💵 Total COD to Collect at Doorstep (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                📦 Net Item Price / سعر البضاعة (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input
                 type="number"
                 step="0.5"
                 min="0"
-                value={collectionUsd}
-                onChange={e => setCollectionUsd(e.target.value)}
+                value={netItemUsd}
+                onChange={e => setNetItemUsd(e.target.value)}
                 required
                 style={{ fontWeight: 700 }}
               />
               <span style={{ fontSize: 11, color: '#0284c7', marginTop: 4 }}>
-                ≈ L.L. {(Number(collectionUsd) * rate).toLocaleString()} (@{rate.toLocaleString()})
+                Shop payout: {formatUSD(modalNetItemNum)}
               </span>
             </div>
 
             <div className="field">
               <label style={{ fontWeight: 700, color: '#0f172a' }}>
-                🚚 Delivery Fee Charged to Shop (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                🚚 Delivery Fee / كلفة التوصيل (USD) <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input
                 type="number"
@@ -2207,8 +2272,20 @@ export function OrderListClient({
                 style={{ fontWeight: 700 }}
               />
               <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                Fee deducted from merchant payout
+                Zone tariff: ${deliveryFeeUsd}
               </span>
+            </div>
+
+            <div className="field">
+              <label style={{ fontWeight: 700, color: '#166534' }}>
+                💵 Total COD to Collect (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <div style={{ padding: '8px 12px', background: '#ecfdf5', border: '1.5px solid #86efac', borderRadius: 6 }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#166534' }}>{formatUSD(modalCodUsd)}</span>
+                <span style={{ fontSize: 11, color: '#0284c7', marginLeft: 8 }}>
+                  ≈ L.L. {modalCodLbpApprox.toLocaleString()}
+                </span>
+              </div>
             </div>
 
             <div className="field">
@@ -2246,16 +2323,18 @@ export function OrderListClient({
               }}
             >
               <div>
-                <span style={{ color: '#94a3b8' }}>Collected:</span> <strong>{formatUSD(Number(collectionUsd) || 0)}</strong>
+                <span style={{ color: '#94a3b8' }}>Net Goods:</span> <strong>{formatUSD(modalNetItemNum)}</strong>
                 <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                <span style={{ color: '#94a3b8' }}>Fee:</span> <strong style={{ color: '#f87171' }}>-{formatUSD(Number(deliveryFeeUsd) || 0)}</strong>
+                <span style={{ color: '#94a3b8' }}>Fee ({pricingMode === 'added' ? 'Customer' : 'Shop'}):</span> <strong style={{ color: pricingMode === 'added' ? '#38bdf8' : '#f87171' }}>{pricingMode === 'added' ? `+${formatUSD(modalFeeUsdNum)}` : `-${formatUSD(modalFeeUsdNum)}`}</strong>
+                <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
+                <span style={{ color: '#4ade80' }}>Total COD:</span> <strong style={{ color: '#4ade80' }}>{formatUSD(modalCodUsd)}</strong>
               </div>
               <div>
-                <span style={{ color: '#38bdf8' }}>🏪 Shop Net:</span> <strong style={{ color: '#4ade80' }}>{formatUSD((Number(collectionUsd) || 0) - (Number(deliveryFeeUsd) || 0))}</strong>
+                <span style={{ color: '#38bdf8' }}>🏪 Shop Net:</span> <strong style={{ color: '#4ade80' }}>{formatUSD(modalShopNetUsd)}</strong>
                 <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                <span style={{ color: '#94a3b8' }}>🚴 Courier:</span> <strong style={{ color: '#facc15' }}>{formatUSD(Number(driverPayUsd) || 0)}</strong>
+                <span style={{ color: '#94a3b8' }}>🚴 Courier:</span> <strong style={{ color: '#facc15' }}>{formatUSD(modalDriverPayNum)}</strong>
                 <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                <span style={{ color: '#94a3b8' }}>📈 Margin:</span> <strong style={{ color: '#60a5fa' }}>{formatUSD((Number(deliveryFeeUsd) || 0) - (Number(driverPayUsd) || 0))}</strong>
+                <span style={{ color: '#94a3b8' }}>📈 Margin:</span> <strong style={{ color: '#60a5fa' }}>{formatUSD(modalCompanyMarginUsd)}</strong>
               </div>
             </div>
 

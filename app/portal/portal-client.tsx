@@ -87,6 +87,7 @@ export function PortalClient({
   const [areaId, setAreaId] = useState(areas[0]?.id || '')
   const [currencyMode, setCurrencyMode] = useState<'USD' | 'LBP'>('USD')
   const [rawAmount, setRawAmount] = useState('')
+  const [feePayerMode, setFeePayerMode] = useState<'customer' | 'shop'>('customer')
   const [notes, setNotes] = useState('')
   const [customCode, setCustomCode] = useState('')
   const [serviceType, setServiceType] = useState<'delivery' | 'replacement' | 'pickup'>('delivery')
@@ -308,11 +309,15 @@ export function PortalClient({
   const deliveryFeeUSD = selectedArea ? Number(selectedArea.fee_usd) : 3.00
   const deliveryFeeLBP = usdToLbp(deliveryFeeUSD, rate)
 
-  // Computed COD and Payout
+  // Computed Net Merchandise, COD, and Payout
   const numericAmount = Math.max(0, parseFloat(rawAmount) || 0)
-  const codUSD = currencyMode === 'USD' ? numericAmount : (numericAmount / rate)
-  const codLBP = currencyMode === 'LBP' ? Math.round(numericAmount) : usdToLbp(codUSD, rate)
-  const netPayoutUSD = Math.max(-deliveryFeeUSD, codUSD - deliveryFeeUSD)
+  const netGoodsUSD = currencyMode === 'USD' ? numericAmount : (numericAmount / rate)
+  const netGoodsLBP = currencyMode === 'LBP' ? Math.round(numericAmount) : usdToLbp(netGoodsUSD, rate)
+  // When 'customer' (standard): Delivery fee is added to net goods value for COD
+  // When 'shop' (free delivery promo): Customer pays only net goods, fee is deducted from shop
+  const codUSD = feePayerMode === 'customer' ? netGoodsUSD + deliveryFeeUSD : netGoodsUSD
+  const codLBP = usdToLbp(codUSD, rate)
+  const netPayoutUSD = feePayerMode === 'customer' ? netGoodsUSD : Math.max(-deliveryFeeUSD, netGoodsUSD - deliveryFeeUSD)
   const netPayoutLBP = usdToLbp(netPayoutUSD, rate)
 
   // Lebanese phone validation
@@ -500,6 +505,7 @@ export function PortalClient({
       setRecipientPhone('')
       setRecipientAddress('')
       setRawAmount('')
+      setFeePayerMode('customer')
       setNotes('')
       setCustomCode('')
       setServiceType('delivery')
@@ -1294,11 +1300,63 @@ export function PortalClient({
             </select>
           </div>
 
-          {/* COD Cash Amount to Collect */}
+          {/* Fee Allocation Mode */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
+              Delivery Fee Option / خيار كلفة التوصيل
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setFeePayerMode('customer')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  border: '1.5px solid',
+                  borderColor: feePayerMode === 'customer' ? 'var(--brand)' : 'var(--line)',
+                  background: feePayerMode === 'customer' ? 'var(--brand-light)' : 'var(--surface)',
+                  color: feePayerMode === 'customer' ? 'var(--brand)' : 'var(--text)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                🚚 Added to Customer
+                <small style={{ display: 'block', fontSize: 10.5, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>
+                  Fee added on top. You get full goods price.
+                </small>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFeePayerMode('shop')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  border: '1.5px solid',
+                  borderColor: feePayerMode === 'shop' ? '#059669' : 'var(--line)',
+                  background: feePayerMode === 'shop' ? 'rgba(5, 150, 105, 0.08)' : 'var(--surface)',
+                  color: feePayerMode === 'shop' ? '#047857' : 'var(--text)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                🎁 Free Delivery (Shop Pays)
+                <small style={{ display: 'block', fontSize: 10.5, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>
+                  You absorb the shipping fee as a promo.
+                </small>
+              </button>
+            </div>
+          </div>
+
+          {/* Net Goods Price */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <label htmlFor="modal-rec-cod" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
-                Cash to Collect from Customer (COD)
+                Net Merchandise Price / سعر البضاعة المطلوب تحصيله
               </label>
               <div style={{ display: 'flex', gap: 4 }}>
                 <button
@@ -1344,21 +1402,33 @@ export function PortalClient({
             }}
           >
             <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: 'var(--brand)' }}>
-              Upfront Price & Payout Breakdown
+              Upfront Price & Settlement Breakdown
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--muted)' }}>Customer Pays on Delivery:</span>
-              <strong>{formatUSD(codUSD)} <small style={{ fontWeight: 400 }}>({formatLBP(codLBP)})</small></strong>
+              <span style={{ color: 'var(--muted)' }}>📦 Net Goods Price (سعر البضاعة):</span>
+              <strong>{formatUSD(netGoodsUSD)} <small style={{ fontWeight: 400 }}>({formatLBP(netGoodsLBP)})</small></strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--muted)' }}>Cedar Delivery Fee:</span>
-              <span style={{ color: '#dc2626', fontWeight: 600 }}>-{formatUSD(deliveryFeeUSD)} <small style={{ fontWeight: 400 }}>({formatLBP(deliveryFeeLBP)})</small></span>
+              <span style={{ color: 'var(--muted)' }}>
+                {feePayerMode === 'customer' ? '🚚 Delivery Fee (Paid by Customer):' : '🚚 Delivery Fee (Paid by Shop):'}
+              </span>
+              <span style={{ color: feePayerMode === 'customer' ? '#2563eb' : '#dc2626', fontWeight: 600 }}>
+                {feePayerMode === 'customer' ? `+${formatUSD(deliveryFeeUSD)}` : `-${formatUSD(deliveryFeeUSD)}`}
+                <small style={{ fontWeight: 400, marginLeft: 4 }}>({formatLBP(deliveryFeeLBP)})</small>
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.6)', padding: '6px 10px', borderRadius: 6 }}>
+              <span style={{ color: '#166534', fontWeight: 700 }}>💵 Total to Collect from Customer at Door:</span>
+              <strong style={{ color: '#166534', fontSize: 14 }}>
+                {formatUSD(codUSD)} <small style={{ fontWeight: 600 }}>({formatLBP(codLBP)})</small>
+              </strong>
             </div>
 
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, color: 'var(--text)' }}>Net Money You Will Receive:</span>
+              <span style={{ fontWeight: 700, color: 'var(--text)' }}>🏪 Net Money You Will Receive:</span>
               <strong style={{ fontSize: 15, color: '#047857' }}>
                 {formatUSD(netPayoutUSD)}
                 <small style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--muted)', textAlign: 'right' }}>
