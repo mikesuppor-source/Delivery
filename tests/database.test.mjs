@@ -93,5 +93,17 @@ test('migrations, isolation, atomic accounting, and idempotency',async t=>{
   const actual=await balance()
   assert.equal(Number(row.cash),actual.cash_held_usd);assert.equal(Number(row.lbp),actual.cash_held_lbp);assert.equal(Number(row.pay),actual.pay_owed_usd)
  })
+ await t.test('fee added on top of net item value delivers exact net payout to merchant',async()=>{
+  const feeAddedOrder = id(99)
+  const netItemVal = 25.00
+  const deliveryFee = 3.00
+  const driverPay = 2.00
+  const totalCod = netItemVal + deliveryFee // 28.00
+  await db.query("insert into orders(id,workspace_id,shop_id,driver_id,usd_to_lbp_rate,collection_usd,delivery_fee_usd,driver_pay_usd) values($1,$2,$3,$4,89500,$5,$6,$7)",[feeAddedOrder,a,shop,drv,totalCod,deliveryFee,driverPay])
+  const row = (await db.query('select collection_usd, delivery_fee_usd, shop_balance_usd from orders where id=$1',[feeAddedOrder])).rows[0]
+  assert.equal(Number(row.collection_usd), 28.00)
+  assert.equal(Number(row.delivery_fee_usd), 3.00)
+  assert.equal(Number(row.shop_balance_usd), 25.00) // Exact Net Item Value!
+ })
  }finally{await db.close()}
 })
