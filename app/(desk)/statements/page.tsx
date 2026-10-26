@@ -26,7 +26,7 @@ export default async function StatementsPage() {
   if (!workspace) return null
   await requireRole(workspace.id, 'manager')
 
-  const [ordersRes, shopsRes, driversRes] = await Promise.all([
+  const [ordersRes, shopsRes, driversRes, ledgerRes] = await Promise.all([
     allRows(
       supabase
         .from('orders')
@@ -53,6 +53,23 @@ export default async function StatementsPage() {
         .eq('workspace_id', workspace.id)
         .order('name')
     ),
+    supabase
+      .from('money_ledger' as any)
+      .select(`
+        id,
+        shop_delta,
+        cash_delta,
+        lbp_delta,
+        pay_delta,
+        reason,
+        created_at,
+        shop:shop_id(name),
+        driver:driver_id(name),
+        order:order_id(code)
+      `)
+      .eq('workspace_id', workspace.id)
+      .order('created_at', { ascending: false })
+      .limit(60),
   ])
 
   return (
@@ -61,6 +78,7 @@ export default async function StatementsPage() {
         orders={(ordersRes.data as any) || []}
         shops={(shopsRes.data as any) || []}
         drivers={(driversRes.data as any) || []}
+        ledger={(ledgerRes.data as any) || []}
         workspaceId={workspace.id}
         rate={Number(workspace.usd_to_lbp)}
       />

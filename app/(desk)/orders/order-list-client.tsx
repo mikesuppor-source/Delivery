@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/modal'
-import { formatUSD, formatLBP, usdToLbp, isDateInPreset, getDateRangeLabel, type DateRangePreset, ORDER_STATUS_LABELS } from '@/lib/utils'
+import { formatUSD, formatLBP, usdToLbp, formatDate, isDateInPreset, getDateRangeLabel, type DateRangePreset, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { UserRole, OrderStatus } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl, buildCustomerOrderMessage, buildDriverDispatchMessage } from '@/lib/whatsapp'
@@ -76,6 +76,43 @@ export function OrderListClient({
   rate,
 }: OrderListClientProps) {
   const [orders, setOrders] = useState<Order[]>(initialOrders)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const soundRef = useRef(soundEnabled)
+  useEffect(() => {
+    soundRef.current = soundEnabled
+  }, [soundEnabled])
+
+  function playChime() {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const now = ctx.currentTime
+      const osc1 = ctx.createOscillator()
+      const gain1 = ctx.createGain()
+      osc1.type = 'sine'
+      osc1.frequency.setValueAtTime(587.33, now)
+      gain1.gain.setValueAtTime(0.15, now)
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3)
+      osc1.connect(gain1)
+      gain1.connect(ctx.destination)
+      osc1.start(now)
+      osc1.stop(now + 0.3)
+
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.type = 'sine'
+      osc2.frequency.setValueAtTime(880, now + 0.12)
+      gain2.gain.setValueAtTime(0.18, now + 0.12)
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
+      osc2.connect(gain2)
+      gain2.connect(ctx.destination)
+      osc2.start(now + 0.12)
+      osc2.stop(now + 0.45)
+    } catch {
+      // AudioContext unavailable or requires interaction
+    }
+  }
 
   // Real-time synchronization: listen for inserts and updates to orders
   useEffect(() => {
@@ -93,6 +130,9 @@ export function OrderListClient({
             const areaObj = areas.find(a => a.id === newRow.area_id) || null
             const enriched: Order = { ...newRow, shop: shopObj, driver: driverObj, area: areaObj }
             setOrders(prev => (prev.some(o => o.id === enriched.id) ? prev : [enriched, ...prev]))
+            if (soundRef.current) {
+              playChime()
+            }
           } else if (payload.eventType === 'UPDATE') {
             const updatedRow = payload.new as any
             const shopObj = shops.find(s => s.id === updatedRow.shop_id) || null
@@ -167,6 +207,7 @@ export function OrderListClient({
   const [editNotes, setEditNotes] = useState('')
   const [editingSubmitting, setEditingSubmitting] = useState(false)
   const [editError, setEditError] = useState('')
+  const [orderEvents, setOrderEvents] = useState<Array<{ id: string; old_status?: string | null; new_status: string; created_at: string }>>([])
 
   const canManage = userRole === 'owner' || userRole === 'manager'
 
@@ -242,8 +283,8 @@ export function OrderListClient({
   async function handleDeleteOrders(targetIds: string[], codesLabel?: string) {
     if (targetIds.length === 0) return
     const msg = targetIds.length === 1
-      ? `Are you sure you want to permanently delete order ${codesLabel || ''}? This action cannot be undone.`
-      : `Are you sure you want to permanently delete these ${targetIds.length} orders? This action cannot be undone.`
+      ? `Are you sure you want to cancel order ${codesLabel || ''}? The order balances will be voided and the audit trail preserved.`
+      : `Are you sure you want to cancel these ${targetIds.length} orders? Balances will be voided and the audit trail preserved.`
 
     if (!window.confirm(msg)) {
       return
@@ -258,19 +299,42 @@ export function OrderListClient({
       })
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to delete orders')
+        throw new Error(data.error || 'Failed to cancel orders')
       }
 
-      setOrders(prev => prev.filter(o => !targetIds.includes(o.id)))
+      setOrders(prev =>
+        prev.map(o =>
+          targetIds.includes(o.id)
+            ? {
+                ...o,
+                status: 'cancelled' as OrderStatus,
+                collection_usd: 0,
+                delivery_fee_usd: 0,
+                driver_pay_usd: 0,
+                shop_balance_usd: 0,
+              }
+            : o
+        )
+      )
       setSelectedOrderIds(prev => prev.filter(id => !targetIds.includes(id)))
       if (editingOrder && targetIds.includes(editingOrder.id)) {
-        setIsEditModalOpen(false)
-        setEditingOrder(null)
+        setEditingOrder(prev =>
+          prev
+            ? {
+                ...prev,
+                status: 'cancelled' as OrderStatus,
+                collection_usd: 0,
+                delivery_fee_usd: 0,
+                driver_pay_usd: 0,
+                shop_balance_usd: 0,
+              }
+            : null
+        )
       }
-      setBulkMessage(`Deleted ${data.count || targetIds.length} orders successfully.`)
+      setBulkMessage(`Cancelled ${data.deletedIds?.length || targetIds.length} orders successfully.`)
       setTimeout(() => setBulkMessage(''), 4000)
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Error deleting orders')
+      alert(err instanceof Error ? err.message : 'Error cancelling orders')
     } finally {
       setBulkLoading(false)
     }
@@ -521,6 +585,7 @@ export function OrderListClient({
   // Open Full Edit Order Modal
   function openEditOrderModal(order: Order) {
     setEditingOrder(order)
+    setOrderEvents([])
     setEditCode(order.code || '')
     setEditDriverId(order.driver?.id || '')
     setEditStatus(order.status)
@@ -534,6 +599,15 @@ export function OrderListClient({
     setEditNotes(order.notes || '')
     setEditError('')
     setIsEditModalOpen(true)
+
+    fetch(`/api/orders/${order.id}/events`)
+      .then(r => r.json())
+      .then(d => {
+        if (d && Array.isArray(d.events)) {
+          setOrderEvents(d.events)
+        }
+      })
+      .catch(() => {})
   }
 
   // Save Full Order Edits
@@ -594,7 +668,15 @@ export function OrderListClient({
   const filteredOrders = useMemo(() => {
     return orders
       .filter(o => {
-        if (filter !== 'all' && o.status !== filter) return false
+        if (filter !== 'all') {
+          if (filter === 'assigned') {
+            if (o.status !== 'assigned' && o.status !== 'picked_up') return false
+          } else if (filter === 'failed') {
+            if (o.status !== 'failed' && o.status !== 'returned') return false
+          } else if (o.status !== filter) {
+            return false
+          }
+        }
         if (!isDateInPreset(o.created_at, datePreset, customStart, customEnd)) return false
         return true
       })
@@ -677,6 +759,22 @@ export function OrderListClient({
             </button>
           )}
 
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setSoundEnabled(prev => {
+                const next = !prev
+                if (next) playChime()
+                return next
+              })
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+            title={soundEnabled ? 'Live Order Audio Alerts: Active (Click to mute)' : 'Live Order Audio Alerts: Muted (Click to enable)'}
+          >
+            <span>{soundEnabled ? '🔔 Sound On' : '🔕 Muted'}</span>
+          </button>
+
           {canManage && (
             <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -701,25 +799,31 @@ export function OrderListClient({
           className={`tab-btn ${filter === 'pending' ? 'active' : ''}`}
           onClick={() => setFilter('pending')}
         >
-          Pending
+          Pending ({orders.filter(o => o.status === 'pending').length})
         </button>
         <button
           className={`tab-btn ${filter === 'assigned' ? 'active' : ''}`}
           onClick={() => setFilter('assigned')}
         >
-          Assigned
+          Assigned ({orders.filter(o => o.status === 'assigned' || o.status === 'picked_up').length})
         </button>
         <button
           className={`tab-btn ${filter === 'delivered' ? 'active' : ''}`}
           onClick={() => setFilter('delivered')}
         >
-          Delivered
+          Delivered ({orders.filter(o => o.status === 'delivered').length})
         </button>
         <button
           className={`tab-btn ${filter === 'failed' ? 'active' : ''}`}
           onClick={() => setFilter('failed')}
         >
-          Failed / Returned
+          Failed / Returned ({orders.filter(o => o.status === 'failed' || o.status === 'returned').length})
+        </button>
+        <button
+          className={`tab-btn ${filter === 'cancelled' ? 'active' : ''}`}
+          onClick={() => setFilter('cancelled')}
+        >
+          Cancelled ({orders.filter(o => o.status === 'cancelled').length})
         </button>
       </div>
 
@@ -1119,6 +1223,7 @@ export function OrderListClient({
                         <option value="delivered">Delivered</option>
                         <option value="failed">Failed</option>
                         <option value="returned">Returned</option>
+                        <option value="cancelled">Cancelled</option>
                       </select>
                     </td>
 
@@ -1202,7 +1307,7 @@ export function OrderListClient({
                             className="btn btn-ghost"
                             onClick={() => handleDeleteOrders([order.id], '#' + order.code)}
                             style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
-                            title="Delete order record"
+                            title="Cancel order and void balances"
                           >
                             <TrashIcon size={13} color="#dc2626" />
                           </button>
@@ -1379,12 +1484,13 @@ export function OrderListClient({
                 alignItems: 'center',
                 gap: 5,
               }}
-              title="Permanently delete selected orders"
+              title="Cancel selected pending orders"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
+              <span>Cancel Selected</span>
               Delete ({selectedOrderIds.length})
             </button>
           </div>
@@ -1573,6 +1679,10 @@ export function OrderListClient({
                     setEditDeliveryFeeUsd('2')
                     setEditCollectionUsd('0')
                     setEditDriverPayUsd('1')
+                  } else if (newSt === 'cancelled') {
+                    setEditDeliveryFeeUsd('0')
+                    setEditCollectionUsd('0')
+                    setEditDriverPayUsd('0')
                   }
                 }}
               >
@@ -1582,6 +1692,7 @@ export function OrderListClient({
                 <option value="delivered">Delivered</option>
                 <option value="failed">Failed</option>
                 <option value="returned">Returned / Retail Refund ($2 Fee)</option>
+                <option value="cancelled">Cancelled (Void COD & Fees)</option>
               </select>
             </div>
 
@@ -1691,6 +1802,27 @@ export function OrderListClient({
                 onChange={e => setEditNotes(e.target.value)}
               />
             </div>
+
+            {orderEvents.length > 0 && (
+              <div className="field full" style={{ marginTop: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                  Order Status Audit Timeline
+                </label>
+                <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '10px 14px', border: '1px solid var(--line)' }}>
+                  {orderEvents.map((evt, idx) => (
+                    <div key={evt.id || idx} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '4px 0', borderBottom: idx < orderEvents.length - 1 ? '1px dashed var(--line)' : 'none' }}>
+                      <span style={{ color: 'var(--brand)', fontWeight: 700 }}>•</span>
+                      <span style={{ color: 'var(--text)' }}>
+                        {evt.old_status ? `${evt.old_status} ➔ ${evt.new_status}` : `Order created as ${evt.new_status}`}
+                      </span>
+                      <small style={{ color: 'var(--muted)', marginLeft: 'auto' }}>
+                        {formatDate(evt.created_at)}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {editError && <p className="error-msg" style={{ marginTop: 12 }}>{editError}</p>}
@@ -1714,7 +1846,7 @@ export function OrderListClient({
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
-                Delete Order Record
+                Cancel Order
               </button>
             )}
             <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>

@@ -34,10 +34,24 @@ interface Driver {
   pay_owed_usd: number
 }
 
+export interface LedgerEntry {
+  id: string
+  shop_delta: number
+  cash_delta: number
+  lbp_delta: number
+  pay_delta: number
+  reason: string
+  created_at: string
+  shop?: { name: string } | null
+  driver?: { name: string } | null
+  order?: { code: string } | null
+}
+
 interface StatementClientProps {
   orders: Order[]
   shops: Shop[]
   drivers: Driver[]
+  ledger?: LedgerEntry[]
   workspaceId: string
   rate: number
 }
@@ -46,6 +60,7 @@ export function StatementClient({
   orders: initialOrders,
   shops: initialShops,
   drivers: initialDrivers,
+  ledger = [],
   workspaceId,
   rate,
 }: StatementClientProps) {
@@ -90,6 +105,55 @@ export function StatementClient({
     setSelectedShopId(shopId)
     setAmountUsd(String(Math.abs(maxAmount)))
     setIsModalOpen(true)
+  }
+
+  function handleExportStatementsCsv() {
+    if (orders.length === 0) {
+      alert('No delivered orders to export.')
+      return
+    }
+
+    const headers = [
+      'Order Code',
+      'Created Date',
+      'Delivered Date',
+      'Shop Name',
+      'Driver Name',
+      'COD Collection ($ USD)',
+      'COD Collection (LBP)',
+      'Delivery Fee ($ USD)',
+      'Shop Net Balance ($ USD)',
+      'Driver Pay ($ USD)',
+      'Exchange Rate (LBP/$)',
+    ]
+
+    const rows = orders.map(o => {
+      const r = Number(o.usd_to_lbp_rate) || rate
+      return [
+        `"${o.code}"`,
+        `"${formatDate(o.created_at)}"`,
+        `"${o.delivered_at ? formatDate(o.delivered_at) : ''}"`,
+        `"${(o.shop?.name || '').replace(/"/g, '""')}"`,
+        `"${(o.driver?.name || '').replace(/"/g, '""')}"`,
+        `"${Number(o.collection_usd).toFixed(2)}"`,
+        `"${usdToLbp(Number(o.collection_usd), r)}"`,
+        `"${Number(o.delivery_fee_usd).toFixed(2)}"`,
+        `"${Number(o.shop_balance_usd).toFixed(2)}"`,
+        `"${Number(o.driver_pay_usd).toFixed(2)}"`,
+        `"${r}"`,
+      ]
+    })
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `cedar_delivery_statement_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   async function handleSettleSubmit(e: React.FormEvent) {
@@ -214,9 +278,20 @@ export function StatementClient({
 
       {/* Delivery statement table */}
       <div className="panel">
-        <div className="panel-title">
-          <h2>Delivered Orders Ledger</h2>
-          <small>{orders.length} delivered orders</small>
+        <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <h2>Delivered Orders Ledger</h2>
+            <small>{orders.length} delivered orders</small>
+          </div>
+          <button
+            type="button"
+            onClick={handleExportStatementsCsv}
+            className="btn btn-secondary btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+            title="Download delivered orders ledger as CSV spreadsheet"
+          >
+            <span>📥 Export Statement CSV</span>
+          </button>
         </div>
         <div className="table-wrap">
           <table>
@@ -283,6 +358,68 @@ export function StatementClient({
             <div className="empty">
               <h3>No delivered orders yet</h3>
               <p>Once orders are marked delivered, they will appear on this statement ledger.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── DOUBLE-ENTRY FINANCIAL LEDGER (AUDIT TRAIL) ─── */}
+      <div className="panel" style={{ marginTop: 24 }}>
+        <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <h2>Double-Entry Financial Ledger</h2>
+            <small>Immutable audit trail of cash, commissions, and merchant balances ({ledger.length} entries)</small>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Related Party / Code</th>
+                <th>Reason / Trigger</th>
+                <th>Shop Delta ($)</th>
+                <th>Cash Held Delta ($)</th>
+                <th>LBP Delta (L.L.)</th>
+                <th>Driver Pay Delta ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.map(entry => (
+                <tr key={entry.id}>
+                  <td>
+                    <small>{formatDate(entry.created_at)}</small>
+                  </td>
+                  <td>
+                    {entry.order && <strong>#{entry.order.code} </strong>}
+                    {entry.shop && <small>{entry.shop.name}</small>}
+                    {entry.driver && <small>{entry.driver.name}</small>}
+                    {!entry.order && !entry.shop && !entry.driver && <small>System Adjustment</small>}
+                  </td>
+                  <td>
+                    <span style={{ fontSize: 12, fontWeight: 500 }}>{entry.reason}</span>
+                  </td>
+                  <td style={{ color: Number(entry.shop_delta) !== 0 ? (Number(entry.shop_delta) > 0 ? '#10b981' : '#f59e0b') : 'var(--muted)' }}>
+                    {Number(entry.shop_delta) !== 0 ? (Number(entry.shop_delta) > 0 ? `+${formatUSD(Number(entry.shop_delta))}` : formatUSD(Number(entry.shop_delta))) : '—'}
+                  </td>
+                  <td style={{ color: Number(entry.cash_delta) !== 0 ? (Number(entry.cash_delta) > 0 ? '#10b981' : '#ef4444') : 'var(--muted)' }}>
+                    {Number(entry.cash_delta) !== 0 ? (Number(entry.cash_delta) > 0 ? `+${formatUSD(Number(entry.cash_delta))}` : formatUSD(Number(entry.cash_delta))) : '—'}
+                  </td>
+                  <td style={{ color: Number(entry.lbp_delta) !== 0 ? '#38bdf8' : 'var(--muted)' }}>
+                    {Number(entry.lbp_delta) !== 0 ? (Number(entry.lbp_delta) > 0 ? `+${Number(entry.lbp_delta).toLocaleString()}` : Number(entry.lbp_delta).toLocaleString()) : '—'}
+                  </td>
+                  <td style={{ color: Number(entry.pay_delta) !== 0 ? (Number(entry.pay_delta) > 0 ? '#6366f1' : '#9ca3af') : 'var(--muted)' }}>
+                    {Number(entry.pay_delta) !== 0 ? (Number(entry.pay_delta) > 0 ? `+${formatUSD(Number(entry.pay_delta))}` : formatUSD(Number(entry.pay_delta))) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {ledger.length === 0 && (
+            <div className="empty">
+              <h3>No ledger records yet</h3>
+              <p>Financial ledger entries are recorded automatically as deliveries and cash remittances are confirmed.</p>
             </div>
           )}
         </div>

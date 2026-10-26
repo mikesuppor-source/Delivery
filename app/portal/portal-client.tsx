@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { formatUSD, formatLBP, usdToLbp, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
+import type { OrderStatus } from '@/lib/roles'
 import { isValidLebanesePhone, formatLebanesePhone } from '@/lib/phone'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
@@ -36,7 +37,7 @@ interface PortalOrder {
   id: string
   code: string
   tracking_token?: string
-  status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'failed' | 'returned'
+  status: OrderStatus
   collection_usd: number
   delivery_fee_usd: number
   shop_balance_usd: number
@@ -125,8 +126,8 @@ export function PortalClient({
   async function handleDeleteOrders(targetIds: string[], codesLabel?: string) {
     if (targetIds.length === 0) return
     const msg = targetIds.length === 1
-      ? `Are you sure you want to permanently delete order ${codesLabel || ''}? This action cannot be undone.`
-      : `Are you sure you want to permanently delete these ${targetIds.length} orders? This action cannot be undone.`
+      ? `Are you sure you want to cancel order ${codesLabel || ''}? The order will be cancelled with balances voided.`
+      : `Are you sure you want to cancel these ${targetIds.length} pending orders?`
 
     if (!window.confirm(msg)) {
       return
@@ -141,16 +142,22 @@ export function PortalClient({
       })
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to delete orders')
+        throw new Error(data.error || 'Failed to cancel orders')
       }
 
-      setOrders(prev => prev.filter(o => !targetIds.includes(o.id)))
+      setOrders(prev =>
+        prev.map(o =>
+          targetIds.includes(o.id)
+            ? { ...o, status: 'cancelled', collection_usd: 0 }
+            : o
+        )
+      )
       setSelectedOrderIds(prev => prev.filter(id => !targetIds.includes(id)))
       if (inspectingOrder && targetIds.includes(inspectingOrder.id)) {
-        setInspectingOrder(null)
+        setInspectingOrder(prev => (prev ? { ...prev, status: 'cancelled', collection_usd: 0 } : null))
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Error deleting orders')
+      alert(err instanceof Error ? err.message : 'Error cancelling orders')
     } finally {
       setIsDeleting(false)
     }
@@ -616,10 +623,10 @@ export function PortalClient({
                 onClick={() => handleDeleteOrders(selectedOrderIds)}
                 className="btn btn-ghost btn-sm"
                 style={{ fontSize: 12, color: '#dc2626', border: '1px solid #fecaca', display: 'inline-flex', alignItems: 'center', gap: 5 }}
-                title="Permanently delete selected order records"
+                title="Cancel selected pending order records"
               >
                 <TrashIcon size={13} color="#dc2626" />
-                <span>{isDeleting ? 'Deleting…' : `Delete (${selectedOrderIds.length})`}</span>
+                <span>{isDeleting ? 'Cancelling…' : `Cancel (${selectedOrderIds.length})`}</span>
               </button>
             </div>
           </div>
@@ -853,7 +860,7 @@ export function PortalClient({
                             onClick={() => handleDeleteOrders([order.id], `#${order.code}`)}
                             className="btn btn-ghost btn-sm"
                             style={{ padding: '4px 7px', fontSize: 11, color: '#dc2626' }}
-                            title={`Delete order #${order.code}`}
+                            title={`Cancel pending order #${order.code}`}
                           >
                             <TrashIcon size={12} color="#dc2626" />
                           </button>
@@ -1516,10 +1523,10 @@ export function PortalClient({
                   onClick={() => handleDeleteOrders([inspectingOrder.id], `#${inspectingOrder.code}`)}
                   className="btn btn-ghost btn-sm"
                   style={{ color: '#dc2626', border: '1px solid #fecaca', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
-                  title="Permanently delete this order record"
+                  title="Cancel this pending order and void fees"
                 >
                   <TrashIcon size={13} color="#dc2626" />
-                  <span>{isDeleting ? 'Deleting…' : 'Delete Record'}</span>
+                  <span>{isDeleting ? 'Cancelling…' : 'Cancel Order'}</span>
                 </button>
               </div>
 

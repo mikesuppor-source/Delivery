@@ -20,7 +20,11 @@ export function verifyWebhook(raw: string, signature: string, secret: string) {
   return equalSignature(createHmac('sha256', secret).update(raw).digest('base64'), signature, 'base64')
 }
 export function siteUrl() {
-  const value = process.env.NEXT_PUBLIC_SITE_URL
+  const value =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined) ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+
   if (!value) throw new ApiError(503, 'Site URL is not configured')
   const url = new URL(value)
   if (url.protocol !== 'https:' && url.hostname !== 'localhost') throw new ApiError(503, 'Invalid site URL')

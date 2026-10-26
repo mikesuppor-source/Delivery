@@ -223,6 +223,13 @@ export function DriverRunSheetClient({
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
+    // Register PWA Service Worker for complete offline resilience
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.warn('PWA Service Worker registration error:', err)
+      })
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
@@ -1166,6 +1173,66 @@ export function DriverRunSheetClient({
                       </div>
                     )}
                   </div>
+
+                  {/* Quick WhatsApp Presets */}
+                  {order.recipient_phone && (
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                      <a
+                        href={`https://wa.me/${order.recipient_phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                          `Hello ${order.recipient_name || 'Customer'}! I am your Cedar courier with delivery #${order.code}. Could you please send me your WhatsApp location pin to reach you quickly?`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flex: 1,
+                          background: 'rgba(37, 211, 102, 0.1)',
+                          border: '1px solid rgba(37, 211, 102, 0.3)',
+                          color: '#4ade80',
+                          padding: '6px 8px',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          textAlign: 'center',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 4,
+                        }}
+                        title="Request location pin on WhatsApp"
+                      >
+                        <WhatsAppIcon size={12} color="#4ade80" />
+                        <span>📍 Ask Pin</span>
+                      </a>
+
+                      <a
+                        href={`https://wa.me/${order.recipient_phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                          `Hello ${order.recipient_name || 'Customer'}! I have arrived outside with your package #${order.code}. COD total: ${formatUSD(order.collection_usd)} (${formatLBP(usdToLbp(order.collection_usd, 89500))}). Please meet me outside.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flex: 1,
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                          color: '#60a5fa',
+                          padding: '6px 8px',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          textAlign: 'center',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 4,
+                        }}
+                        title="Notify customer you have arrived"
+                      >
+                        <span>🚪 I'm Outside</span>
+                      </a>
+                    </div>
+                  )}
 
                   {/* ─── COURIER DISPATCH WORKFLOW BUTTONS ─── */}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

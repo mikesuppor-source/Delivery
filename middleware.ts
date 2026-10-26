@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const isPublic = ['/login','/portal/login','/portal/signup','/shopify','/track','/api/portal/auth/signup','/api/webhooks/shopify','/api/orders/location','/api/invite/preview','/favicon.ico','/logo.png','/manifest.json'].includes(path) || path.startsWith('/track/') || path.startsWith('/invite/') || path.startsWith('/print/order/')
+  const isPublic = ['/login','/portal/login','/portal/signup','/forgot-password','/reset-password','/shopify','/track','/api/portal/auth/signup','/api/webhooks/shopify','/api/orders/location','/api/invite/preview','/favicon.ico','/logo.png','/manifest.json','/sw.js'].includes(path) || path.startsWith('/track/') || path.startsWith('/invite/') || path.startsWith('/print/order/')
 
   // Redirect unauthenticated users
   if (!user && !isPublic) {

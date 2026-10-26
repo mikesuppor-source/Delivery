@@ -1,6 +1,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
+import type { OrderStatus } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, formatDisplayAddress } from '@/lib/maps'
@@ -38,7 +39,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
           recipient_name, recipient_phone, recipient_address,
           driver_id,
-          shop:shop_id(name),
+          shop:shop_id(name, phone),
           area:area_id(name),
           driver:driver_id(id, name, phone)
         `)
@@ -57,7 +58,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
         id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
         recipient_name, recipient_phone, recipient_address,
         driver_id,
-        shop:shop_id(name),
+        shop:shop_id(name, phone),
         area:area_id(name),
         driver:driver_id(id, name, phone)
       `)
@@ -80,7 +81,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     id: string
     code: string
     tracking_token?: string
-    status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'failed' | 'returned'
+    status: OrderStatus
     collection_usd: number
     usd_to_lbp_rate: number
     created_at: string
@@ -89,7 +90,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     recipient_phone: string | null
     recipient_address: string | null
     driver_id: string | null
-    shop: { name: string } | null
+    shop: { name: string; phone?: string | null } | null
     area: { name: string } | null
     driver: { id: string; name: string; phone?: string | null } | null
   } | null
@@ -138,7 +139,9 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           <div className="track-support-bar">
             <span>Need help with your delivery?</span>
             <a
-              href="https://wa.me/96170000000?text=Hello%20Cedar%20Delivery,%20I%20need%20help%20tracking%20my%20order"
+              href={`https://wa.me/${(process.env.NEXT_PUBLIC_SUPPORT_PHONE || '96170000000').replace(/\D/g, '')}?text=${encodeURIComponent(
+                `Hello Cedar Delivery, I need assistance tracking my order ${code}.`
+              )}`}
               target="_blank"
               rel="noopener noreferrer"
               className="whatsapp-btn"
@@ -155,6 +158,10 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
   const rate = Number(order.usd_to_lbp_rate) || 89500
   const colUSD = Number(order.collection_usd) || 0
   const colLBP = usdToLbp(colUSD, rate)
+
+  const supportPhone = (order.shop?.phone || process.env.NEXT_PUBLIC_SUPPORT_PHONE || '').replace(/\D/g, '')
+  const courierPhone = order.driver?.phone ? order.driver.phone.replace(/\D/g, '') : supportPhone
+  const dispatchContactNumber = supportPhone || courierPhone || '96170000000'
 
   // Status mapping
   const statusSteps = [
@@ -410,7 +417,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
             {/* Share Pin Location via WhatsApp */}
             <a
-              href={`https://wa.me/${(order.driver?.phone ? order.driver.phone.replace(/\D/g, '') : '96170000000')}?text=${encodeURIComponent(
+              href={`https://wa.me/${courierPhone || dispatchContactNumber}?text=${encodeURIComponent(
                 `Hello, I am tracking my delivery for order ${order.code} (Recipient: ${order.recipient_name || 'Customer'}). My delivery address is: ${order.recipient_address || ''}. Here is my live pin location:`
               )}`}
               target="_blank"
@@ -429,17 +436,19 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
                 className="btn btn-secondary btn-sm"
                 style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
               >
-                <span>≡ƒô₧ Call Courier ({order.driver.name})</span>
+                <span>📞 Call Courier ({order.driver.name})</span>
               </a>
             ) : (
               <a
-                href="https://wa.me/96170000000?text=Hello%20Cedar%20Delivery,%20I%20need%20assistance%20with%20my%20delivery."
+                href={`https://wa.me/${dispatchContactNumber}?text=${encodeURIComponent(
+                  `Hello, I need assistance with delivery for order ${order.code}.`
+                )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-secondary btn-sm"
                 style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
               >
-                <span>≡ƒÆ¼ Contact Dispatch Office</span>
+                <span>💬 Contact Dispatch Office</span>
               </a>
             )}
           </div>
@@ -467,7 +476,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             <p>Our dispatch team is available via WhatsApp.</p>
           </div>
           <a
-            href={`https://wa.me/96170000000?text=${encodeURIComponent(
+            href={`https://wa.me/${dispatchContactNumber}?text=${encodeURIComponent(
               `Hello Cedar Delivery, I am tracking order ${order.code} and have a question regarding my delivery.`
             )}`}
             target="_blank"

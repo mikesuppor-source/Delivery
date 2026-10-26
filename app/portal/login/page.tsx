@@ -178,9 +178,14 @@ export default function PortalLoginPage() {
           </div>
 
           <div>
-            <label htmlFor="portal-password" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
-              Password
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label htmlFor="portal-password" style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block' }}>
+                Password
+              </label>
+              <Link href="/forgot-password" style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>
+                Forgot password?
+              </Link>
+            </div>
             <input
               id="portal-password"
               type="password"
