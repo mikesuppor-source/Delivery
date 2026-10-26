@@ -25,6 +25,7 @@ test('mixed tender must match the amount due',()=>{
  const order={status:'picked_up',collection_usd:100,usd_to_lbp_rate:100000}
  assert.throws(()=>orderPatch({status:'delivered',podCollectedUsd:20,podCollectedLbp:0},order,true))
  assert.equal(orderPatch({status:'delivered',podCollectedUsd:20,podCollectedLbp:8000000},order,true).pod_collected_usd,20)
+ assert.equal(orderPatch({status:'delivered',podCollectedUsd:20,podCollectedLbp:0,discrepancyReason:'customer short on change'},order,true).pod_collected_usd,20)
 })
 test('area matching rejects empty and ambiguous addresses',()=>{
  const areas=[{id:'a',name:'Beirut',fee_usd:3},{id:'b',name:'Tripoli',fee_usd:5}]

@@ -7,10 +7,11 @@ import { GoogleMapsIcon } from '@/components/google-maps-icon'
 interface CustomerGpsShareProps {
   orderId: string
   orderCode: string
+  trackingToken?: string
   currentAddress?: string | null
 }
 
-export function CustomerGpsShare({ orderId, orderCode, currentAddress }: CustomerGpsShareProps) {
+export function CustomerGpsShare({ orderId, orderCode, trackingToken, currentAddress }: CustomerGpsShareProps) {
   const [isLocating, setIsLocating] = useState(false)
   const [savedAddress, setSavedAddress] = useState<string | null>(null)
   const [extraNotes, setExtraNotes] = useState('')
@@ -38,7 +39,7 @@ export function CustomerGpsShare({ orderId, orderCode, currentAddress }: Custome
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              token: orderCode,
+              token: trackingToken || orderCode,
               lat,
               lng,
               extraNotes: extraNotes.trim() || undefined,

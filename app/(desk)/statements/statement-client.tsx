@@ -30,6 +30,7 @@ interface Driver {
   id: string
   name: string
   cash_held_usd: number
+  cash_held_lbp?: number
   pay_owed_usd: number
 }
 
@@ -59,6 +60,7 @@ export function StatementClient({
   const [selectedDriverId, setSelectedDriverId] = useState(drivers[0]?.id || '')
   const [selectedShopId, setSelectedShopId] = useState(shops[0]?.id || '')
   const [amountUsd, setAmountUsd] = useState('')
+  const [amountLbp, setAmountLbp] = useState('')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -78,6 +80,7 @@ export function StatementClient({
     setSettlementType('driver_cash_remittance')
     setSelectedDriverId(driverId)
     setAmountUsd(String(maxAmount))
+    setAmountLbp('')
     setIsModalOpen(true)
   }
 
@@ -108,7 +111,8 @@ export function StatementClient({
           workspaceId,
           type: apiType,
           direction: isShop ? direction : undefined,
-          amountUsd: Number(amountUsd),
+          amountUsd: Number(amountUsd) || 0,
+          amountLbp: Number(amountLbp) || 0,
           shopId: isShop ? selectedShopId : null,
           driverId: !isShop ? selectedDriverId : null,
           note,
@@ -119,12 +123,17 @@ export function StatementClient({
       if (!res.ok) throw new Error(data.error || 'Failed to process settlement')
       settlementRequestId.current = null
 
-      const amt = Number(amountUsd)
+      const amt = Number(amountUsd) || 0
+      const amtLbp = Number(amountLbp) || 0
       if (settlementType === 'driver_cash_remittance') {
         setDrivers(prev =>
-          prev.map(d => (d.id === selectedDriverId ? { ...d, cash_held_usd: Math.max(0, d.cash_held_usd - amt) } : d))
+          prev.map(d => (d.id === selectedDriverId ? {
+            ...d,
+            cash_held_usd: Math.max(0, d.cash_held_usd - amt),
+            cash_held_lbp: Math.max(0, (d.cash_held_lbp || 0) - amtLbp),
+          } : d))
         )
-        showToast(`Remittance of $${amt} recorded successfully!`)
+        showToast(`Remittance of $${amt}${amtLbp > 0 ? ` + ${formatLBP(amtLbp)}` : ''} recorded successfully!`)
       } else if (settlementType === 'driver_pay') {
         setDrivers(prev =>
           prev.map(d => (d.id === selectedDriverId ? { ...d, pay_owed_usd: Math.max(0, d.pay_owed_usd - amt) } : d))
@@ -144,6 +153,7 @@ export function StatementClient({
 
       setIsModalOpen(false)
       setAmountUsd('')
+      setAmountLbp('')
       setNote('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error processing settlement')
@@ -301,7 +311,7 @@ export function StatementClient({
                 <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)} required>
                   {drivers.map(d => (
                     <option key={d.id} value={d.id}>
-                      {d.name} (Holds ${d.cash_held_usd} | Owed ${d.pay_owed_usd})
+                      {d.name} (Holds ${d.cash_held_usd}{d.cash_held_lbp ? ` + ${formatLBP(d.cash_held_lbp)}` : ''} | Owed ${d.pay_owed_usd})
                     </option>
                   ))}
                 </select>
@@ -319,18 +329,45 @@ export function StatementClient({
               </div>
             )}
 
-            <div className="field full">
-              <label>Amount (USD)</label>
-              <input
-                type="number"
-                step="0.5"
-                min="0.5"
-                placeholder="0.00"
-                value={amountUsd}
-                onChange={e => setAmountUsd(e.target.value)}
-                required
-              />
-            </div>
+            {settlementType === 'driver_cash_remittance' ? (
+              <>
+                <div className="field half">
+                  <label>Amount (USD)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={amountUsd}
+                    onChange={e => setAmountUsd(e.target.value)}
+                  />
+                </div>
+                <div className="field half">
+                  <label>Amount (LBP)</label>
+                  <input
+                    type="number"
+                    step="500"
+                    min="0"
+                    placeholder="0 LBP"
+                    value={amountLbp}
+                    onChange={e => setAmountLbp(e.target.value)}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="field full">
+                <label>Amount (USD)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  placeholder="0.00"
+                  value={amountUsd}
+                  onChange={e => setAmountUsd(e.target.value)}
+                  required
+                />
+              </div>
+            )}
 
             <div className="field full">
               <label>Note / Receipt Reference (Optional)</label>

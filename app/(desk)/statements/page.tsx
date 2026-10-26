@@ -49,7 +49,7 @@ export default async function StatementsPage() {
     allRows(
       supabase
         .from('drivers')
-        .select('id, name, cash_held_usd, pay_owed_usd')
+        .select('id, name, cash_held_usd, cash_held_lbp, pay_owed_usd')
         .eq('workspace_id', workspace.id)
         .order('name')
     ),

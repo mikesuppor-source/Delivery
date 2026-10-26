@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/modal'
 import { formatUSD, formatLBP, usdToLbp, isDateInPreset, getDateRangeLabel, type DateRangePreset, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { UserRole, OrderStatus } from '@/lib/roles'
@@ -75,6 +76,50 @@ export function OrderListClient({
   rate,
 }: OrderListClientProps) {
   const [orders, setOrders] = useState<Order[]>(initialOrders)
+
+  // Real-time synchronization: listen for inserts and updates to orders
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('desk-orders-' + workspaceId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `workspace_id=eq.${workspaceId}` },
+        payload => {
+          if (payload.eventType === 'INSERT') {
+            const newRow = payload.new as any
+            const shopObj = shops.find(s => s.id === newRow.shop_id) || null
+            const driverObj = drivers.find(d => d.id === newRow.driver_id) || null
+            const areaObj = areas.find(a => a.id === newRow.area_id) || null
+            const enriched: Order = { ...newRow, shop: shopObj, driver: driverObj, area: areaObj }
+            setOrders(prev => (prev.some(o => o.id === enriched.id) ? prev : [enriched, ...prev]))
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedRow = payload.new as any
+            const shopObj = shops.find(s => s.id === updatedRow.shop_id) || null
+            const driverObj = drivers.find(d => d.id === updatedRow.driver_id) || null
+            const areaObj = areas.find(a => a.id === updatedRow.area_id) || null
+            setOrders(prev =>
+              prev.map(o =>
+                o.id === updatedRow.id
+                  ? {
+                      ...o,
+                      ...updatedRow,
+                      shop: shopObj || o.shop,
+                      driver: driverObj || o.driver,
+                      area: areaObj || o.area,
+                    }
+                  : o
+              )
+            )
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [workspaceId, shops, drivers, areas])
   const [filter, setFilter] = useState<string>('all')
   const [datePreset, setDatePreset] = useState<DateRangePreset>('all')
   const [customStart, setCustomStart] = useState('')

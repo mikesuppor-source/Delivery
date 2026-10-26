@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PrintOrderPageProps): Promise
 export default async function PrintOrderPage({ params, searchParams }: PrintOrderPageProps) {
   const { code } = await params
   const { print } = await searchParams
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data: rawOrder } = await supabase
     .from('orders')

@@ -27,6 +27,7 @@ interface Driver {
   phone: string | null
   active: boolean
   cash_held_usd: number
+  cash_held_lbp?: number
   pay_owed_usd: number
   user_id: string | null
   created_at?: string
@@ -102,6 +103,7 @@ export function DriverProfileClient({
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false)
   const [settlementType, setSettlementType] = useState<'driver_cash_remittance' | 'driver_pay'>('driver_cash_remittance')
   const [settlementAmount, setSettlementAmount] = useState('')
+  const [settlementAmountLbp, setSettlementAmountLbp] = useState('')
   const [settlementNote, setSettlementNote] = useState('')
   const [settling, setSettling] = useState(false)
   const [settleError, setSettleError] = useState('')
@@ -229,9 +231,10 @@ export function DriverProfileClient({
     setSettling(true)
     setSettleError('')
 
-    const amount = parseFloat(settlementAmount)
-    if (isNaN(amount) || amount <= 0) {
-      setSettleError('Please enter a valid amount')
+    const amount = parseFloat(settlementAmount) || 0
+    const amountLbp = parseFloat(settlementAmountLbp) || 0
+    if (amount <= 0 && amountLbp <= 0) {
+      setSettleError('Please enter a valid payment or remittance amount')
       setSettling(false)
       return
     }
@@ -246,6 +249,7 @@ export function DriverProfileClient({
           workspaceId: workspace.id,
           type: settlementType,
           amountUsd: amount,
+          amountLbp: amountLbp,
           driverId: driver.id,
           note: settlementNote || null,
         }),
@@ -260,6 +264,7 @@ export function DriverProfileClient({
         setDriver(prev => ({
           ...prev,
           cash_held_usd: Math.max(0, Number(prev.cash_held_usd) - amount),
+          cash_held_lbp: Math.max(0, Number(prev.cash_held_lbp || 0) - amountLbp),
         }))
       } else if (settlementType === 'driver_pay') {
         setDriver(prev => ({
@@ -271,6 +276,7 @@ export function DriverProfileClient({
       setSettlements(prev => [data.settlement, ...prev])
       setIsSettlementModalOpen(false)
       setSettlementAmount('')
+      setSettlementAmountLbp('')
       setSettlementNote('')
     } catch (err: unknown) {
       setSettleError(err instanceof Error ? err.message : 'Error recording settlement')
@@ -1451,6 +1457,7 @@ export function DriverProfileClient({
                 <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Current Unremitted COD</span>
                 <strong style={{ display: 'block', fontSize: 18, marginTop: 4, color: '#b45309' }}>
                   {formatUSD(Number(driver.cash_held_usd))}
+                  {driver.cash_held_lbp ? ` + ${formatLBP(Number(driver.cash_held_lbp))}` : ''}
                 </strong>
               </div>
               <div style={{ padding: 12, background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }}>
@@ -1486,24 +1493,48 @@ export function DriverProfileClient({
               </select>
             </div>
 
-            <div className="field full">
-              <label>Amount (USD)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="0.00"
-                value={settlementAmount}
-                onChange={e => setSettlementAmount(e.target.value)}
-                required
-                autoFocus
-              />
-              {settlementAmount && !isNaN(parseFloat(settlementAmount)) && (
-                <small style={{ color: 'var(--muted)', marginTop: 4, display: 'block' }}>
-                  ≈ {formatLBP(usdToLbp(parseFloat(settlementAmount), workspace.usd_to_lbp))} (at {workspace.usd_to_lbp.toLocaleString()} LBP/USD)
-                </small>
-              )}
-            </div>
+            {settlementType === 'driver_cash_remittance' ? (
+              <>
+                <div className="field full" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label>Amount (USD)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={settlementAmount}
+                      onChange={e => setSettlementAmount(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>Amount (LBP)</label>
+                    <input
+                      type="number"
+                      step="500"
+                      min="0"
+                      placeholder="0 LBP"
+                      value={settlementAmountLbp}
+                      onChange={e => setSettlementAmountLbp(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="field full">
+                <label>Amount (USD)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="0.00"
+                  value={settlementAmount}
+                  onChange={e => setSettlementAmount(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+            )}
 
             <div className="field full">
               <label>Note / Reference (Optional)</label>

@@ -57,7 +57,7 @@ export default async function OverviewPage() {
 
     allRows(supabase
       .from('drivers')
-      .select('id, name, cash_held_usd, pay_owed_usd')
+      .select('id, name, cash_held_usd, cash_held_lbp, pay_owed_usd')
       .eq('workspace_id', workspace.id)
       .eq('active', true)),
   ])
@@ -75,6 +75,7 @@ export default async function OverviewPage() {
   const profitMargin = totalDeliveries > 0 ? (netCompanyProfit / totalDeliveries) * 100 : 0
 
   const totalOutstandingCashHeld = (driversRes.data || []).reduce((s, d) => s + Number(d.cash_held_usd || 0), 0)
+  const totalOutstandingCashHeldLbp = (driversRes.data || []).reduce((s, d) => s + Number((d as any).cash_held_lbp || 0), 0)
   const totalOutstandingPayOwed = (driversRes.data || []).reduce((s, d) => s + Number(d.pay_owed_usd || 0), 0)
 
   // Top shops by volume & fees
@@ -195,7 +196,10 @@ export default async function OverviewPage() {
             <article className="accent">
               <span>Unremitted Driver Cash</span>
               <strong>{formatUSD(totalOutstandingCashHeld)}</strong>
-              <small>Pay owed: {formatUSD(totalOutstandingPayOwed)}</small>
+              <small>
+                {totalOutstandingCashHeldLbp > 0 ? `+ ${formatLBP(totalOutstandingCashHeldLbp)} · ` : ''}
+                Pay owed: {formatUSD(totalOutstandingPayOwed)}
+              </small>
             </article>
           </>
         )}

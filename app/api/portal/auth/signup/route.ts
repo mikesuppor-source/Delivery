@@ -14,7 +14,12 @@ export const POST=api(async req=>{
  const name=textField(body.shopName,'shop name',200,true)
  const phone=textField(body.phone,'phone',40)
  if(phone && !isValidLebanesePhone(phone)) throw new ApiError(400,'Invalid Lebanese phone number')
- const workspaceId=uuid(process.env.MERCHANT_WORKSPACE_ID,'configured merchant workspace')
+ let configuredWs = process.env.MERCHANT_WORKSPACE_ID
+ if (!configuredWs) {
+  const { data: firstWs } = await createServiceClient().from('workspaces').select('id').order('created_at').limit(1).maybeSingle()
+  configuredWs = firstWs?.id
+ }
+ const workspaceId=uuid(configuredWs,'configured merchant workspace')
  await rateLimit('signup:'+email,3)
  await rateLimit('signup-ip:'+(req.headers.get('x-forwarded-for')?.split(',')[0]||'unknown'),10)
  const client=await createClient()

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
@@ -23,6 +23,8 @@ export async function generateMetadata({ params }: TrackPageProps): Promise<Meta
 export default async function TrackOrderPage({ params }: TrackPageProps) {
   const { code } = await params
   const supabase = createServiceClient()
+  const authSupabase = await createClient()
+  const { data: { user } } = await authSupabase.auth.getUser()
 
   const trimmed = code.trim()
   const isHexHash = /^[a-f0-9]{64}$/i.test(trimmed)
@@ -33,7 +35,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
       const res = await supabase
         .from('orders')
         .select(`
-          id, code, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
+          id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
           recipient_name, recipient_phone, recipient_address,
           driver_id,
           shop:shop_id(name),
@@ -52,7 +54,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     const res = await supabase
       .from('orders')
       .select(`
-        id, code, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
+        id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
         recipient_name, recipient_phone, recipient_address,
         driver_id,
         shop:shop_id(name),
@@ -64,15 +66,20 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     rawOrder = res.data
   }
 
-  const { data: drivers } = await supabase
-    .from('drivers')
-    .select('id, name, phone')
-    .eq('active', true)
-    .order('name')
+  let drivers: Array<{ id: string; name: string; phone?: string | null }> = []
+  if (user) {
+    const { data } = await supabase
+      .from('drivers')
+      .select('id, name, phone')
+      .eq('active', true)
+      .order('name')
+    drivers = data || []
+  }
 
   const order = rawOrder as {
     id: string
     code: string
+    tracking_token?: string
     status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'failed' | 'returned'
     collection_usd: number
     usd_to_lbp_rate: number
@@ -374,6 +381,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           <CustomerGpsShare
             orderId={order.id}
             orderCode={order.code}
+            trackingToken={order.tracking_token}
             currentAddress={order.recipient_address}
           />
         )}
@@ -437,18 +445,20 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           </div>
         </div>
 
-        {/* Courier Dispatch & Check-In Action Hub */}
-        <CourierTrackActions
-          orderId={order.id}
-          orderCode={order.code}
-          currentStatus={order.status}
-          currentDriverName={order.driver?.name}
-          currentDriverId={order.driver_id}
-          recipientAddress={order.recipient_address}
-          recipientPhone={order.recipient_phone}
-          recipientName={order.recipient_name}
-          drivers={drivers || []}
-        />
+        {/* Courier Dispatch & Check-In Action Hub (Authenticated Staff Only) */}
+        {user && (
+          <CourierTrackActions
+            orderId={order.id}
+            orderCode={order.code}
+            currentStatus={order.status}
+            currentDriverName={order.driver?.name}
+            currentDriverId={order.driver_id}
+            recipientAddress={order.recipient_address}
+            recipientPhone={order.recipient_phone}
+            recipientName={order.recipient_name}
+            drivers={drivers || []}
+          />
+        )}
 
         {/* WhatsApp Help Button */}
         <div className="track-footer">

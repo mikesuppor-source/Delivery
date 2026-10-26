@@ -1,18 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { api, ApiError, checked, textField, money } from '@/lib/api'
+import { authenticated } from '@/lib/access'
+import { createServiceClient } from '@/lib/supabase/server'
 
 // POST /api/workspace — Create a new workspace and set the caller as Owner
-export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { name, usdToLbp, currency, displayName } = await req.json()
-
-  if (!name || !name.trim()) {
-    return NextResponse.json({ error: 'Workspace name is required' }, { status: 400 })
-  }
-
+export const POST = api(async req => {
+  const { user } = await authenticated()
+  const body = await req.json()
+  const name = textField(body.name, 'workspace name', 100, true)
   const slug = name
     .toLowerCase()
     .trim()
@@ -22,35 +17,29 @@ export async function POST(req: NextRequest) {
   const serviceClient = createServiceClient()
 
   // Create workspace
-  const { data: ws, error: wsError } = await serviceClient
+  const ws = checked(await serviceClient
     .from('workspaces')
     .insert({
-      name: name.trim(),
+      name,
       slug,
-      usd_to_lbp: Number(usdToLbp) || 89500,
-      currency: currency || 'USD',
+      usd_to_lbp: money(body.usdToLbp, 'exchange rate', 89500),
+      currency: ['USD', 'LBP'].includes(body.currency) ? body.currency : 'USD',
     })
     .select('id, name')
-    .single()
-
-  if (wsError) {
-    return NextResponse.json({ error: wsError.message }, { status: 500 })
-  }
+    .single())
 
   // Create workspace member as owner
-  const { error: memberError } = await serviceClient
+  checked(await serviceClient
     .from('workspace_members')
     .insert({
       workspace_id: ws.id,
       user_id: user.id,
       role: 'owner',
-      display_name: displayName?.trim() || user.email?.split('@')[0] || 'Owner',
+      display_name: textField(body.displayName, 'display name', 200) || user.email?.split('@')[0] || 'Owner',
       joined_at: new Date().toISOString(),
     })
-
-  if (memberError) {
-    return NextResponse.json({ error: memberError.message }, { status: 500 })
-  }
+    .select('id')
+    .single())
 
   // Create default delivery areas
   await serviceClient.from('delivery_areas').insert([
@@ -71,4 +60,4 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json({ success: true, workspace: ws })
-}
+})

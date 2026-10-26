@@ -3,6 +3,7 @@ import { api, ApiError, checked, ids, money, textField, uuid } from '@/lib/api'
 import { authenticated, workspaceAccess, validateReferences } from '@/lib/access'
 import { generateUniqueOrderCode, formatOrderCode } from '@/lib/order-codes'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
+import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 
 export const GET = api(async req => {
   const { client } = await authenticated()
@@ -10,7 +11,14 @@ export const GET = api(async req => {
   const search = textField(params.get('search'), 'search', 100)
   const page = Math.max(0, Math.floor(Number(params.get('page')) || 0))
   let query = client.from('orders').select(ORDER_SELECT, { count: 'exact' })
-  if (search) query = /^[a-f0-9]{64}$/i.test(search) ? query.eq('tracking_token', search.toLowerCase()) : query.eq('code', formatOrderCode(search))
+  if (search) {
+    if (/^[a-f0-9]{64}$/i.test(search)) {
+      query = query.eq('tracking_token', search.toLowerCase())
+    } else {
+      const codeClean = formatOrderCode(search)
+      query = query.or(`code.ilike.%${codeClean || search}%,recipient_name.ilike.%${search}%,recipient_phone.ilike.%${search}%,recipient_address.ilike.%${search}%`)
+    }
+  }
   const result = await query.order('created_at',{ascending:false}).order('id').range(page*100,page*100+99)
   const orders=checked(result)
   return NextResponse.json({ orders, count:result.count, page })
@@ -57,6 +65,9 @@ export const PATCH = api(async req => {
   }
   const updated = checked(updateResult)
   if(!updated) throw new ApiError(404,'Order not found or update could not be completed')
+  if(updated.status === 'delivered') {
+    fulfillShopifyOrder(db, order.id).catch(e => console.error('Shopify fulfillment sync failed:', e))
+  }
   return NextResponse.json({success:true,order:updated})
 })
 export const DELETE = api(async req => {

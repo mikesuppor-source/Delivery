@@ -6,9 +6,8 @@ export async function installShopify(shopId:string,domain:string,token:string) {
  try {
   await db.from('shop_integrations').upsert({shop_id:shopId,access_token:token,updated_at:new Date().toISOString()},{onConflict:'shop_id'})
  } catch (e) { void e }
- try {
-  await (db.from('shops') as any).update({shopify_domain:domain,shopify_access_token:token}).eq('id',shopId)
- } catch {
+ const updateWithToken = await (db.from('shops') as any).update({shopify_domain:domain,shopify_access_token:token}).eq('id',shopId)
+ if (updateWithToken.error) {
   await db.from('shops').update({shopify_domain:domain}).eq('id',shopId)
  }
  const parsed=token.startsWith('{')?JSON.parse(token).access_token:token

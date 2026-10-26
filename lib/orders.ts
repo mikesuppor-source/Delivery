@@ -31,12 +31,21 @@ export function orderPatch(body: Record<string, unknown>, order: Record<string, 
   }
   for (const [input,column] of Object.entries({podCollectedUsd:'pod_collected_usd',podCollectedLbp:'pod_collected_lbp'}))
     if (body[input] !== undefined) updates[column]=money(body[input],input)
-  // Require exact tender totals; shortage/change approval is a separate future workflow.
+  // Require exact tender totals or an explicit discrepancy reason
   if (updates.status === 'delivered' && (body.podCollectedUsd !== undefined || body.podCollectedLbp !== undefined)) {
-    const usd=Number(updates.pod_collected_usd ?? order.pod_collected_usd ?? 0)
-    const lbp=Number(updates.pod_collected_lbp ?? order.pod_collected_lbp ?? 0)
-    const expected=Number(updates.collection_usd ?? order.collection_usd)
-    if (Math.abs(usd + lbp / Number(order.usd_to_lbp_rate) - expected)>0.02) throw new ApiError(400,'Collected cash must match the amount due')
+    const usd = Number(updates.pod_collected_usd ?? order.pod_collected_usd ?? 0)
+    const lbp = Number(updates.pod_collected_lbp ?? order.pod_collected_lbp ?? 0)
+    const expected = Number(updates.collection_usd ?? order.collection_usd)
+    const rate = Number(order.usd_to_lbp_rate) || 89500
+    const diff = Math.round((usd + lbp / rate - expected) * 100) / 100
+    if (Math.abs(diff) > 0.02) {
+      if (body.discrepancyReason) {
+        const reason = textField(body.discrepancyReason, 'discrepancy reason', 200)
+        updates.notes = `[Cash Discrepancy: ${diff > 0 ? '+' : ''}${diff}$ - ${reason}] ` + (updates.notes || order.notes || '')
+      } else {
+        throw new ApiError(400, `Collected cash differs by ${Math.abs(diff).toFixed(2)}$ from expected amount. Provide a discrepancy reason or adjust tender.`)
+      }
+    }
   }
   return updates as Database['public']['Tables']['orders']['Update']
 }

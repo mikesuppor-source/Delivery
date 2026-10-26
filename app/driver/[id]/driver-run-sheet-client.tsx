@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import {
   formatUSD,
   formatLBP,
@@ -238,6 +239,32 @@ export function DriverRunSheetClient({
       }
     }
   }, [orders, driver.id])
+
+  // Realtime updates for newly assigned or modified driver orders
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('driver-orders-' + driver.id)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `driver_id=eq.${driver.id}` },
+        payload => {
+          if (payload.eventType === 'INSERT') {
+            const newOrder = payload.new as DriverRunSheetOrder
+            setOrders(prev => (prev.some(o => o.id === newOrder.id) ? prev : [newOrder, ...prev]))
+            showNotification('success', `New order #${newOrder.code} assigned to you!`)
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as DriverRunSheetOrder
+            setOrders(prev => prev.map(o => (o.id === updated.id ? { ...o, ...updated } : o)))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [driver.id])
 
   // Sync offline queue items to the server
   const syncOfflineQueue = useCallback(async () => {

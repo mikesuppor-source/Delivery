@@ -10,7 +10,7 @@ export const POST=api(async req=>{
  if(!verifyWebhook(raw,req.headers.get('x-shopify-hmac-sha256')||'',shopifyCredentials().secret))throw new ApiError(401,'Invalid webhook signature')
  const domain=shopDomain(req.headers.get('x-shopify-shop-domain'))
  const topic=req.headers.get('x-shopify-topic')
- if(topic!=='orders/create')throw new ApiError(400,'Unsupported webhook topic')
+ if(topic!=='orders/create')return NextResponse.json({success:true,status:'ignored',topic})
  const db=createServiceClient()
  const {data:shop}=await db.from('shops').select('id,workspace_id,prefix').eq('shopify_domain',domain).eq('active',true).maybeSingle()
  if(!shop)throw new ApiError(404,'Connected shop not found')

@@ -26,21 +26,43 @@ export default async function PrintPage() {
   const workspace = wsData as { id: string; name: string; usd_to_lbp: number } | null
   if (!workspace) return null
 
-  const { data: orders } = await allRows(supabase
-    .from('orders')
-    .select(`
-      *,
-      shop:shop_id(name), driver:driver_id(name)
-    `)
-    .eq('workspace_id', workspace.id)
-    .eq('status', 'delivered')
-    .order('created_at', { ascending: false }))
+  const [ordersRes, shopsRes, driversRes] = await Promise.all([
+    allRows(
+      supabase
+        .from('orders')
+        .select(`
+          *,
+          shop:shop_id(name), driver:driver_id(name)
+        `)
+        .eq('workspace_id', workspace.id)
+        .eq('status', 'delivered')
+        .order('created_at', { ascending: false })
+    ),
+    allRows(
+      supabase
+        .from('shops')
+        .select('id, name, balance_usd')
+        .eq('workspace_id', workspace.id)
+        .order('name')
+    ),
+    allRows(
+      supabase
+        .from('drivers')
+        .select('id, name, cash_held_usd, pay_owed_usd')
+        .eq('workspace_id', workspace.id)
+        .order('name')
+    ),
+  ])
+
+  const orders = (ordersRes.data as any[]) || []
+  const shops = (shopsRes.data as any[]) || []
+  const drivers = (driversRes.data as any[]) || []
 
   const rate = Number(workspace.usd_to_lbp)
-  const totalCollected   = orders?.reduce((s, o) => s + Number(o.collection_usd), 0) ?? 0
-  const totalDriverCash  = orders?.reduce((s, o) => s + Number(o.driver_pay_usd), 0) ?? 0
-  const totalShopBalance = orders?.reduce((s, o) => s + Number(o.shop_balance_usd), 0) ?? 0
-  const totalDriverPay   = orders?.reduce((s, o) => s + Number(o.driver_pay_usd), 0) ?? 0
+  const totalCollected   = orders.reduce((s, o) => s + Number(o.collection_usd), 0)
+  const totalDriverCash  = drivers.reduce((s, d) => s + Number(d.cash_held_usd), 0)
+  const totalShopBalance = shops.reduce((s, sh) => s + Number(sh.balance_usd), 0)
+  const totalDriverPay   = drivers.reduce((s, d) => s + Number(d.pay_owed_usd), 0)
 
   return (
     <div className="print-page">
