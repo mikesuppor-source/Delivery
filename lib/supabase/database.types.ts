@@ -752,6 +752,7 @@ export type Database = {
       accept_staff_invite: { Args: { p_token: string; p_user: string; p_email: string; p_name: string }; Returns: boolean }
       consume_limit: { Args: { p_key: string; p_max: number }; Returns: boolean }
       is_member: { Args: { ws_id: string }; Returns: boolean }
+      set_allow_owner_delete: { Args: { p_allow: boolean }; Returns: boolean }
       my_role: {
         Args: { ws_id: string }
         Returns: Database["public"]["Enums"]["user_role"]

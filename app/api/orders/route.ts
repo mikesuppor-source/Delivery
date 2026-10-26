@@ -81,39 +81,48 @@ export const PATCH = api(async req => {
 })
 export const DELETE = api(async req => {
   const body=await req.json()
-  const {db,workspaceId}=await workspaceAccess(body.workspaceId,['owner','manager'])
+  // STRICTLY REQUIRE 'owner' ROLE FOR PERMANENT RECORD DELETION!
+  const {db,workspaceId,member}=await workspaceAccess(body.workspaceId,['owner'])
+  if (member.role !== 'owner') {
+    throw new ApiError(403, 'Forbidden: Only the workspace owner can delete records.')
+  }
+
   const selected=ids(body.orderIds || [body.orderId])
-  const orders=checked(await db.from('orders').select('id,status').in('id',selected).eq('workspace_id',workspaceId))
+  const orders=checked(await db.from('orders').select('id,status,code').in('id',selected).eq('workspace_id',workspaceId))
   if (orders.length !== selected.length) throw new ApiError(404, 'One or more orders not found')
 
-  // Delivered or returned orders cannot be cancelled due to completed delivery accounting
-  const completed = orders.filter(o => o.status === 'delivered' || o.status === 'returned')
-  if (completed.length > 0) {
-    throw new ApiError(409, 'Completed or delivered orders cannot be cancelled because accounting records are finalised.')
+  const targetIds = orders.map(o => o.id)
+
+  const client = db as any
+  try {
+    // 1. Authorize deletion via database session config
+    await client.rpc('set_allow_owner_delete', { p_allow: true })
+
+    // 2. Remove associated order events
+    await client.from('order_events').delete().in('order_id', targetIds).eq('workspace_id', workspaceId)
+
+    // 3. Remove attachments if any
+    await client.from('order_attachments').delete().in('order_id', targetIds)
+
+    // 4. Unlink money ledger entries to maintain accounting balance integrity without FK constraint errors
+    await client.from('money_ledger').update({ order_id: null }).in('order_id', targetIds).eq('workspace_id', workspaceId)
+
+    // 5. Unlink settlements
+    await client.from('settlements').update({ order_id: null }).in('order_id', targetIds).eq('workspace_id', workspaceId)
+
+    // 6. Delete the actual orders from the database
+    const deleteResult = await client.from('orders').delete().in('id', targetIds).eq('workspace_id', workspaceId).select('id')
+    const deleted = checked(deleteResult)
+
+    const deletedList = Array.isArray(deleted) ? deleted : []
+
+    return NextResponse.json({
+      success: true,
+      deletedIds: deletedList.map((o: any) => o.id),
+      message: `Permanently deleted ${deletedList.length} order record(s) (Owner Action).`,
+    })
+  } finally {
+    // Always reset deletion authorization
+    await (client).rpc('set_allow_owner_delete', { p_allow: false })
   }
-
-  // Filter out orders that are already cancelled
-  const toProcess = orders.filter(o => o.status !== 'cancelled')
-  if (toProcess.length === 0) {
-    return NextResponse.json({ success: true, deletedIds: selected, message: 'Orders are already cancelled.' })
-  }
-
-  // Transition pre-delivery orders (assigned, failed, pending) cleanly through pending to void driver allocation
-  const nonPending = toProcess.filter(o => o.status !== 'pending')
-  if (nonPending.length > 0) {
-    const nonPendingIds = nonPending.map(o => o.id)
-    checked(await db.from('orders').update({ status: 'pending', driver_id: null }).in('id', nonPendingIds).eq('workspace_id', workspaceId))
-  }
-
-  // Cancel orders - database trigger automatically zeroes balances and logs audit event
-  const targetIds = toProcess.map(o => o.id)
-  const cancelled = checked(
-    await db.from('orders').update({ status: 'cancelled' }).in('id', targetIds).eq('workspace_id', workspaceId).select('id')
-  )
-
-  return NextResponse.json({
-    success: true,
-    deletedIds: cancelled.map(o => o.id),
-    message: 'Orders cancelled; balances voided and audit records retained.',
-  })
 })

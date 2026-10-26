@@ -257,6 +257,7 @@ export function OrderListClient({
   }, [recipientPhone])
 
   const canManage = userRole === 'owner' || userRole === 'manager'
+  const isOwner = userRole === 'owner'
 
   // Bulk Selection & Batch Actions
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
@@ -329,9 +330,13 @@ export function OrderListClient({
 
   async function handleDeleteOrders(targetIds: string[], codesLabel?: string) {
     if (targetIds.length === 0) return
+    if (!isOwner) {
+      alert('Only the workspace owner has permission to permanently delete order records.')
+      return
+    }
     const msg = targetIds.length === 1
-      ? `Are you sure you want to cancel order ${codesLabel || ''}? The order balances will be voided and the audit trail preserved.`
-      : `Are you sure you want to cancel these ${targetIds.length} orders? Balances will be voided and the audit trail preserved.`
+      ? `Are you sure you want to permanently delete order ${codesLabel || ''}? This action is exclusive to the workspace owner and cannot be undone.`
+      : `Are you sure you want to permanently delete these ${targetIds.length} order records? This action is exclusive to the workspace owner and cannot be undone.`
 
     if (!window.confirm(msg)) {
       return
@@ -346,42 +351,19 @@ export function OrderListClient({
       })
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to cancel orders')
+        throw new Error(data.error || 'Failed to delete orders')
       }
 
-      setOrders(prev =>
-        prev.map(o =>
-          targetIds.includes(o.id)
-            ? {
-                ...o,
-                status: 'cancelled' as OrderStatus,
-                collection_usd: 0,
-                delivery_fee_usd: 0,
-                driver_pay_usd: 0,
-                shop_balance_usd: 0,
-              }
-            : o
-        )
-      )
+      // Remove permanently deleted records from UI state
+      setOrders(prev => prev.filter(o => !targetIds.includes(o.id)))
       setSelectedOrderIds(prev => prev.filter(id => !targetIds.includes(id)))
       if (editingOrder && targetIds.includes(editingOrder.id)) {
-        setEditingOrder(prev =>
-          prev
-            ? {
-                ...prev,
-                status: 'cancelled' as OrderStatus,
-                collection_usd: 0,
-                delivery_fee_usd: 0,
-                driver_pay_usd: 0,
-                shop_balance_usd: 0,
-              }
-            : null
-        )
+        setEditingOrder(null)
       }
-      setBulkMessage(`Cancelled ${data.deletedIds?.length || targetIds.length} orders successfully.`)
+      setBulkMessage(data.message || `Deleted ${targetIds.length} order(s) permanently.`)
       setTimeout(() => setBulkMessage(''), 4000)
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Error cancelling orders')
+      alert(err instanceof Error ? err.message : 'Error deleting orders')
     } finally {
       setBulkLoading(false)
     }
@@ -1458,13 +1440,13 @@ export function OrderListClient({
                         >
                           Track
                         </Link>
-                        {canManage && order.status !== 'cancelled' && (
+                        {isOwner && (
                           <button
                             type="button"
                             className="btn btn-ghost"
                             onClick={() => handleDeleteOrders([order.id], '#' + order.code)}
                             style={{ fontSize: 11, padding: '4px 8px', color: '#dc2626' }}
-                            title="Cancel order and void balances"
+                            title="Permanently delete record (Owner Only)"
                           >
                             <TrashIcon size={13} color="#dc2626" />
                           </button>
@@ -1627,28 +1609,30 @@ export function OrderListClient({
             </Link>
 
             {/* Batch Delete Orders */}
-            <button
-              type="button"
-              disabled={bulkLoading}
-              onClick={() => handleDeleteOrders(selectedOrderIds)}
-              className="btn btn-ghost btn-sm"
-              style={{
-                fontSize: 12,
-                color: '#fca5a5',
-                background: 'rgba(239, 68, 68, 0.18)',
-                border: '1px solid rgba(239, 68, 68, 0.35)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-              }}
-              title="Cancel selected orders"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-              <span>Cancel Selected ({selectedOrderIds.length})</span>
-            </button>
+            {isOwner && (
+              <button
+                type="button"
+                disabled={bulkLoading}
+                onClick={() => handleDeleteOrders(selectedOrderIds)}
+                className="btn btn-ghost btn-sm"
+                style={{
+                  fontSize: 12,
+                  color: '#fca5a5',
+                  background: 'rgba(239, 68, 68, 0.18)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+                title="Permanently delete selected records (Owner Only)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                <span>Delete Selected ({selectedOrderIds.length})</span>
+              </button>
+            )}
           </div>
         </div>
       )}
