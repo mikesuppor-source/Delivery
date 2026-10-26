@@ -70,7 +70,11 @@ export const PATCH = api(async (req) => {
   }
 
   if (action === 'mark_paid') {
-    // 1. Create settlement record
+    // 1. Fetch workspace exchange rate
+    const ws = checked(await db.from('workspaces').select('usd_to_lbp').eq('id', workspaceId).single());
+    const rate = Number(ws?.usd_to_lbp) || 89500;
+
+    // 2. Create settlement record
     const settlement = checked(
       await db
         .from('settlements')
@@ -80,7 +84,7 @@ export const PATCH = api(async (req) => {
           type: 'shop_payment',
           amount_usd: request.amount_usd,
           amount_lbp: request.amount_lbp || 0,
-          usd_to_lbp: 89500,
+          usd_to_lbp: rate,
           note: `Payout via ${request.method} (${request.account_details})` + (request.notes ? ` - ${request.notes}` : ''),
           created_by: user.id,
         })

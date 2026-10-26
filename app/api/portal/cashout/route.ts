@@ -5,35 +5,7 @@ import { shopAccess } from '@/lib/access';
 export const GET = api(async () => {
   const { db, shop } = await shopAccess();
 
-  // 1. Fetch all delivered orders to calculate gross delivered merchant balance
-  const { data: deliveredOrders, error: ordersErr } = await db
-    .from('orders')
-    .select('id, collection_usd, delivery_fee_usd, shop_balance_usd, usd_to_lbp_rate')
-    .eq('shop_id', shop.id)
-    .eq('status', 'delivered');
-
-  if (ordersErr) throw new ApiError(500, ordersErr.message);
-
-  const grossDeliveredUsd = (deliveredOrders || []).reduce(
-    (sum, o) => sum + (Number(o.shop_balance_usd) || 0),
-    0
-  );
-
-  // 2. Fetch existing settlements for this shop
-  const { data: settlements, error: settleErr } = await db
-    .from('settlements')
-    .select('amount_usd')
-    .eq('shop_id', shop.id)
-    .eq('type', 'shop_payment');
-
-  if (settleErr) throw new ApiError(500, settleErr.message);
-
-  const settledUsd = (settlements || []).reduce(
-    (sum, s) => sum + (Number(s.amount_usd) || 0),
-    0
-  );
-
-  // 3. Fetch cashout requests
+  // 1. Fetch cashout requests
   const { data: requests, error: reqErr } = await db
     .from('cashout_requests')
     .select('*')
@@ -42,12 +14,15 @@ export const GET = api(async () => {
 
   if (reqErr) throw new ApiError(500, reqErr.message);
 
+  // 2. Real running merchant balance from shop table (maintained by double-entry accounting triggers)
+  const currentShopBalance = Number(shop.balance_usd) || 0;
+
   // Pending cashout requests count against available balance
   const pendingOrPaidCashoutsUsd = (requests || [])
     .filter((r) => r.status === 'pending' || r.status === 'approved')
     .reduce((sum, r) => sum + (Number(r.amount_usd) || 0), 0);
 
-  const availableUsd = Math.max(0, Math.round((grossDeliveredUsd - settledUsd - pendingOrPaidCashoutsUsd) * 100) / 100);
+  const availableUsd = Math.max(0, Math.round((currentShopBalance - pendingOrPaidCashoutsUsd) * 100) / 100);
 
   // Get workspace exchange rate
   const { data: ws } = await db
@@ -64,8 +39,7 @@ export const GET = api(async () => {
     availableUsd,
     availableLbp,
     rate,
-    grossDeliveredUsd: Math.round(grossDeliveredUsd * 100) / 100,
-    settledUsd: Math.round(settledUsd * 100) / 100,
+    currentShopBalance: Math.round(currentShopBalance * 100) / 100,
   });
 });
 
@@ -82,28 +56,8 @@ export const POST = api(async (req) => {
   const accountDetails = textField(body.accountDetails, 'account details / recipient phone', 500, true);
   const notes = textField(body.notes, 'notes', 1000);
 
-  // Calculate current available balance
-  const { data: deliveredOrders } = await db
-    .from('orders')
-    .select('shop_balance_usd')
-    .eq('shop_id', shop.id)
-    .eq('status', 'delivered');
-
-  const grossDeliveredUsd = (deliveredOrders || []).reduce(
-    (sum, o) => sum + (Number(o.shop_balance_usd) || 0),
-    0
-  );
-
-  const { data: settlements } = await db
-    .from('settlements')
-    .select('amount_usd')
-    .eq('shop_id', shop.id)
-    .eq('type', 'shop_payment');
-
-  const settledUsd = (settlements || []).reduce(
-    (sum, s) => sum + (Number(s.amount_usd) || 0),
-    0
-  );
+  // Calculate current available balance from materialized shop balance minus pending cashouts
+  const currentShopBalance = Number(shop.balance_usd) || 0;
 
   const { data: requests } = await db
     .from('cashout_requests')
@@ -114,7 +68,7 @@ export const POST = api(async (req) => {
     .filter((r) => r.status === 'pending' || r.status === 'approved')
     .reduce((sum, r) => sum + (Number(r.amount_usd) || 0), 0);
 
-  const availableUsd = Math.max(0, Math.round((grossDeliveredUsd - settledUsd - pendingCashoutsUsd) * 100) / 100);
+  const availableUsd = Math.max(0, Math.round((currentShopBalance - pendingCashoutsUsd) * 100) / 100);
 
   if (amountUsd > availableUsd) {
     throw new ApiError(

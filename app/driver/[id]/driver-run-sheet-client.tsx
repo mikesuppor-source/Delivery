@@ -1283,7 +1283,7 @@ export function DriverRunSheetClient({
 
                       <a
                         href={`https://wa.me/${order.recipient_phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                          `Hello ${order.recipient_name || 'Customer'}! I have arrived outside with your package #${order.code}. COD total: ${formatUSD(order.collection_usd)} (${formatLBP(usdToLbp(order.collection_usd, 89500))}). Please meet me outside.`
+                          `Hello ${order.recipient_name || 'Customer'}! I have arrived outside with your package #${order.code}. COD total: ${formatUSD(order.collection_usd)} (${formatLBP(usdToLbp(order.collection_usd, order.usd_to_lbp_rate || 89500))}). Please meet me outside.`
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
