@@ -78,7 +78,7 @@ export function NewOrderClient({
 
   // Package Specs
   const [serviceType, setServiceType] = useState<'delivery' | 'replacement' | 'pickup'>('delivery')
-  const [weightKg, setWeightKg] = useState('1')
+  const [weightKg, setWeightKg] = useState('')
   const [isBreakable, setIsBreakable] = useState(false)
   const [carrierTrackingCode, setCarrierTrackingCode] = useState('')
   const [notes, setNotes] = useState('')
@@ -162,7 +162,7 @@ export function NewOrderClient({
     setTownSearchQuery('')
     setNotes('')
     setServiceType('delivery')
-    setWeightKg('1')
+    setWeightKg('')
     setIsBreakable(false)
     setCarrierTrackingCode('')
     setPhoneMatchedCustomer(null)
@@ -216,7 +216,7 @@ export function NewOrderClient({
           recipientPhone,
           recipientAddress,
           serviceType,
-          weightKg: Number(weightKg) || 1.0,
+          weightKg: weightKg.trim() ? Number(weightKg) : null,
           isBreakable,
           carrierTrackingCode: carrierTrackingCode.trim() || undefined,
           destinationTown: destinationTown.trim() || undefined,
@@ -922,11 +922,13 @@ export function NewOrderClient({
                 <input
                   id="package-weight"
                   type="number"
-                  step="0.5"
-                  min="0.1"
+                  step="any"
+                  min="0"
+                  placeholder="Optional (e.g. 1)"
                   value={weightKg}
                   onChange={e => setWeightKg(e.target.value)}
                 />
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>Optional — leave blank if not needed</small>
               </div>
 
               {/* Fragile / Breakable */}

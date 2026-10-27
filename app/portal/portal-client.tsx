@@ -91,7 +91,7 @@ export function PortalClient({
   const [notes, setNotes] = useState('')
   const [customCode, setCustomCode] = useState('')
   const [serviceType, setServiceType] = useState<'delivery' | 'replacement' | 'pickup'>('delivery')
-  const [weightKg, setWeightKg] = useState('1')
+  const [weightKg, setWeightKg] = useState('')
   const [isBreakable, setIsBreakable] = useState(false)
   const [phoneMatchedCustomer, setPhoneMatchedCustomer] = useState<{
     name: string
@@ -483,7 +483,7 @@ export function PortalClient({
           areaId,
           collectionUsd: codUSD,
           serviceType,
-          weightKg: Number(weightKg) || 1.0,
+          weightKg: weightKg.trim() ? Number(weightKg) : null,
           isBreakable,
           notes,
           code: customCode || null,
@@ -509,7 +509,7 @@ export function PortalClient({
       setNotes('')
       setCustomCode('')
       setServiceType('delivery')
-      setWeightKg('1')
+      setWeightKg('')
       setIsBreakable(false)
       setPhoneMatchedCustomer(null)
     } catch (err: unknown) {
@@ -1247,8 +1247,9 @@ export function PortalClient({
               </label>
               <input
                 type="number"
-                step="0.5"
-                min="0.1"
+                step="any"
+                min="0"
+                placeholder="Optional (KG)"
                 value={weightKg}
                 onChange={e => setWeightKg(e.target.value)}
                 style={{ fontSize: 13 }}
@@ -2017,7 +2018,7 @@ export function PortalClient({
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input
                     type="number"
-                    step="0.5"
+                    step="any"
                     min="1"
                     max={cashoutAvailableUsd}
                     value={cashoutAmountUsd}

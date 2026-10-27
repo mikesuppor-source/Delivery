@@ -62,6 +62,12 @@ export async function sendPushToDriver(
   await Promise.allSettled(
     subs.map(async sub => {
       try {
+        const pushOptions: webpush.RequestOptions = {
+          TTL: 86400,
+          urgency: 'high',
+          topic: payload.tag || 'cedar-dispatch',
+        }
+
         await webpush.sendNotification(
           {
             endpoint: sub.endpoint,
@@ -70,7 +76,8 @@ export async function sendPushToDriver(
               auth: sub.auth,
             },
           },
-          notificationData
+          notificationData,
+          pushOptions
         )
         sent++
         await supabase
@@ -80,6 +87,7 @@ export async function sendPushToDriver(
       } catch (err: any) {
         failed++
         const statusCode = err?.statusCode || err?.status
+        console.error('[WebPush Dispatch Failed]:', statusCode, err?.body || err?.message)
         if (statusCode === 404 || statusCode === 410) {
           // Push subscription is no longer valid or user revoked permissions
           staleSubIds.push(sub.id)

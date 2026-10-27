@@ -43,7 +43,7 @@ export const POST = api(async req => {
     driver_pay_usd:money(body.driverPayUsd,'driver pay'),recipient_name:textField(body.recipientName,'recipient',200),
     recipient_phone:textField(body.recipientPhone,'phone',40),recipient_address:textField(body.recipientAddress,'address',1000),
     service_type:(body.serviceType === 'replacement' || body.serviceType === 'pickup') ? body.serviceType : 'delivery',
-    weight_kg:Math.max(0.1, Number(body.weightKg) || 1.0),
+    weight_kg:(body.weightKg != null && body.weightKg !== '') ? Math.max(0, Number(body.weightKg)) : undefined,
     is_breakable:Boolean(body.isBreakable),
     payment_method:textField(body.paymentMethod, 'payment method', 40) || 'cash_usd',
     carrier_name:textField(body.carrierName, 'carrier name', 100),

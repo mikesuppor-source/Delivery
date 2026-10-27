@@ -738,6 +738,20 @@ export function DriverRunSheetClient({
         return
       }
 
+      // Detect iOS Safari (not running in standalone PWA mode)
+      const isIos = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)
+      if (isIos && !isStandaloneApp) {
+        setShowIosInstallModal(true)
+        showNotification(
+          'error',
+          lang === 'ar'
+            ? 'على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً لتفعيل الإشعارات'
+            : 'On iPhone, tap Share -> Add to Home Screen, then open from Home Screen to enable alerts'
+        )
+        setPushLoading(false)
+        return
+      }
+
       if ('Notification' in window) {
         const perm = await Notification.requestPermission()
         if (perm !== 'granted') {
@@ -747,8 +761,13 @@ export function DriverRunSheetClient({
         }
       }
 
-      const reg = await navigator.serviceWorker.ready
-      if (!('pushManager' in reg)) {
+      let reg = await navigator.serviceWorker.getRegistration()
+      if (!reg) {
+        reg = await navigator.serviceWorker.register('/sw.js')
+      }
+      await navigator.serviceWorker.ready
+
+      if (!reg || !('pushManager' in reg)) {
         showNotification('error', 'PushManager is not available on this device.')
         setPushLoading(false)
         return
@@ -775,6 +794,15 @@ export function DriverRunSheetClient({
         setPushSubscribed(true)
         setAlertsEnabled(true)
         showNotification('success', t('pushActiveToast'))
+        // Send a test alert immediately so the courier sees the lock-screen notification work right now
+        fetch('/api/driver/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driverId: driver.id,
+            test: true,
+          }),
+        }).catch(() => {})
       } else {
         showNotification('error', t('pushFailedToast'))
       }
@@ -865,6 +893,68 @@ export function DriverRunSheetClient({
       supabase.removeChannel(channel)
     }
   }, [driver.id, playOrderChime, triggerVibration, triggerPushNotification])
+
+  // ─── HIGH-FREQUENCY AUTO-SYNC & LOCK-SCREEN RECOVERY POLLING ───
+  const pollOrdersRef = useRef<boolean>(false)
+  const pollDriverOrders = useCallback(async () => {
+    if (pollOrdersRef.current) return
+    pollOrdersRef.current = true
+    try {
+      const res = await fetch(`/api/driver/orders?driverId=${driver.id}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data && Array.isArray(data.orders)) {
+        setOrders(prev => {
+          const prevMap = new Map(prev.map(o => [o.id, o]))
+          let hasNewOrder = false
+          let newestCode = ''
+
+          for (const newOrd of data.orders) {
+            const existing = prevMap.get(newOrd.id)
+            if (!existing && (newOrd.status === 'assigned' || newOrd.status === 'picked_up')) {
+              hasNewOrder = true
+              newestCode = newOrd.code
+            }
+          }
+
+          if (hasNewOrder) {
+            playOrderChime()
+            triggerVibration()
+            showNotification(
+              'success',
+              lang === 'ar' ? `🚨 طلب جديد #${newestCode} تم تعيينه لك!` : `🚨 New order #${newestCode} assigned to you!`
+            )
+          }
+
+          return data.orders
+        })
+      }
+    } catch (_e) {
+      void _e
+    } finally {
+      pollOrdersRef.current = false
+    }
+  }, [driver.id, lang, playOrderChime, triggerVibration])
+
+  useEffect(() => {
+    // Poll every 4 seconds for real-time mobile order alerts
+    const interval = setInterval(pollDriverOrders, 4000)
+
+    // Pull immediately whenever phone screen turns on or user switches back to app
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        pollDriverOrders()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [pollDriverOrders])
 
   // Sync offline queue items to the server
   const syncOfflineQueue = useCallback(async () => {
@@ -1431,6 +1521,75 @@ export function DriverRunSheetClient({
             )}
           </div>
         </div>
+
+        {/* ─── PUSH NOTIFICATIONS PROMINENT BANNER (IF NOT SUBSCRIBED) ─── */}
+        {!pushSubscribed && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(30, 58, 138, 0.45) 0%, rgba(15, 23, 42, 0.9) 100%)',
+              border: '1.5px solid #3b82f6',
+              borderRadius: 12,
+              padding: '12px 14px',
+              marginBottom: 14,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.15)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🔔</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#93c5fd' }}>
+                  {t('pushBannerTitle')}
+                </span>
+              </div>
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1', lineHeight: 1.45 }}>
+              {t('pushBannerDesc')}
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+              <button
+                type="button"
+                onClick={handleSubscribePush}
+                disabled={pushLoading}
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span>{pushLoading ? '…' : t('pushBannerBtn')}</span>
+              </button>
+              {!isStandaloneApp && (
+                <button
+                  type="button"
+                  onClick={handleInstallApp}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: '#94a3b8',
+                    border: '1px solid #475569',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('installAppBtn')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ─── METRIC CARDS ─── */}
         <div

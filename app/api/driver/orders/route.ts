@@ -4,6 +4,40 @@ import { driverAccess } from '@/lib/access'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
 import { savePod } from '@/lib/pod'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
+import { allRows } from '@/lib/pagination'
+
+export const GET = api(async req => {
+  const url = new URL(req.url)
+  const driverId = url.searchParams.get('driverId')
+  const { db, driver } = await driverAccess(driverId)
+
+  const { data: rawOrders } = await allRows(
+    db
+      .from('orders')
+      .select(`
+        *,
+        shop:shop_id(id, name, phone),
+        area:area_id(id, name)
+      `)
+      .eq('driver_id', driver.id)
+      .order('created_at', { ascending: false })
+  )
+
+  const orders = ((rawOrders as any[]) || []).map(o => ({
+    ...o,
+    recipient_address:
+      o.location_lat != null && o.location_lng != null
+        ? (o.recipient_address || '') +
+          ' (https://maps.google.com/?q=' +
+          o.location_lat +
+          ',' +
+          o.location_lng +
+          ')'
+        : o.recipient_address,
+  }))
+
+  return NextResponse.json({ success: true, orders })
+})
 export const PATCH = api(async req => {
   const body=await req.json()
   const {db,driver}=await driverAccess(body.driverId)

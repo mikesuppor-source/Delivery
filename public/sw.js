@@ -1,5 +1,5 @@
 // Cedar Delivery Desk — PWA Service Worker for Offline Courier Run Sheets
-const CACHE_NAME = 'cedar-driver-pwa-v2';
+const CACHE_NAME = 'cedar-driver-pwa-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',

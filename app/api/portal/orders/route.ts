@@ -22,7 +22,7 @@ export const POST=api(async req=>{
  const order=checked(await db.from('orders').insert({workspace_id:shop.workspace_id,shop_id:shop.id,area_id:area.id,code,status:'pending',
   usd_to_lbp_rate:ws.usd_to_lbp,collection_usd:money(body.collectionUsd,'collection'),delivery_fee_usd:area.fee_usd,driver_pay_usd:1,
   service_type:(body.serviceType === 'replacement' || body.serviceType === 'pickup') ? body.serviceType : 'delivery',
-  weight_kg:Math.max(0.1, Number(body.weightKg) || 1.0),
+  weight_kg:(body.weightKg != null && body.weightKg !== '') ? Math.max(0, Number(body.weightKg)) : undefined,
   is_breakable:Boolean(body.isBreakable),
   payment_method:textField(body.paymentMethod, 'payment method', 40) || 'cash_usd',
   destination_governorate:textField(body.destinationGovernorate, 'governorate', 100),
