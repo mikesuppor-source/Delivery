@@ -66,7 +66,6 @@ export async function sendPushToDriver(
         const pushOptions: webpush.RequestOptions = {
           TTL: 86400,
           urgency: 'high',
-          topic: payload.tag || 'cedar-dispatch',
         }
 
         await webpush.sendNotification(
