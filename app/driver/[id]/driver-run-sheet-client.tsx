@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -17,6 +17,7 @@ import {
   formatDisplayAddress,
   calculateDistanceKm,
   formatDistance,
+  getLebanonAreaCoordinates,
 } from '@/lib/maps'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
@@ -96,6 +97,21 @@ interface DriverRunSheetClientProps {
   workspaceName: string
 }
 
+function resolveOrderCoordinates(order: DriverRunSheetOrder): { lat: number; lng: number } | null {
+  if (order.location_lat != null && order.location_lng != null) {
+    const lat = Number(order.location_lat)
+    const lng = Number(order.location_lng)
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng }
+  }
+  const parsed = parseLocation(order.recipient_address)
+  if (parsed.isCoords && parsed.lat && parsed.lng) {
+    return { lat: parsed.lat, lng: parsed.lng }
+  }
+  const areaCoords = getLebanonAreaCoordinates(order.area?.name) || getLebanonAreaCoordinates(order.recipient_address)
+  if (areaCoords) return areaCoords
+  return null
+}
+
 export function DriverRunSheetClient({
   driver,
   initialOrders,
@@ -119,66 +135,191 @@ export function DriverRunSheetClient({
   const [viewPodOrder, setViewPodOrder] = useState<DriverRunSheetOrder | null>(null)
 
   // Phone GPS & Navigation Proximity State
+  type GpsStatus = 'prompt' | 'requesting' | 'active' | 'denied' | 'unavailable' | 'timeout' | 'unsupported'
   const [driverGps, setDriverGps] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null)
-  const [gpsStatus, setGpsStatus] = useState<'prompt' | 'active' | 'denied' | 'unsupported'>('prompt')
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>('prompt')
+  const [gpsErrorText, setGpsErrorText] = useState<string | null>(null)
   const [sortByNearest, setSortByNearest] = useState<boolean>(false)
 
-  // Real-time GPS watch & telemetry
-  const requestGps = useCallback(() => {
+  const watchIdRef = useRef<number | null>(null)
+  const lastTelemetryRef = useRef<{ lat: number; lng: number; time: number } | null>(null)
+
+  // Send telemetry ping to server (throttled to at most once per 25s unless moved > 30m)
+  const sendLocationTelemetry = useCallback((lat: number, lng: number) => {
+    const now = Date.now()
+    const last = lastTelemetryRef.current
+    if (last) {
+      const timeDiff = now - last.time
+      const latDiff = Math.abs(lat - last.lat)
+      const lngDiff = Math.abs(lng - last.lng)
+      if (timeDiff < 25000 && latDiff < 0.0003 && lngDiff < 0.0003) {
+        return
+      }
+    }
+    lastTelemetryRef.current = { lat, lng, time: now }
+
+    fetch('/api/driver/location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        driverId: driver.id,
+        lat,
+        lng,
+      }),
+    }).catch(() => {})
+  }, [driver.id])
+
+  // Handle successful position acquisition
+  const handleGpsSuccess = useCallback((pos: GeolocationPosition) => {
+    const coords = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: Math.round(pos.coords.accuracy),
+    }
+    setDriverGps(coords)
+    setGpsStatus('active')
+    setGpsErrorText(null)
+
+    try {
+      localStorage.setItem('cedar_driver_gps_active', '1')
+    } catch (_e) {
+      void _e
+    }
+
+    sendLocationTelemetry(coords.lat, coords.lng)
+
+    // Start background watchPosition only after permission is confirmed and position is retrieved
+    if (typeof window !== 'undefined' && navigator.geolocation && watchIdRef.current === null) {
+      try {
+        const id = navigator.geolocation.watchPosition(
+          wPos => {
+            const wCoords = {
+              lat: wPos.coords.latitude,
+              lng: wPos.coords.longitude,
+              accuracy: Math.round(wPos.coords.accuracy),
+            }
+            setDriverGps(wCoords)
+            setGpsStatus('active')
+            sendLocationTelemetry(wCoords.lat, wCoords.lng)
+          },
+          _wErr => {
+            void _wErr
+          },
+          { enableHighAccuracy: false, maximumAge: 15000, timeout: 20000 }
+        )
+        watchIdRef.current = id
+      } catch (_e) {
+        void _e
+      }
+    }
+  }, [sendLocationTelemetry])
+
+  // Real-time GPS request with 2-tier fallback (satellite high-accuracy -> network low-accuracy)
+  const requestGps = useCallback((forceLowAccuracy = false) => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
       setGpsStatus('unsupported')
+      setGpsErrorText('GPS is not supported by your browser.')
       return
     }
 
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const coords = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy),
-        }
-        setDriverGps(coords)
-        setGpsStatus('active')
+    setGpsStatus('requesting')
+    setGpsErrorText(null)
 
-        // Send telemetry ping to server (throttled)
-        fetch('/api/driver/location', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            driverId: driver.id,
-            lat: coords.lat,
-            lng: coords.lng,
-          }),
-        }).catch(() => {})
-      },
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+
+    const fallbackToLowAccuracy = () => {
+      navigator.geolocation.getCurrentPosition(
+        handleGpsSuccess,
+        err => {
+          if (err.code === err.PERMISSION_DENIED) {
+            setGpsStatus('denied')
+            setGpsErrorText(
+              'Location permission was denied. Tap the lock/aA icon in your browser address bar to allow location, then tap Retry GPS.'
+            )
+          } else if (err.code === err.POSITION_UNAVAILABLE) {
+            setGpsStatus('unavailable')
+            setGpsErrorText(
+              'Location is turned OFF on your phone. Please swipe down and turn ON Location / GPS in your phone settings, then tap Retry GPS.'
+            )
+          } else if (err.code === err.TIMEOUT) {
+            setGpsStatus('timeout')
+            setGpsErrorText(
+              'Location search timed out. Tap Retry GPS or tap Network.'
+            )
+          } else {
+            setGpsStatus('unavailable')
+            setGpsErrorText('Unable to retrieve location. Please check your phone location settings.')
+          }
+        },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+      )
+    }
+
+    if (forceLowAccuracy) {
+      fallbackToLowAccuracy()
+      return
+    }
+
+    // Tier 1: Try high accuracy with a 7s timeout
+    navigator.geolocation.getCurrentPosition(
+      handleGpsSuccess,
       err => {
         if (err.code === err.PERMISSION_DENIED) {
           setGpsStatus('denied')
+          setGpsErrorText(
+            'Location permission was denied. Tap the lock/aA icon in your browser address bar to allow location, then tap Retry GPS.'
+          )
+        } else {
+          // If timeout or unavailable with satellites, auto-fallback to cell/WiFi network positioning
+          fallbackToLowAccuracy()
         }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 7000, maximumAge: 30000 }
     )
+  }, [handleGpsSuccess])
 
-    const watchId = navigator.geolocation.watchPosition(
-      pos => {
-        const coords = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy),
-        }
-        setDriverGps(coords)
-        setGpsStatus('active')
-      },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 15000 }
-    )
+  // Clean up watcher on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null && typeof window !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
+      }
+    }
+  }, [])
 
-    return () => navigator.geolocation.clearWatch(watchId)
-  }, [driver.id])
-
+  // Auto-connect if permission was previously granted or saved
   useEffect(() => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
-      requestGps()
+      let savedActive = false
+      try {
+        savedActive = localStorage.getItem('cedar_driver_gps_active') === '1'
+      } catch (_e) {
+        void _e
+      }
+
+      if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(res => {
+          if (res.state === 'granted') {
+            requestGps()
+          } else if (res.state === 'denied') {
+            setGpsStatus('denied')
+            setGpsErrorText(
+              'Location permission was denied. Tap the lock/aA icon in your browser address bar to allow location, then tap Retry GPS.'
+            )
+          } else if (savedActive) {
+            requestGps()
+          }
+        }).catch(_err => {
+          void _err
+          if (savedActive) requestGps()
+        })
+      } else if (savedActive) {
+        requestGps()
+      }
     }
   }, [requestGps])
 
@@ -218,18 +359,8 @@ export function DriverRunSheetClient({
 
     if (sortByNearest && driverGps) {
       return [...list].sort((a, b) => {
-        const getCoords = (o: DriverRunSheetOrder) => {
-          if (o.location_lat != null && o.location_lng != null) {
-            return { lat: Number(o.location_lat), lng: Number(o.location_lng) }
-          }
-          const parsed = parseLocation(o.recipient_address)
-          if (parsed.isCoords && parsed.lat && parsed.lng) {
-            return { lat: parsed.lat, lng: parsed.lng }
-          }
-          return null
-        }
-        const coordsA = getCoords(a)
-        const coordsB = getCoords(b)
+        const coordsA = resolveOrderCoordinates(a)
+        const coordsB = resolveOrderCoordinates(b)
         if (!coordsA && !coordsB) return 0
         if (!coordsA) return 1
         if (!coordsB) return -1
@@ -1123,82 +1254,194 @@ export function DriverRunSheetClient({
         {/* ─── PHONE GPS STATUS & PROXIMITY SORT ─── */}
         <div
           style={{
-            background: gpsStatus === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(30, 41, 59, 0.6)',
-            border: '1px solid ' + (gpsStatus === 'active' ? 'rgba(16, 185, 129, 0.25)' : '#334155'),
+            background:
+              gpsStatus === 'active'
+                ? 'rgba(16, 185, 129, 0.1)'
+                : gpsStatus === 'requesting'
+                ? 'rgba(59, 130, 246, 0.1)'
+                : gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'timeout'
+                ? 'rgba(239, 68, 68, 0.1)'
+                : 'rgba(30, 41, 59, 0.6)',
+            border:
+              '1px solid ' +
+              (gpsStatus === 'active'
+                ? 'rgba(16, 185, 129, 0.3)'
+                : gpsStatus === 'requesting'
+                ? 'rgba(59, 130, 246, 0.3)'
+                : gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'timeout'
+                ? 'rgba(239, 68, 68, 0.3)'
+                : '#334155'),
             borderRadius: 12,
-            padding: '8px 12px',
+            padding: '10px 12px',
             marginBottom: 12,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            flexDirection: 'column',
             gap: 8,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: gpsStatus === 'active' ? '#10b981' : (gpsStatus === 'denied' ? '#ef4444' : '#64748b'),
-                boxShadow: gpsStatus === 'active' ? '0 0 8px #10b981' : 'none',
-                flexShrink: 0,
-              }}
-            />
-            <div style={{ fontSize: 12, color: gpsStatus === 'active' ? '#34d399' : '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              width: '100%',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: '50%',
+                  background:
+                    gpsStatus === 'active'
+                      ? '#10b981'
+                      : gpsStatus === 'requesting'
+                      ? '#38bdf8'
+                      : gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'timeout'
+                      ? '#ef4444'
+                      : '#64748b',
+                  boxShadow:
+                    gpsStatus === 'active'
+                      ? '0 0 8px #10b981'
+                      : gpsStatus === 'requesting'
+                      ? '0 0 8px #38bdf8'
+                      : 'none',
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ fontSize: 12, color: '#f8fafc', minWidth: 0 }}>
+                {gpsStatus === 'active' ? (
+                  <span style={{ color: '#34d399' }}>
+                    <strong>Phone GPS Live</strong> {driverGps?.accuracy ? `(±${driverGps.accuracy}m)` : ''}
+                  </span>
+                ) : gpsStatus === 'requesting' ? (
+                  <span style={{ color: '#38bdf8' }}>
+                    <strong>Acquiring phone GPS...</strong> (allow browser prompt)
+                  </span>
+                ) : gpsStatus === 'denied' ? (
+                  <span style={{ color: '#f87171', fontWeight: 600 }}>
+                    Location access denied in browser
+                  </span>
+                ) : gpsStatus === 'unavailable' ? (
+                  <span style={{ color: '#f87171', fontWeight: 600 }}>
+                    Phone GPS is OFF or signal lost
+                  </span>
+                ) : gpsStatus === 'timeout' ? (
+                  <span style={{ color: '#f87171', fontWeight: 600 }}>
+                    GPS search timed out
+                  </span>
+                ) : (
+                  <span style={{ color: '#cbd5e1' }}>
+                    Enable Phone GPS to track distance
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               {gpsStatus === 'active' ? (
-                <span>
-                  <strong>Phone GPS Live</strong> {driverGps?.accuracy ? `(±${driverGps.accuracy}m)` : ''}
-                </span>
-              ) : gpsStatus === 'denied' ? (
-                <span style={{ color: '#f87171' }}>Location permission denied in browser</span>
+                <button
+                  type="button"
+                  onClick={() => setSortByNearest(prev => !prev)}
+                  style={{
+                    background: sortByNearest ? '#10b981' : '#1e293b',
+                    color: sortByNearest ? '#022c22' : '#94a3b8',
+                    border: '1px solid ' + (sortByNearest ? '#10b981' : '#334155'),
+                    padding: '5px 10px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <NavigationIcon size={10} color={sortByNearest ? '#022c22' : '#94a3b8'} />
+                  <span>{sortByNearest ? 'Nearest First' : 'Sort Nearest'}</span>
+                </button>
+              ) : gpsStatus === 'requesting' ? (
+                <button
+                  type="button"
+                  disabled
+                  style={{
+                    background: '#1e3a8a',
+                    color: '#93c5fd',
+                    border: '1px solid #2563eb',
+                    padding: '5px 12px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'wait',
+                    opacity: 0.9,
+                  }}
+                >
+                  Locating...
+                </button>
               ) : (
-                <span>Connect Phone GPS to track distance</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => requestGps(false)}
+                    style={{
+                      background: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '5px 12px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {gpsStatus === 'prompt' ? 'Enable GPS' : 'Retry GPS'}
+                  </button>
+                  {(gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'timeout') && (
+                    <button
+                      type="button"
+                      onClick={() => requestGps(true)}
+                      style={{
+                        background: '#334155',
+                        color: '#cbd5e1',
+                        border: '1px solid #475569',
+                        padding: '5px 8px',
+                        borderRadius: 6,
+                        fontSize: 10.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                      title="Use Cell/WiFi network location"
+                    >
+                      Network
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            {gpsStatus === 'active' ? (
-              <button
-                type="button"
-                onClick={() => setSortByNearest(prev => !prev)}
-                style={{
-                  background: sortByNearest ? '#10b981' : '#1e293b',
-                  color: sortByNearest ? '#022c22' : '#94a3b8',
-                  border: '1px solid ' + (sortByNearest ? '#10b981' : '#334155'),
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <NavigationIcon size={10} color={sortByNearest ? '#022c22' : '#94a3b8'} />
-                <span>{sortByNearest ? 'Nearest First' : 'Sort Nearest'}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={requestGps}
-                style={{
-                  background: '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                Enable GPS
-              </button>
-            )}
-          </div>
+          {/* Diagnostic Help Banner when GPS error occurs */}
+          {gpsErrorText && gpsStatus !== 'active' && (
+            <div
+              style={{
+                background: 'rgba(15, 23, 42, 0.7)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                borderRadius: 8,
+                padding: '8px 10px',
+                fontSize: 11.5,
+                lineHeight: 1.4,
+                color: '#fca5a5',
+              }}
+            >
+              <div style={{ marginBottom: 4, fontWeight: 700, color: '#f87171' }}>
+                {gpsStatus === 'denied' ? 'How to allow browser location:' : 'GPS Connection Note:'}
+              </div>
+              <div>{gpsErrorText}</div>
+            </div>
+          )}
         </div>
 
         {/* ─── ORDER CARDS LIST ─── */}
@@ -1229,9 +1472,7 @@ export function DriverRunSheetClient({
               const isUpdating = updatingId === order.id
               const parsedLoc = parseLocation(order.recipient_address)
               const cleanAddr = formatDisplayAddress(order.recipient_address)
-              const orderCoords = (order.location_lat != null && order.location_lng != null)
-                ? { lat: Number(order.location_lat), lng: Number(order.location_lng) }
-                : (parsedLoc.isCoords && parsedLoc.lat && parsedLoc.lng ? { lat: parsedLoc.lat, lng: parsedLoc.lng } : null)
+              const orderCoords = resolveOrderCoordinates(order)
               const distanceKm = (driverGps && orderCoords)
                 ? calculateDistanceKm(driverGps.lat, driverGps.lng, orderCoords.lat, orderCoords.lng)
                 : null

@@ -187,3 +187,86 @@ export function formatDistance(km: number): string {
   return `${km.toFixed(1)} km away`
 }
 
+/**
+ * Known centroid coordinates for Lebanese governorates and major delivery areas.
+ * Used as a fallback when orders have text-only area/city without GPS coordinates.
+ */
+export const LEBANON_REGION_CENTROIDS: Record<string, { lat: number; lng: number }> = {
+  // Beirut & Suburbs
+  beirut: { lat: 33.8938, lng: 35.5018 },
+  achrafieh: { lat: 33.8886, lng: 35.5161 },
+  hamra: { lat: 33.8967, lng: 35.4828 },
+  verdun: { lat: 33.8872, lng: 35.4856 },
+  'ras beirut': { lat: 33.8975, lng: 35.4744 },
+  'mar mikhael': { lat: 33.8983, lng: 35.5256 },
+  gemmayze: { lat: 33.8961, lng: 35.5133 },
+  badaro: { lat: 33.8744, lng: 35.5167 },
+
+  // Mount Lebanon / Metn / Baabda / Keserwan / Chouf / Aley
+  metn: { lat: 33.8860, lng: 35.5683 },
+  'sin el fil': { lat: 33.8767, lng: 35.5333 },
+  dekwaneh: { lat: 33.8867, lng: 35.5417 },
+  bourj_hammoud: { lat: 33.8944, lng: 35.5389 },
+  'bourj hammoud': { lat: 33.8944, lng: 35.5389 },
+  antelias: { lat: 33.9167, lng: 35.5833 },
+  dbayeh: { lat: 33.9500, lng: 35.5900 },
+  zalqa: { lat: 33.9050, lng: 35.5700 },
+  baabda: { lat: 33.8333, lng: 35.5333 },
+  hadath: { lat: 33.8444, lng: 35.5278 },
+  hazmieh: { lat: 33.8611, lng: 35.5389 },
+  choueifat: { lat: 33.8083, lng: 35.5167 },
+  aley: { lat: 33.8058, lng: 35.6025 },
+  bhamdoun: { lat: 33.8089, lng: 35.6569 },
+  jounieh: { lat: 33.9808, lng: 35.6178 },
+  kaslik: { lat: 33.9789, lng: 35.6144 },
+  sarba: { lat: 33.9867, lng: 35.6200 },
+  jbeil: { lat: 34.1226, lng: 35.6517 },
+  byblos: { lat: 34.1226, lng: 35.6517 },
+  chouf: { lat: 33.6958, lng: 35.5800 },
+  damour: { lat: 33.7333, lng: 35.4500 },
+
+  // North Lebanon & Akkar
+  tripoli: { lat: 34.4367, lng: 35.8497 },
+  'el mina': { lat: 34.4444, lng: 35.8222 },
+  batroun: { lat: 34.2553, lng: 35.6581 },
+  koura: { lat: 34.3389, lng: 35.8089 },
+  zgharta: { lat: 34.3989, lng: 35.8947 },
+  bcharre: { lat: 34.2500, lng: 36.0111 },
+  akkar: { lat: 34.5458, lng: 36.0786 },
+  halba: { lat: 34.5428, lng: 36.0800 },
+
+  // South Lebanon & Nabatieh
+  saida: { lat: 33.5631, lng: 35.3689 },
+  sidon: { lat: 33.5631, lng: 35.3689 },
+  sour: { lat: 33.2733, lng: 35.1939 },
+  tyre: { lat: 33.2733, lng: 35.1939 },
+  nabatieh: { lat: 33.3789, lng: 35.4839 },
+  jezzen: { lat: 33.5417, lng: 35.5833 },
+  jezzine: { lat: 33.5417, lng: 35.5833 },
+  marjayoun: { lat: 33.3600, lng: 35.5900 },
+  bint_jbeil: { lat: 33.1250, lng: 35.4333 },
+  'bint jbeil': { lat: 33.1250, lng: 35.4333 },
+
+  // Bekaa & Baalbek
+  zahle: { lat: 33.8463, lng: 35.9020 },
+  zahlé: { lat: 33.8463, lng: 35.9020 },
+  chtoura: { lat: 33.8167, lng: 35.8500 },
+  baalbek: { lat: 34.0058, lng: 36.2181 },
+  hermel: { lat: 34.3944, lng: 36.3847 },
+  west_bekaa: { lat: 33.6167, lng: 35.7833 },
+  'west bekaa': { lat: 33.6167, lng: 35.7833 },
+  rashaya: { lat: 33.5000, lng: 35.8500 },
+}
+
+export function getLebanonAreaCoordinates(areaOrAddress?: string | null): { lat: number; lng: number } | null {
+  if (!areaOrAddress || !areaOrAddress.trim()) return null
+  const clean = areaOrAddress.toLowerCase().trim()
+  for (const [key, coords] of Object.entries(LEBANON_REGION_CENTROIDS)) {
+    if (clean.includes(key)) {
+      return coords
+    }
+  }
+  return null
+}
+
+
