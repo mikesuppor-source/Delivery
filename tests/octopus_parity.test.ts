@@ -6,6 +6,7 @@ import {
   formatLebaneseDestination,
 } from '../lib/lebanon-geo';
 import { orderPatch } from '../lib/orders';
+import { calculateDistanceKm, formatDistance } from '../lib/maps';
 
 test('Lebanon Geography covers all 8 governorates and major cazas', () => {
   assert.equal(LEBANON_GEO.length, 8);
@@ -180,3 +181,16 @@ test('Multi-driver pool load balancer distributes orders fairly across 10 driver
     assert.equal(activeLoads.get(d), 3);
   }
 });
+
+test('Haversine distance calculation and formatting for courier mobile GPS', () => {
+  // Distance between Beirut Downtown (33.8969, 35.5069) and Hamra (33.8972, 35.4828) ~ 2.2 km
+  const distKm = calculateDistanceKm(33.8969, 35.5069, 33.8972, 35.4828);
+  assert.ok(distKm >= 2.0 && distKm <= 2.5);
+  assert.equal(formatDistance(distKm), `${distKm.toFixed(1)} km away`);
+
+  // Very close distance (< 1km)
+  const closeKm = calculateDistanceKm(33.8969, 35.5069, 33.8971, 35.5072);
+  assert.ok(closeKm < 1.0);
+  assert.ok(formatDistance(closeKm).includes('m away'));
+});
+

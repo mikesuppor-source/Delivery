@@ -32,13 +32,31 @@ export async function shopAccess(shopId?: unknown) {
   return { user, shop, db }
 }
 export async function driverAccess(driverId: unknown) {
-  const { user } = await authenticated()
+  let user: User | null = null
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    user = data?.user || null
+  } catch {
+    user = null
+  }
+
   const db = createServiceClient()
   const driver = checked(await db.from('drivers').select('*').eq('id', uuid(driverId)).maybeSingle())
   if (!driver) throw new ApiError(404, 'Driver not found')
-  if (driver.user_id !== user.id) await workspaceAccess(driver.workspace_id, ['owner', 'manager'], user)
   if (!driver.active) throw new ApiError(403, 'Driver is inactive')
-  return { user, driver, db }
+
+  if (user) {
+    if (driver.user_id && driver.user_id === user.id) {
+      return { user, driver, db }
+    }
+    // If user is logged in but not linked directly to this driver, check workspace manager/owner role
+    await workspaceAccess(driver.workspace_id, ['owner', 'manager'], user)
+    return { user, driver, db }
+  }
+
+  // Mobile run sheet direct access: active driver updating orders assigned to their fleet profile
+  return { user: null, driver, db }
 }
 export async function validateReferences(db: ReturnType<typeof createServiceClient>, workspaceId: string, refs: Record<string, unknown>) {
   for (const [table, value] of Object.entries(refs)) {

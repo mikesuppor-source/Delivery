@@ -312,6 +312,9 @@ export type Database = {
           active: boolean
           cash_held_usd: number
           created_at: string
+          current_lat: number | null
+          current_lng: number | null
+          last_location_at: string | null
           id: string
           name: string
           pay_owed_usd: number
@@ -324,6 +327,9 @@ export type Database = {
           active?: boolean
           cash_held_usd?: number
           created_at?: string
+          current_lat?: number | null
+          current_lng?: number | null
+          last_location_at?: string | null
           id?: string
           name: string
           pay_owed_usd?: number
@@ -336,6 +342,9 @@ export type Database = {
           active?: boolean
           cash_held_usd?: number
           created_at?: string
+          current_lat?: number | null
+          current_lng?: number | null
+          last_location_at?: string | null
           id?: string
           name?: string
           pay_owed_usd?: number

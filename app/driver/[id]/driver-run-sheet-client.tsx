@@ -10,7 +10,14 @@ import {
   formatDate,
   ORDER_STATUS_LABELS,
 } from '@/lib/utils'
-import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, parseLocation, formatDisplayAddress } from '@/lib/maps'
+import {
+  getGoogleMapsDirectionsUrl,
+  getWazeDirectionsUrl,
+  parseLocation,
+  formatDisplayAddress,
+  calculateDistanceKm,
+  formatDistance,
+} from '@/lib/maps'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import {
@@ -45,6 +52,8 @@ export interface DriverRunSheetOrder {
   recipient_name: string | null
   recipient_phone: string | null
   recipient_address: string | null
+  location_lat?: number | null
+  location_lng?: number | null
   shop?: { id: string; name: string; phone?: string | null } | null
   area?: { id: string; name: string } | null
   pod_signature?: string | null
@@ -109,14 +118,78 @@ export function DriverRunSheetClient({
   const [failModalOrder, setFailModalOrder] = useState<DriverRunSheetOrder | null>(null)
   const [viewPodOrder, setViewPodOrder] = useState<DriverRunSheetOrder | null>(null)
 
+  // Phone GPS & Navigation Proximity State
+  const [driverGps, setDriverGps] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null)
+  const [gpsStatus, setGpsStatus] = useState<'prompt' | 'active' | 'denied' | 'unsupported'>('prompt')
+  const [sortByNearest, setSortByNearest] = useState<boolean>(false)
+
+  // Real-time GPS watch & telemetry
+  const requestGps = useCallback(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGpsStatus('unsupported')
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const coords = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: Math.round(pos.coords.accuracy),
+        }
+        setDriverGps(coords)
+        setGpsStatus('active')
+
+        // Send telemetry ping to server (throttled)
+        fetch('/api/driver/location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driverId: driver.id,
+            lat: coords.lat,
+            lng: coords.lng,
+          }),
+        }).catch(() => {})
+      },
+      err => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setGpsStatus('denied')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    )
+
+    const watchId = navigator.geolocation.watchPosition(
+      pos => {
+        const coords = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: Math.round(pos.coords.accuracy),
+        }
+        setDriverGps(coords)
+        setGpsStatus('active')
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15000 }
+    )
+
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [driver.id])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      requestGps()
+    }
+  }, [requestGps])
+
   function showNotification(type: 'success' | 'error', message: string) {
     setNotification({ type, message })
     setTimeout(() => setNotification(null), 4000)
   }
 
-  // Filter & Search Logic
+  // Filter & Search Logic (with GPS Nearest-First sorting)
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    const list = orders.filter(order => {
       // Tab filter
       if (filterTab === 'to_deliver') {
         if (order.status !== 'assigned' && order.status !== 'picked_up') return false
@@ -142,7 +215,32 @@ export function DriverRunSheetClient({
 
       return true
     })
-  }, [orders, filterTab, search])
+
+    if (sortByNearest && driverGps) {
+      return [...list].sort((a, b) => {
+        const getCoords = (o: DriverRunSheetOrder) => {
+          if (o.location_lat != null && o.location_lng != null) {
+            return { lat: Number(o.location_lat), lng: Number(o.location_lng) }
+          }
+          const parsed = parseLocation(o.recipient_address)
+          if (parsed.isCoords && parsed.lat && parsed.lng) {
+            return { lat: parsed.lat, lng: parsed.lng }
+          }
+          return null
+        }
+        const coordsA = getCoords(a)
+        const coordsB = getCoords(b)
+        if (!coordsA && !coordsB) return 0
+        if (!coordsA) return 1
+        if (!coordsB) return -1
+        const distA = calculateDistanceKm(driverGps.lat, driverGps.lng, coordsA.lat, coordsA.lng)
+        const distB = calculateDistanceKm(driverGps.lat, driverGps.lng, coordsB.lat, coordsB.lng)
+        return distA - distB
+      })
+    }
+
+    return list
+  }, [orders, filterTab, search, sortByNearest, driverGps])
 
   // Key KPI metrics
   const stats = useMemo(() => {
@@ -827,6 +925,87 @@ export function DriverRunSheetClient({
           </div>
         </div>
 
+        {/* ─── PHONE GPS STATUS & PROXIMITY SORT ─── */}
+        <div
+          style={{
+            background: gpsStatus === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(30, 41, 59, 0.6)',
+            border: '1px solid ' + (gpsStatus === 'active' ? 'rgba(16, 185, 129, 0.25)' : '#334155'),
+            borderRadius: 12,
+            padding: '8px 12px',
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: gpsStatus === 'active' ? '#10b981' : (gpsStatus === 'denied' ? '#ef4444' : '#64748b'),
+                boxShadow: gpsStatus === 'active' ? '0 0 8px #10b981' : 'none',
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ fontSize: 12, color: gpsStatus === 'active' ? '#34d399' : '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {gpsStatus === 'active' ? (
+                <span>
+                  <strong>Phone GPS Live</strong> {driverGps?.accuracy ? `(±${driverGps.accuracy}m)` : ''}
+                </span>
+              ) : gpsStatus === 'denied' ? (
+                <span style={{ color: '#f87171' }}>Location permission denied in browser</span>
+              ) : (
+                <span>Connect Phone GPS to track distance</span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {gpsStatus === 'active' ? (
+              <button
+                type="button"
+                onClick={() => setSortByNearest(prev => !prev)}
+                style={{
+                  background: sortByNearest ? '#10b981' : '#1e293b',
+                  color: sortByNearest ? '#022c22' : '#94a3b8',
+                  border: '1px solid ' + (sortByNearest ? '#10b981' : '#334155'),
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <NavigationIcon size={10} color={sortByNearest ? '#022c22' : '#94a3b8'} />
+                <span>{sortByNearest ? 'Nearest First' : 'Sort Nearest'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={requestGps}
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Enable GPS
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* ─── ORDER CARDS LIST ─── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filteredOrders.length === 0 ? (
@@ -855,6 +1034,12 @@ export function DriverRunSheetClient({
               const isUpdating = updatingId === order.id
               const parsedLoc = parseLocation(order.recipient_address)
               const cleanAddr = formatDisplayAddress(order.recipient_address)
+              const orderCoords = (order.location_lat != null && order.location_lng != null)
+                ? { lat: Number(order.location_lat), lng: Number(order.location_lng) }
+                : (parsedLoc.isCoords && parsedLoc.lat && parsedLoc.lng ? { lat: parsedLoc.lat, lng: parsedLoc.lng } : null)
+              const distanceKm = (driverGps && orderCoords)
+                ? calculateDistanceKm(driverGps.lat, driverGps.lng, orderCoords.lat, orderCoords.lng)
+                : null
               const orderRate = order.usd_to_lbp_rate || rate
               const isDelivered = order.status === 'delivered'
               const isPickedUp = order.status === 'picked_up'
@@ -1050,6 +1235,25 @@ export function DriverRunSheetClient({
                       {parsedLoc.isCoords && (
                         <span style={{ fontSize: 10.5, fontWeight: 700, color: '#34d399', background: '#064e3b', padding: '1px 6px', borderRadius: 4 }}>
                           GPS Pin
+                        </span>
+                      )}
+                      {distanceKm !== null && (
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            color: '#34d399',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            padding: '1px 7px',
+                            borderRadius: 4,
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                          }}
+                        >
+                          <NavigationIcon size={10} color="#34d399" />
+                          {formatDistance(distanceKm)}
                         </span>
                       )}
                     </div>
