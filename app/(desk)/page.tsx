@@ -74,9 +74,9 @@ export default async function OverviewPage() {
   const netCompanyProfit = totalDeliveries - totalDriverPay
   const profitMargin = totalDeliveries > 0 ? (netCompanyProfit / totalDeliveries) * 100 : 0
 
-  const totalOutstandingCashHeld = (driversRes.data || []).reduce((s, d) => s + Number(d.cash_held_usd || 0), 0)
-  const totalOutstandingCashHeldLbp = (driversRes.data || []).reduce((s, d) => s + Number((d as any).cash_held_lbp || 0), 0)
-  const totalOutstandingPayOwed = (driversRes.data || []).reduce((s, d) => s + Number(d.pay_owed_usd || 0), 0)
+  const totalOutstandingCashHeld = (driversRes.data || []).reduce((s, d) => s + Math.max(0, Number(d.cash_held_usd || 0)), 0)
+  const totalOutstandingCashHeldLbp = (driversRes.data || []).reduce((s, d) => s + Math.max(0, Number((d as any).cash_held_lbp || 0)), 0)
+  const totalOutstandingPayOwed = (driversRes.data || []).reduce((s, d) => s + Math.max(0, Number(d.pay_owed_usd || 0)), 0)
 
   // Top shops by volume & fees
   const shopPerformance = ((shopsRes.data || []) as any[]).map(shop => {
