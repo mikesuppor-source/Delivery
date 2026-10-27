@@ -1,6 +1,7 @@
 import { allRows } from '@/lib/pagination'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 
@@ -15,7 +16,7 @@ export default async function DriverPortalIndexPage() {
 
   const serviceSupabase = await createClient()
 
-  // If logged in, check if user is directly linked to a driver
+  // 1. If logged in via user account, check if user is directly linked to a driver
   if (user?.id) {
     const { data: linkedDriver } = await serviceSupabase
       .from('drivers')
@@ -25,6 +26,22 @@ export default async function DriverPortalIndexPage() {
 
     if (linkedDriver?.id) {
       redirect(`/driver/${linkedDriver.id}`)
+    }
+  }
+
+  // 2. Persistent Mobile App Session: If this device already has a saved courier cookie, open directly!
+  const cookieStore = await cookies()
+  const savedDriverId = cookieStore.get('cedar_saved_driver_id')?.value
+  if (savedDriverId) {
+    const { data: savedDriver } = await serviceSupabase
+      .from('drivers')
+      .select('id')
+      .eq('id', savedDriverId)
+      .eq('active', true)
+      .maybeSingle()
+
+    if (savedDriver?.id) {
+      redirect(`/driver/${savedDriver.id}`)
     }
   }
 

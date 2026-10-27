@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { Modal } from '@/components/modal'
-import { formatUSD } from '@/lib/utils'
+import { formatUSD, formatDate } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
@@ -16,6 +16,10 @@ interface Driver {
   active: boolean
   cash_held_usd: number
   pay_owed_usd: number
+  current_lat?: number | null
+  current_lng?: number | null
+  last_location_at?: string | null
+  active_orders_count?: number
 }
 
 interface MemberUser {
@@ -122,6 +126,8 @@ export function DriverListClient({
               <tr>
                 <th>Driver Name</th>
                 <th>Phone</th>
+                <th>Fleet Flow / Workload</th>
+                <th>Live GPS Location</th>
                 <th>Cash Held (To Remit)</th>
                 <th>Pay Owed (Earnings)</th>
                 <th>Status</th>
@@ -165,6 +171,51 @@ export function DriverListClient({
                     ) : '—'}
                   </td>
                   <td>
+                    {driver.active_orders_count && driver.active_orders_count > 0 ? (
+                      <span className="badge badge-assigned" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6' }} />
+                        <span>{driver.active_orders_count} to deliver</span>
+                      </span>
+                    ) : (
+                      <span className="badge" style={{ background: 'var(--surface-hover)', color: 'var(--muted)' }}>
+                        Idle (Available)
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {driver.current_lat && driver.current_lng ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <a
+                          href={`https://www.google.com/maps?q=${driver.current_lat},${driver.current_lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#10b981',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            textDecoration: 'none',
+                          }}
+                          title="Open live coordinates on Google Maps"
+                        >
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+                          <span>View on Map</span>
+                        </a>
+                        {driver.last_location_at && (
+                          <small style={{ fontSize: 10, color: 'var(--muted)' }}>
+                            {formatDate(driver.last_location_at)}
+                          </small>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        No GPS ping yet
+                      </span>
+                    )}
+                  </td>
+                  <td>
                     <strong>{formatUSD(Number(driver.cash_held_usd))}</strong>
                     <small>Unremitted COD</small>
                   </td>
@@ -179,12 +230,28 @@ export function DriverListClient({
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {driver.phone && (
+                        <a
+                          href={getWhatsAppUrl(
+                            driver.phone,
+                            `Hello ${driver.name}, here is your Cedar live run sheet link: https://delivery-five-roan.vercel.app/driver/${driver.id}`
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-secondary"
+                          style={{ fontSize: 11, padding: '4px 8px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          title="Send Run Sheet app link to courier on WhatsApp"
+                        >
+                          <WhatsAppIcon size={11} color="#25D366" />
+                          <span>Send Link</span>
+                        </a>
+                      )}
                       <Link
                         href={`/drivers/${driver.id}`}
                         className="btn btn-secondary"
                         style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none' }}
                       >
-                        View Profile
+                        Profile
                       </Link>
                       {canEdit && (
                         <button

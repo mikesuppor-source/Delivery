@@ -16,11 +16,11 @@ export default async function DriversPage() {
   const member = memberData as { workspace_id: string; role: any } | null
   if (!member) return null
 
-  const [driversRes, staffRes] = await Promise.all([
+  const [driversRes, staffRes, pendingOrdersRes] = await Promise.all([
     allRows(
       supabase
         .from('drivers')
-        .select('id, name, phone, active, cash_held_usd, pay_owed_usd')
+        .select('id, name, phone, active, cash_held_usd, pay_owed_usd, current_lat, current_lng, last_location_at')
         .eq('workspace_id', member.workspace_id)
         .order('name')
     ),
@@ -31,7 +31,27 @@ export default async function DriversPage() {
         .eq('workspace_id', member.workspace_id)
         .eq('role', 'driver')
     ),
+    allRows(
+      supabase
+        .from('orders')
+        .select('driver_id')
+        .eq('workspace_id', member.workspace_id)
+        .in('status', ['assigned', 'picked_up'])
+        .not('driver_id', 'is', null)
+    ),
   ])
+
+  const pendingCounts: Record<string, number> = {}
+  for (const o of (pendingOrdersRes.data as any[]) || []) {
+    if (o.driver_id) {
+      pendingCounts[o.driver_id] = (pendingCounts[o.driver_id] || 0) + 1
+    }
+  }
+
+  const drivers = ((driversRes.data as any[]) || []).map(d => ({
+    ...d,
+    active_orders_count: pendingCounts[d.id] || 0,
+  }))
 
   const staffMembers = ((staffRes.data as any[]) || []).map(s => ({
     id: s.user_id,
@@ -41,7 +61,7 @@ export default async function DriversPage() {
   return (
     <div className="content">
       <DriverListClient
-        drivers={(driversRes.data as any) || []}
+        drivers={drivers}
         staffMembers={staffMembers}
         workspaceId={member.workspace_id}
         userRole={member.role as UserRole}

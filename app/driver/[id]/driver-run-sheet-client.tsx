@@ -277,6 +277,12 @@ export function DriverRunSheetClient({
     const queueKey = `cedar_driver_offline_queue_${driver.id}`
     const ordersKey = `cedar_driver_orders_${driver.id}`
 
+    // 0. Bind this device to this courier profile permanently
+    try {
+      localStorage.setItem('cedar_saved_driver_id', driver.id)
+      document.cookie = `cedar_saved_driver_id=${driver.id}; path=/; max-age=31536000; SameSite=Lax`
+    } catch {}
+
     // 1. Initial connectivity check
     setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
@@ -348,6 +354,95 @@ export function DriverRunSheetClient({
     }
   }, [orders, driver.id])
 
+  // ─── AUDIO CHIME & PUSH NOTIFICATIONS TELEMETRY ───
+  const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setAlertsEnabled(Notification.permission === 'granted')
+    }
+  }, [])
+
+  const playOrderChime = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+
+      // Tone 1: High crisp ding (880 Hz / A5)
+      const osc1 = ctx.createOscillator()
+      const gain1 = ctx.createGain()
+      osc1.type = 'sine'
+      osc1.frequency.setValueAtTime(880, ctx.currentTime)
+      gain1.gain.setValueAtTime(0.5, ctx.currentTime)
+      gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+      osc1.connect(gain1)
+      gain1.connect(ctx.destination)
+      osc1.start(ctx.currentTime)
+      osc1.stop(ctx.currentTime + 0.3)
+
+      // Tone 2: Harmonic chime (1320 Hz / E6)
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.type = 'sine'
+      osc2.frequency.setValueAtTime(1320, ctx.currentTime + 0.15)
+      gain2.gain.setValueAtTime(0.6, ctx.currentTime + 0.15)
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
+      osc2.connect(gain2)
+      gain2.connect(ctx.destination)
+      osc2.start(ctx.currentTime + 0.15)
+      osc2.stop(ctx.currentTime + 0.6)
+    } catch (e) {
+      console.warn('Audio chime error:', e)
+    }
+  }, [])
+
+  const triggerVibration = useCallback(() => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([200, 100, 200, 100, 400])
+      } catch {}
+    }
+  }, [])
+
+  const triggerPushNotification = useCallback((order: DriverRunSheetOrder) => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(`🚨 New Delivery Assigned: #${order.code}`, {
+          body: `Area: ${order.area?.name || 'Assigned Area'} | COD: $${Number(order.collection_usd || 0).toFixed(2)}`,
+          icon: '/logo.png',
+        })
+      } catch {}
+    }
+  }, [])
+
+  const handleEnableAlerts = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const perm = await Notification.requestPermission()
+        setAlertsEnabled(perm === 'granted')
+        playOrderChime()
+        triggerVibration()
+        showNotification('success', '✓ Audible chime & push notifications activated!')
+      } catch {
+        playOrderChime()
+        triggerVibration()
+      }
+    } else {
+      playOrderChime()
+      triggerVibration()
+      showNotification('success', '✓ Audible chime tested!')
+    }
+  }
+
+  const handleSwitchCourier = () => {
+    try {
+      localStorage.removeItem('cedar_saved_driver_id')
+      document.cookie = 'cedar_saved_driver_id=; path=/; max-age=0'
+    } catch {}
+    window.location.href = '/driver'
+  }
+
   // Realtime updates for newly assigned or modified driver orders
   useEffect(() => {
     const supabase = createClient()
@@ -361,9 +456,22 @@ export function DriverRunSheetClient({
             const newOrder = payload.new as DriverRunSheetOrder
             setOrders(prev => (prev.some(o => o.id === newOrder.id) ? prev : [newOrder, ...prev]))
             showNotification('success', `New order #${newOrder.code} assigned to you!`)
+            playOrderChime()
+            triggerVibration()
+            triggerPushNotification(newOrder)
           } else if (payload.eventType === 'UPDATE') {
             const updated = payload.new as DriverRunSheetOrder
-            setOrders(prev => prev.map(o => (o.id === updated.id ? { ...o, ...updated } : o)))
+            setOrders(prev => {
+              const existed = prev.some(o => o.id === updated.id)
+              if (!existed && (updated.status === 'assigned' || updated.status === 'picked_up')) {
+                playOrderChime()
+                triggerVibration()
+                triggerPushNotification(updated)
+                showNotification('success', `New order #${updated.code} assigned to you!`)
+                return [updated, ...prev]
+              }
+              return prev.map(o => (o.id === updated.id ? { ...o, ...updated } : o))
+            })
           }
         }
       )
@@ -372,7 +480,7 @@ export function DriverRunSheetClient({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [driver.id])
+  }, [driver.id, playOrderChime, triggerVibration, triggerPushNotification])
 
   // Sync offline queue items to the server
   const syncOfflineQueue = useCallback(async () => {
@@ -617,30 +725,48 @@ export function DriverRunSheetClient({
             </div>
           </div>
 
-          {/* Quick Help Link with Dispatch */}
-          <a
-            href={`https://wa.me/96170000000?text=${encodeURIComponent(
-              `Hello Dispatch, this is courier ${driver.name}. I need assistance on my run sheet.`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              background: '#1e293b',
-              color: '#38bdf8',
-              border: '1px solid #334155',
-              padding: '6px 10px',
-              borderRadius: 8,
-              fontSize: 11.5,
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              textDecoration: 'none',
-            }}
-          >
-            <WhatsAppIcon size={13} color="#25D366" />
-            <span>Dispatch</span>
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Quick Alert Chime Test */}
+            <button
+              type="button"
+              onClick={handleEnableAlerts}
+              title={alertsEnabled ? 'Alert chime active (tap to test)' : 'Tap to enable loud alert sound & push notifications'}
+              style={{
+                background: alertsEnabled ? 'rgba(16, 185, 129, 0.15)' : '#1e293b',
+                color: alertsEnabled ? '#34d399' : '#94a3b8',
+                border: '1px solid ' + (alertsEnabled ? 'rgba(16, 185, 129, 0.3)' : '#334155'),
+                padding: '6px 8px',
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                cursor: 'pointer',
+              }}
+            >
+              <span>{alertsEnabled ? '🔔 Sound ON' : '🔕 Sound'}</span>
+            </button>
+
+            {/* Switch Courier Profile */}
+            <button
+              type="button"
+              onClick={handleSwitchCourier}
+              title="Switch courier profile or exit"
+              style={{
+                background: '#1e293b',
+                color: '#64748b',
+                border: '1px solid #334155',
+                padding: '6px 8px',
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Exit
+            </button>
+          </div>
         </div>
       </header>
 
@@ -740,6 +866,66 @@ export function DriverRunSheetClient({
 
       {/* ─── MAIN CONTENT CONTAINER (MOBILE OPTIMIZED) ─── */}
       <main style={{ maxWidth: 640, margin: '0 auto', padding: '16px' }}>
+        {/* PWA Phone App Install Tip & Alert Test */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
+            border: '1px solid #334155',
+            borderRadius: 12,
+            padding: '10px 14px',
+            marginBottom: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: '#10b981',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 15,
+                fontWeight: 900,
+                flexShrink: 0,
+              }}
+            >
+              C
+            </div>
+            <div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#f8fafc' }}>
+                Run as Dedicated Phone App
+              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                Tap Share/Menu $\rightarrow$ <strong>Add to Home Screen</strong> to keep on your phone
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleEnableAlerts}
+            style={{
+              background: alertsEnabled ? 'rgba(16, 185, 129, 0.2)' : '#059669',
+              color: alertsEnabled ? '#34d399' : '#ffffff',
+              border: alertsEnabled ? '1px solid rgba(16, 185, 129, 0.4)' : 'none',
+              padding: '6px 10px',
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {alertsEnabled ? '🔔 Alert Ready' : '🔔 Enable Alert'}
+          </button>
+        </div>
+
         {/* ─── METRIC CARDS ─── */}
         <div
           style={{
