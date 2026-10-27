@@ -108,6 +108,15 @@ export function DriverProfileClient({
   const [settling, setSettling] = useState(false)
   const [settleError, setSettleError] = useState('')
 
+  // End-of-Day Shift Close Modal State
+  const [isShiftCloseModalOpen, setIsShiftCloseModalOpen] = useState(false)
+  const [shiftCloseMode, setShiftCloseMode] = useState<'full' | 'net'>('full')
+  const [shiftHandoverUsd, setShiftHandoverUsd] = useState('')
+  const [shiftHandoverLbp, setShiftHandoverLbp] = useState('')
+  const [shiftNotes, setShiftNotes] = useState('')
+  const [closingShift, setClosingShift] = useState(false)
+  const [shiftCloseError, setShiftCloseError] = useState('')
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editName, setEditName] = useState(driver.name)
   const [editPhone, setEditPhone] = useState(driver.phone || '')
@@ -278,10 +287,130 @@ export function DriverProfileClient({
       setSettlementAmount('')
       setSettlementAmountLbp('')
       setSettlementNote('')
+
+      if (data.settlement?.id) {
+        window.open(`/print/settlement/${data.settlement.id}?print=1`, '_blank')
+      }
     } catch (err: unknown) {
       setSettleError(err instanceof Error ? err.message : 'Error recording settlement')
     } finally {
       setSettling(false)
+    }
+  }
+
+  function openShiftCloseModal() {
+    setShiftCloseMode('full')
+    setShiftHandoverUsd(Number(driver.cash_held_usd) > 0 ? String(driver.cash_held_usd) : '')
+    setShiftHandoverLbp(Number(driver.cash_held_lbp) > 0 ? String(driver.cash_held_lbp) : '')
+    setShiftNotes(`End-of-day shift settlement for ${driver.name} — ${new Date().toLocaleDateString('en-GB')}`)
+    setShiftCloseError('')
+    setIsShiftCloseModalOpen(true)
+  }
+
+  async function handleExecuteShiftClosure(e: React.FormEvent) {
+    e.preventDefault()
+    setClosingShift(true)
+    setShiftCloseError('')
+
+    const cashHeld = Number(driver.cash_held_usd) || 0
+    const payOwed = Number(driver.pay_owed_usd) || 0
+    const amountUsd = parseFloat(shiftHandoverUsd) || 0
+    const amountLbp = parseFloat(shiftHandoverLbp) || 0
+
+    if (amountUsd <= 0 && amountLbp <= 0) {
+      setShiftCloseError('Please enter a valid cash remittance amount.')
+      setClosingShift(false)
+      return
+    }
+
+    try {
+      if (shiftCloseMode === 'full') {
+        const res = await fetch('/api/settle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idempotencyKey: crypto.randomUUID(),
+            workspaceId: workspace.id,
+            type: 'driver_cash_remittance',
+            amountUsd,
+            amountLbp,
+            driverId: driver.id,
+            note: shiftNotes || `Shift closure: COD cash remittance for ${driver.name}`,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to record remittance')
+
+        setDriver(prev => ({
+          ...prev,
+          cash_held_usd: Math.max(0, Number(prev.cash_held_usd) - amountUsd),
+          cash_held_lbp: Math.max(0, Number(prev.cash_held_lbp || 0) - amountLbp),
+        }))
+        setSettlements(prev => [data.settlement, ...prev])
+        setIsShiftCloseModalOpen(false)
+
+        if (data.settlement?.id) {
+          window.open(`/print/settlement/${data.settlement.id}?print=1`, '_blank')
+        }
+      } else {
+        // Net Handover: Remit full cash held and pay driver commission
+        const remitRes = await fetch('/api/settle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idempotencyKey: crypto.randomUUID(),
+            workspaceId: workspace.id,
+            type: 'driver_cash_remittance',
+            amountUsd: cashHeld,
+            amountLbp,
+            driverId: driver.id,
+            note: `${shiftNotes} (COD Remitted: $${cashHeld})`,
+          }),
+        })
+        const remitData = await remitRes.json()
+        if (!remitRes.ok) throw new Error(remitData.error || 'Failed to record remittance')
+
+        let paySettlement = null
+        if (payOwed > 0) {
+          const payRes = await fetch('/api/settle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              idempotencyKey: crypto.randomUUID(),
+              workspaceId: workspace.id,
+              type: 'driver_pay',
+              amountUsd: payOwed,
+              amountLbp: 0,
+              driverId: driver.id,
+              note: `${shiftNotes} (Commission Deducted at Handover: $${payOwed})`,
+            }),
+          })
+          const payData = await payRes.json()
+          if (payRes.ok) {
+            paySettlement = payData.settlement
+          }
+        }
+
+        setDriver(prev => ({
+          ...prev,
+          cash_held_usd: 0,
+          cash_held_lbp: 0,
+          pay_owed_usd: 0,
+        }))
+
+        const newItems = [remitData.settlement]
+        if (paySettlement) newItems.unshift(paySettlement)
+        setSettlements(prev => [...newItems, ...prev])
+        setIsShiftCloseModalOpen(false)
+
+        if (remitData.settlement?.id) {
+          window.open(`/print/settlement/${remitData.settlement.id}?print=1`, '_blank')
+        }
+      }
+    } catch (err: unknown) {
+      setShiftCloseError(err instanceof Error ? err.message : 'Error closing shift')
+    } finally {
+      setClosingShift(false)
     }
   }
 
@@ -532,6 +661,19 @@ export function DriverProfileClient({
                     <line x1="12" y1="12" x2="16" y2="14" />
                   </svg>
                   Pay Courier ({formatUSD(Number(driver.pay_owed_usd))})
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={openShiftCloseModal}
+                  title="Close today's shift, record COD cash hand-in, and print handover voucher"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#059669', borderColor: '#047857' }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                  <span>Close Shift & Settle</span>
                 </button>
 
                 <button
@@ -1556,6 +1698,153 @@ export function DriverProfileClient({
             </button>
             <button type="submit" className="btn btn-primary" disabled={settling}>
               {settling ? 'Recording…' : 'Confirm & Save'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ─── MODAL: END-OF-DAY SHIFT CLOSURE ─── */}
+      <Modal
+        isOpen={isShiftCloseModalOpen}
+        onClose={() => setIsShiftCloseModalOpen(false)}
+        title="End-of-Day Shift Closure & Cash Handover"
+      >
+        <form onSubmit={handleExecuteShiftClosure}>
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.45 }}>
+              Reconcile courier deliveries, record physical cash remittance, and generate the official signed cashier handover voucher.
+            </p>
+
+            {/* Quick Shift Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+              <div style={{ background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px' }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Delivered</span>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>{deliveredCount}</div>
+                <small style={{ color: 'var(--muted)', fontSize: 10 }}>Stops completed</small>
+              </div>
+
+              <div style={{ background: 'var(--bg)', border: '1.5px solid #059669', borderRadius: 8, padding: '10px' }}>
+                <span style={{ fontSize: 11, color: '#059669', fontWeight: 700 }}>COD Cash Held</span>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#059669', marginTop: 2 }}>
+                  {formatUSD(Number(driver.cash_held_usd))}
+                </div>
+                <small style={{ color: 'var(--muted)', fontSize: 10 }}>In driver pouch</small>
+              </div>
+
+              <div style={{ background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px' }}>
+                <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}>Driver Pay</span>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--brand)', marginTop: 2 }}>
+                  {formatUSD(Number(driver.pay_owed_usd))}
+                </div>
+                <small style={{ color: 'var(--muted)', fontSize: 10 }}>Commission due</small>
+              </div>
+            </div>
+
+            {/* Handover Mode Tabs */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                SETTLEMENT METHOD
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShiftCloseMode('full')
+                    setShiftHandoverUsd(String(driver.cash_held_usd || ''))
+                  }}
+                  style={{
+                    background: shiftCloseMode === 'full' ? 'var(--brand)' : 'var(--bg)',
+                    color: shiftCloseMode === 'full' ? '#fff' : 'var(--text)',
+                    border: '1px solid ' + (shiftCloseMode === 'full' ? 'var(--brand)' : 'var(--line)'),
+                    borderRadius: 6,
+                    padding: '8px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  Full Cash Handover ({formatUSD(Number(driver.cash_held_usd))})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShiftCloseMode('net')
+                    const net = Math.max(0, Number(driver.cash_held_usd) - Number(driver.pay_owed_usd))
+                    setShiftHandoverUsd(String(net))
+                  }}
+                  style={{
+                    background: shiftCloseMode === 'net' ? '#059669' : 'var(--bg)',
+                    color: shiftCloseMode === 'net' ? '#fff' : 'var(--text)',
+                    border: '1px solid ' + (shiftCloseMode === 'net' ? '#059669' : 'var(--line)'),
+                    borderRadius: 6,
+                    padding: '8px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  Net Handover (Deduct Pay)
+                </button>
+              </div>
+              <small style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4, display: 'block' }}>
+                {shiftCloseMode === 'full'
+                  ? 'Driver hands in 100% of collected COD cash. Driver pay remains in their ledger balance.'
+                  : `Driver keeps their earned commission ($${Number(driver.pay_owed_usd).toFixed(2)}) and hands in the net balance ($${Math.max(0, Number(driver.cash_held_usd) - Number(driver.pay_owed_usd)).toFixed(2)}). Both are settled.`}
+              </small>
+            </div>
+
+            <div className="form-grid">
+              <div className="field">
+                <label>Physical USD Cash Handed to Cashier ($)</label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={shiftHandoverUsd}
+                  onChange={e => setShiftHandoverUsd(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Optional LBP Cash Handed In (L.L.)</label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="0"
+                  value={shiftHandoverLbp}
+                  onChange={e => setShiftHandoverLbp(e.target.value)}
+                />
+              </div>
+
+              <div className="field full">
+                <label>Shift Handover Notes / Memo</label>
+                <input
+                  type="text"
+                  value={shiftNotes}
+                  onChange={e => setShiftNotes(e.target.value)}
+                  placeholder="e.g. Evening shift closed, cash verified in pouch"
+                />
+              </div>
+            </div>
+          </div>
+
+          {shiftCloseError && <p className="error-msg" style={{ marginTop: 12 }}>{shiftCloseError}</p>}
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-ghost" onClick={() => setIsShiftCloseModalOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={closingShift}
+              style={{ background: '#059669', borderColor: '#047857' }}
+            >
+              {closingShift ? 'Closing Shift…' : '✓ Confirm & Print Handover Slip'}
             </button>
           </div>
         </form>

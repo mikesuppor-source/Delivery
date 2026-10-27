@@ -19,7 +19,8 @@ import {
   formatDistance,
   getLebanonAreaCoordinates,
 } from '@/lib/maps'
-import { normalizePhoneForWhatsApp } from '@/lib/whatsapp'
+import { buildCourierToCustomerMessage, getWhatsAppUrl } from '@/lib/whatsapp'
+import QRCode from 'qrcode'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import {
@@ -220,6 +221,20 @@ export function DriverRunSheetClient({
   const [showCityPickerModal, setShowCityPickerModal] = useState<boolean>(false)
   const [showGpsHelpModal, setShowGpsHelpModal] = useState<boolean>(false)
   const [isInAppBrowser, setIsInAppBrowser] = useState<boolean>(false)
+  const [showShiftSummaryModal, setShowShiftSummaryModal] = useState<boolean>(false)
+  const [shiftQrDataUrl, setShiftQrDataUrl] = useState<string>('')
+
+  const handleOpenShiftSummary = async () => {
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10)
+      const qrPayload = `CEDAR:SHIFT:${driver.id}:${stats.cashCollectedUsd}:${todayStr}`
+      const url = await QRCode.toDataURL(qrPayload, { width: 220, margin: 1 })
+      setShiftQrDataUrl(url)
+    } catch (_e) {
+      void _e
+    }
+    setShowShiftSummaryModal(true)
+  }
 
   const handleInstallApp = async () => {
     if (deferredInstallPrompt) {
@@ -1627,16 +1642,34 @@ export function DriverRunSheetClient({
 
           {/* Card 2: Cash Collected in Hand */}
           <div
+            onClick={handleOpenShiftSummary}
             style={{
               background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)',
               border: '1.5px solid #059669',
               borderRadius: 12,
               padding: '12px 14px',
+              cursor: 'pointer',
+              transition: 'transform 0.1s ease',
             }}
           >
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              {t('cashInHand')}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                {t('cashInHand')}
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  background: 'rgba(16, 185, 129, 0.25)',
+                  border: '1px solid #10b981',
+                  color: '#6ee7b7',
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  fontWeight: 700,
+                }}
+              >
+                {t('shiftHandoverBtn')} 📋
+              </span>
+            </div>
             <div style={{ fontSize: 24, fontWeight: 900, color: '#10b981', marginTop: 4 }}>
               {formatUSD(stats.cashCollectedUsd)}
             </div>
@@ -2394,9 +2427,22 @@ export function DriverRunSheetClient({
                     {/* WhatsApp Customer */}
                     {order.recipient_phone ? (
                       <a
-                        href={`https://wa.me/${normalizePhoneForWhatsApp(order.recipient_phone)}?text=${encodeURIComponent(
-                          `Hello ${order.recipient_name || 'Customer'}! I am your Cedar courier with delivery #${order.code}. I am heading to your location.`
-                        )}`}
+                        href={getWhatsAppUrl(
+                          order.recipient_phone,
+                          buildCourierToCustomerMessage(
+                            {
+                              code: order.code,
+                              tracking_token: order.tracking_token,
+                              recipient_name: order.recipient_name,
+                              recipient_address: order.recipient_address,
+                              collection_usd: Number(order.collection_usd) || 0,
+                              usd_to_lbp_rate: rate,
+                              shop: order.shop,
+                              driverName: driver.name,
+                            },
+                            lang
+                          )
+                        )}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -2413,10 +2459,10 @@ export function DriverRunSheetClient({
                           alignItems: 'center',
                           gap: 2,
                         }}
-                        title="Chat on WhatsApp"
+                        title={lang === 'ar' ? 'إرسال إشعار على واتساب' : 'Notify Customer on WhatsApp'}
                       >
                         <WhatsAppIcon size={12} color="#ffffff" />
-                        <span>{t('whatsapp')}</span>
+                        <span>{t('onTheWay')}</span>
                       </a>
                     ) : (
                       <div
@@ -2488,9 +2534,12 @@ export function DriverRunSheetClient({
                   {order.recipient_phone && (
                     <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
                       <a
-                        href={`https://wa.me/${normalizePhoneForWhatsApp(order.recipient_phone)}?text=${encodeURIComponent(
-                          `Hello ${order.recipient_name || 'Customer'}! I am your Cedar courier with delivery #${order.code}. Could you please send me your WhatsApp location pin to reach you quickly?`
-                        )}`}
+                        href={getWhatsAppUrl(
+                          order.recipient_phone,
+                          lang === 'ar'
+                            ? `مرحباً ${order.recipient_name || 'العميل الكريم'}! معكم سائق التوصيل لطلبك #${order.code} من متجر ${order.shop?.name || ''}. يرجى إرسال موقعك المباشر (WhatsApp Location Pin) لنصلك بأسرع وقت.`
+                            : `Hello ${order.recipient_name || 'Customer'}! I am your Cedar courier with delivery #${order.code} from ${order.shop?.name || 'our store'}. Could you please send me your WhatsApp location pin to reach you quickly?`
+                        )}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -2509,16 +2558,19 @@ export function DriverRunSheetClient({
                           justifyContent: 'center',
                           gap: 4,
                         }}
-                        title="Request location pin on WhatsApp"
+                        title={lang === 'ar' ? 'طلب اللوكيشن عبر واتساب' : 'Request location pin on WhatsApp'}
                       >
                         <WhatsAppIcon size={12} color="#4ade80" />
-                        <span>Ask Pin</span>
+                        <span>{t('askPin')}</span>
                       </a>
 
                       <a
-                        href={`https://wa.me/${normalizePhoneForWhatsApp(order.recipient_phone)}?text=${encodeURIComponent(
-                          `Hello ${order.recipient_name || 'Customer'}! I have arrived outside with your package #${order.code}. COD total: ${formatUSD(order.collection_usd)} (${formatLBP(usdToLbp(order.collection_usd, order.usd_to_lbp_rate || 89500))}). Please meet me outside.`
-                        )}`}
+                        href={getWhatsAppUrl(
+                          order.recipient_phone,
+                          lang === 'ar'
+                            ? `مرحباً ${order.recipient_name || 'العميل الكريم'}! أنا بالخارج الآن لتسليم طلبك #${order.code}. المبلغ المطلوب (COD): ${formatUSD(Number(order.collection_usd) || 0)} (~ ${formatLBP(usdToLbp(Number(order.collection_usd) || 0, rate))}). يرجى الاستلام.`
+                            : `Hello ${order.recipient_name || 'Customer'}! I have arrived outside with your package #${order.code}. COD total: ${formatUSD(Number(order.collection_usd) || 0)} (${formatLBP(usdToLbp(Number(order.collection_usd) || 0, rate))}). Please meet me outside.`
+                        )}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -2537,9 +2589,9 @@ export function DriverRunSheetClient({
                           justifyContent: 'center',
                           gap: 4,
                         }}
-                        title="Notify customer you have arrived"
+                        title={lang === 'ar' ? 'إشعار بالوصول خارج المبنى' : 'Notify customer you have arrived'}
                       >
-                        <span>I'm Outside</span>
+                        <span>{t('arrivedOutside')}</span>
                       </a>
                     </div>
                   )}
@@ -2820,6 +2872,136 @@ export function DriverRunSheetClient({
               }}
             >
               Got It
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── SHIFT HANDOVER SUMMARY MODAL ─── */}
+      {showShiftSummaryModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.82)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+          onClick={() => setShowShiftSummaryModal(false)}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              border: '1.5px solid #059669',
+              borderRadius: 16,
+              padding: '20px',
+              maxWidth: 420,
+              width: '100%',
+              color: '#f8fafc',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 20 }}>📋</span>
+                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: '#6ee7b7' }}>
+                  {t('shiftHandoverTitle')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowShiftSummaryModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 20, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ background: '#0f172a', padding: '12px', borderRadius: 10, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>{driver.name}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                {new Date().toLocaleDateString(lang === 'ar' ? 'ar-LB' : 'en-GB', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </div>
+            </div>
+
+            {/* Metrics Breakdown */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+              <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '10px' }}>
+                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{t('ordersCompletedToday')}</span>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>{stats.delivered}</div>
+              </div>
+              <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '10px' }}>
+                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{t('earnedPay')}</span>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#10b981', marginTop: 2 }}>
+                  {formatUSD(orders.filter(o => o.status === 'delivered').reduce((s, o) => s + (Number(o.driver_pay_usd) || 0), 0))}
+                </div>
+              </div>
+            </div>
+
+            {/* Cash in Hand to Turn In */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%)',
+                border: '1.5px solid #10b981',
+                borderRadius: 10,
+                padding: '12px 14px',
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase' }}>
+                {t('totalCodHeld')}
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: '#10b981', marginTop: 2 }}>
+                {formatUSD(stats.cashCollectedUsd)}
+              </div>
+              <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 2, fontWeight: 600 }}>
+                ≈ {formatLBP(usdToLbp(stats.cashCollectedUsd, rate))}
+              </div>
+            </div>
+
+            {/* Handover QR Code for Cashier Scan */}
+            {shiftQrDataUrl && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
+                <div style={{ background: '#ffffff', padding: 8, borderRadius: 10, display: 'inline-block' }}>
+                  <img src={shiftQrDataUrl} alt="Shift Handover QR" style={{ width: 160, height: 160, display: 'block' }} />
+                </div>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, textAlign: 'center' }}>
+                  {t('voucherScanHint')}
+                </div>
+              </div>
+            )}
+
+            <p style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 16, lineHeight: 1.45, textAlign: 'center' }}>
+              {t('scanOrPresent')}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setShowShiftSummaryModal(false)}
+              style={{
+                width: '100%',
+                background: '#059669',
+                color: '#ffffff',
+                border: 'none',
+                padding: '12px',
+                borderRadius: 8,
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              {lang === 'ar' ? 'إغلاق' : 'Close Summary'}
             </button>
           </div>
         </div>

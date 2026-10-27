@@ -151,6 +151,60 @@ export function buildCustomerOrderMessage(order: {
 /**
  * Generates courier assignment / dispatch notification message
  */
+export function buildCourierToCustomerMessage(order: {
+  code: string
+  tracking_token?: string
+  recipient_name?: string | null
+  recipient_address?: string | null
+  collection_usd: number
+  usd_to_lbp_rate?: number
+  shop?: { name: string } | null
+  driverName?: string | null
+}, lang: 'en' | 'ar' = 'ar'): string {
+  const baseUrl = getBaseUrl()
+  const customer = order.recipient_name?.trim() || (lang === 'ar' ? 'العميل الكريم' : 'Customer')
+  const shopName = order.shop?.name || (lang === 'ar' ? 'المتجر' : 'Store')
+  const rate = Number(order.usd_to_lbp_rate) || 89500
+  const colUSD = Number(order.collection_usd) || 0
+  const colLBP = usdToLbp(colUSD, rate)
+  const trackingLink = `${baseUrl}/track/${order.tracking_token || order.code}`
+
+  if (lang === 'ar') {
+    let msg = `مرحباً ${customer}! 🛵\n`
+    msg += `معك سائق توصيل طلبك *#${order.code}* من متجر *${shopName}*.\n\n`
+    if (colUSD > 0) {
+      msg += `💵 *المبلغ المطلوب تحضيره عند الاستلام (COD):*\n`
+      msg += `*${formatUSD(colUSD)}* (~ ${formatLBP(colLBP)})\n\n`
+    } else {
+      msg += `📦 *الطلب مدفوع مسبقاً ($0.00)*\n\n`
+    }
+    if (order.recipient_address) {
+      msg += `📍 *عنوان التسليم:* ${order.recipient_address}\n\n`
+    }
+    msg += `📲 يرجى إرسال موقعك المباشر (Location Pin) لتسهيل الوصول إليك:\n${trackingLink}\n\n`
+    msg += `شكراً لتعاونكم!`
+    return msg
+  }
+
+  let msg = `Hello ${customer}! 🛵\n`
+  msg += `I am your courier on the way with your delivery *#${order.code}* from *${shopName}*.\n\n`
+  if (colUSD > 0) {
+    msg += `💵 *Cash to Prepare (COD):*\n`
+    msg += `*${formatUSD(colUSD)}* (~ ${formatLBP(colLBP)})\n\n`
+  } else {
+    msg += `📦 *Prepaid Delivery ($0.00)*\n\n`
+  }
+  if (order.recipient_address) {
+    msg += `📍 *Destination:* ${order.recipient_address}\n\n`
+  }
+  msg += `📲 Please reply with your live location pin or delivery instructions:\n${trackingLink}\n\n`
+  msg += `Thank you!`
+  return msg
+}
+
+/**
+ * Generates courier assignment / dispatch notification message
+ */
 export function buildDriverDispatchMessage(order: {
   code: string
   tracking_token?: string

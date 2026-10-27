@@ -65,6 +65,7 @@ export default async function DeskLayout({
         <Topbar
           usdToLbp={Number(workspace.usd_to_lbp)}
           workspaceId={workspace.id}
+          userRole={member.role}
         />
         {children}
       </main>

@@ -3,7 +3,7 @@ import { api,ApiError,checked,money,textField } from '@/lib/api'
 import { workspaceAccess } from '@/lib/access'
 export const PATCH=api(async req=>{
  const body=await req.json()
- const {db,workspaceId}=await workspaceAccess(body.workspaceId,['owner'])
+ const {db,workspaceId}=await workspaceAccess(body.workspaceId,['owner','manager'])
  const updates:{name?:string;currency?:string;usd_to_lbp?:number;default_driver_pay_usd?:number;default_delivery_fee_usd?:number}={}
  if(body.name!==undefined)updates.name=textField(body.name,'workspace name',200,true)
  if(body.currency!==undefined){
