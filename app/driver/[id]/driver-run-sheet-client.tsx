@@ -112,6 +112,19 @@ function resolveOrderCoordinates(order: DriverRunSheetOrder): { lat: number; lng
   return null
 }
 
+export const LEBANON_QUICK_CITIES = [
+  { name: 'Beirut (Central)', lat: 33.8938, lng: 35.5018 },
+  { name: 'Metn / Sin El Fil', lat: 33.8860, lng: 35.5683 },
+  { name: 'Baabda / Hadath', lat: 33.8333, lng: 35.5333 },
+  { name: 'Jounieh / Keserwan', lat: 33.9808, lng: 35.6178 },
+  { name: 'Jbeil / Byblos', lat: 34.1226, lng: 35.6517 },
+  { name: 'Tripoli / North', lat: 34.4367, lng: 35.8497 },
+  { name: 'Saida / Sidon', lat: 33.5631, lng: 35.3689 },
+  { name: 'Sour / Tyre', lat: 33.2733, lng: 35.1939 },
+  { name: 'Zahlé / Bekaa', lat: 33.8463, lng: 35.9020 },
+  { name: 'Chouf / Aley', lat: 33.8058, lng: 35.6025 },
+]
+
 export function DriverRunSheetClient({
   driver,
   initialOrders,
@@ -136,10 +149,50 @@ export function DriverRunSheetClient({
 
   // Phone GPS & Navigation Proximity State
   type GpsStatus = 'prompt' | 'requesting' | 'active' | 'denied' | 'unavailable' | 'timeout' | 'unsupported'
-  const [driverGps, setDriverGps] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null)
+  const [driverGps, setDriverGps] = useState<{ lat: number; lng: number; accuracy?: number; label?: string } | null>(null)
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('prompt')
   const [gpsErrorText, setGpsErrorText] = useState<string | null>(null)
   const [sortByNearest, setSortByNearest] = useState<boolean>(false)
+
+  // PWA App Install, In-App Browser & Modals State
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null)
+  const [isStandaloneApp, setIsStandaloneApp] = useState<boolean>(false)
+  const [showIosInstallModal, setShowIosInstallModal] = useState<boolean>(false)
+  const [showCityPickerModal, setShowCityPickerModal] = useState<boolean>(false)
+  const [showGpsHelpModal, setShowGpsHelpModal] = useState<boolean>(false)
+  const [isInAppBrowser, setIsInAppBrowser] = useState<boolean>(false)
+
+  const handleInstallApp = async () => {
+    if (deferredInstallPrompt) {
+      try {
+        deferredInstallPrompt.prompt()
+        const choice = await deferredInstallPrompt.userChoice
+        if (choice.outcome === 'accepted') {
+          setIsStandaloneApp(true)
+          setDeferredInstallPrompt(null)
+        }
+      } catch (_e) {
+        void _e
+      }
+    } else {
+      setShowIosInstallModal(true)
+    }
+  }
+
+  const handleSelectManualCity = (city: { name: string; lat: number; lng: number }) => {
+    const coords = { lat: city.lat, lng: city.lng, accuracy: 500, label: city.name }
+    setDriverGps(coords)
+    setGpsStatus('active')
+    setGpsErrorText(null)
+    setShowCityPickerModal(false)
+    sendLocationTelemetry(coords.lat, coords.lng)
+    try {
+      localStorage.setItem('cedar_driver_gps_active', '1')
+      localStorage.setItem('cedar_driver_manual_city', city.name)
+    } catch (_e) {
+      void _e
+    }
+  }
 
   const watchIdRef = useRef<number | null>(null)
   const lastTelemetryRef = useRef<{ lat: number; lng: number; time: number } | null>(null)
@@ -291,34 +344,78 @@ export function DriverRunSheetClient({
     }
   }, [])
 
+  // Detect In-App Browser (WhatsApp, Instagram, etc.) & PWA Standalone State
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ua = navigator.userAgent || ''
+      setIsInAppBrowser(/WhatsApp|FBAN|FBAV|Instagram|Line/i.test(ua))
+
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true
+      setIsStandaloneApp(isStandalone)
+
+      const handleBeforeInstall = (e: Event) => {
+        e.preventDefault()
+        setDeferredInstallPrompt(e)
+      }
+      window.addEventListener('beforeinstallprompt', handleBeforeInstall)
+
+      const handleInstalled = () => {
+        setIsStandaloneApp(true)
+        setDeferredInstallPrompt(null)
+      }
+      window.addEventListener('appinstalled', handleInstalled)
+
+      return () => {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
+        window.removeEventListener('appinstalled', handleInstalled)
+      }
+    }
+  }, [])
+
   // Auto-connect if permission was previously granted or saved
   useEffect(() => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
+    if (typeof window !== 'undefined') {
       let savedActive = false
+      let savedCity: string | null = null
       try {
         savedActive = localStorage.getItem('cedar_driver_gps_active') === '1'
+        savedCity = localStorage.getItem('cedar_driver_manual_city')
       } catch (_e) {
         void _e
       }
 
-      if (navigator.permissions && navigator.permissions.query) {
-        navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(res => {
-          if (res.state === 'granted') {
-            requestGps()
-          } else if (res.state === 'denied') {
-            setGpsStatus('denied')
-            setGpsErrorText(
-              'Location permission was denied. Tap the lock/aA icon in your browser address bar to allow location, then tap Retry GPS.'
-            )
-          } else if (savedActive) {
-            requestGps()
-          }
-        }).catch(_err => {
-          void _err
-          if (savedActive) requestGps()
-        })
-      } else if (savedActive) {
-        requestGps()
+      if (savedCity) {
+        const found = LEBANON_QUICK_CITIES.find(c => c.name === savedCity)
+        if (found) {
+          setDriverGps({ lat: found.lat, lng: found.lng, accuracy: 500, label: found.name })
+          setGpsStatus('active')
+        }
+      }
+
+      if (navigator.geolocation) {
+        if (navigator.permissions && navigator.permissions.query) {
+          navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(res => {
+            if (res.state === 'granted') {
+              requestGps()
+            } else if (res.state === 'denied') {
+              if (!savedCity) {
+                setGpsStatus('denied')
+                setGpsErrorText(
+                  'Location permission was denied. Tap the lock/aA icon in your browser address bar to allow location, or pick your area manually.'
+                )
+              }
+            } else if (savedActive && !savedCity) {
+              requestGps()
+            }
+          }).catch(_err => {
+            void _err
+            if (savedActive && !savedCity) requestGps()
+          })
+        } else if (savedActive && !savedCity) {
+          requestGps()
+        }
       }
     }
   }, [requestGps])
@@ -1006,7 +1103,41 @@ export function DriverRunSheetClient({
 
       {/* ─── MAIN CONTENT CONTAINER (MOBILE OPTIMIZED) ─── */}
       <main style={{ maxWidth: 640, margin: '0 auto', padding: '16px' }}>
-        {/* PWA Phone App Install Tip & Alert Test */}
+        {/* In-App Browser (WhatsApp / Telegram) Warning */}
+        {isInAppBrowser && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(180, 83, 9, 0.25) 100%)',
+              border: '1.5px solid #f59e0b',
+              borderRadius: 12,
+              padding: '12px 14px',
+              marginBottom: 14,
+              color: '#fef08a',
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>⚠️ Viewing Inside WhatsApp Browser</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#fef3c7', lineHeight: 1.45 }}>
+              WhatsApp&apos;s built-in browser blocks Phone GPS and prevents adding the app to your home screen.
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                padding: '6px 10px',
+                background: 'rgba(0,0,0,0.3)',
+                borderRadius: 8,
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: '#fde68a',
+              }}
+            >
+              👉 Tap the <strong>3 dots (⋮)</strong> or <strong>Share icon</strong> in the top or bottom corner and choose <u>Open in Safari</u> or <u>Open in Chrome</u>.
+            </div>
+          </div>
+        )}
+
+        {/* PWA Phone App Install Bar */}
         <div
           style={{
             background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
@@ -1018,52 +1149,78 @@ export function DriverRunSheetClient({
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 10,
+            flexWrap: 'wrap',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             <div
               style={{
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 borderRadius: 8,
                 background: '#10b981',
                 color: '#fff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: 900,
                 flexShrink: 0,
               }}
             >
               C
             </div>
-            <div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#f8fafc' }}>
-                Run as Dedicated Phone App
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
+                {isStandaloneApp ? 'Cedar Courier App' : 'Install as Phone App'}
               </div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                Tap Share/Menu $\rightarrow$ <strong>Add to Home Screen</strong> to keep on your phone
+                {isStandaloneApp ? 'Running in Fullscreen App Mode' : 'Add to Home Screen for fast 1-tap run sheet launch'}
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleEnableAlerts}
-            style={{
-              background: alertsEnabled ? 'rgba(16, 185, 129, 0.2)' : '#059669',
-              color: alertsEnabled ? '#34d399' : '#ffffff',
-              border: alertsEnabled ? '1px solid rgba(16, 185, 129, 0.4)' : 'none',
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {alertsEnabled ? '🔔 Alert Ready' : '🔔 Enable Alert'}
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {!isStandaloneApp && (
+              <button
+                type="button"
+                onClick={handleInstallApp}
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <span>📲 Install App</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleEnableAlerts}
+              style={{
+                background: alertsEnabled ? 'rgba(16, 185, 129, 0.2)' : '#059669',
+                color: alertsEnabled ? '#34d399' : '#ffffff',
+                border: alertsEnabled ? '1px solid rgba(16, 185, 129, 0.4)' : 'none',
+                padding: '6px 10px',
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {alertsEnabled ? '🔔 Alert Ready' : '🔔 Enable Sound'}
+            </button>
+          </div>
         </div>
 
         {/* ─── METRIC CARDS ─── */}
@@ -1315,7 +1472,7 @@ export function DriverRunSheetClient({
               <div style={{ fontSize: 12, color: '#f8fafc', minWidth: 0 }}>
                 {gpsStatus === 'active' ? (
                   <span style={{ color: '#34d399' }}>
-                    <strong>Phone GPS Live</strong> {driverGps?.accuracy ? `(±${driverGps.accuracy}m)` : ''}
+                    <strong>{driverGps?.label ? `Location: ${driverGps.label}` : 'Phone GPS Live'}</strong> {driverGps?.label ? '(Area)' : (driverGps?.accuracy ? `(±${driverGps.accuracy}m)` : '')}
                   </span>
                 ) : gpsStatus === 'requesting' ? (
                   <span style={{ color: '#38bdf8' }}>
@@ -1343,26 +1500,45 @@ export function DriverRunSheetClient({
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               {gpsStatus === 'active' ? (
-                <button
-                  type="button"
-                  onClick={() => setSortByNearest(prev => !prev)}
-                  style={{
-                    background: sortByNearest ? '#10b981' : '#1e293b',
-                    color: sortByNearest ? '#022c22' : '#94a3b8',
-                    border: '1px solid ' + (sortByNearest ? '#10b981' : '#334155'),
-                    padding: '5px 10px',
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <NavigationIcon size={10} color={sortByNearest ? '#022c22' : '#94a3b8'} />
-                  <span>{sortByNearest ? 'Nearest First' : 'Sort Nearest'}</span>
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => setSortByNearest(prev => !prev)}
+                    style={{
+                      background: sortByNearest ? '#10b981' : '#1e293b',
+                      color: sortByNearest ? '#022c22' : '#94a3b8',
+                      border: '1px solid ' + (sortByNearest ? '#10b981' : '#334155'),
+                      padding: '5px 10px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <NavigationIcon size={10} color={sortByNearest ? '#022c22' : '#94a3b8'} />
+                    <span>{sortByNearest ? 'Nearest First' : 'Sort Nearest'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCityPickerModal(true)}
+                    style={{
+                      background: '#1e293b',
+                      color: '#94a3b8',
+                      border: '1px solid #334155',
+                      padding: '5px 8px',
+                      borderRadius: 6,
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                    title="Change delivery area"
+                  >
+                    Area ▾
+                  </button>
+                </div>
               ) : gpsStatus === 'requesting' ? (
                 <button
                   type="button"
@@ -1382,7 +1558,7 @@ export function DriverRunSheetClient({
                   Locating...
                 </button>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => requestGps(false)}
@@ -1400,23 +1576,42 @@ export function DriverRunSheetClient({
                     {gpsStatus === 'prompt' ? 'Enable GPS' : 'Retry GPS'}
                   </button>
                   {(gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'timeout') && (
-                    <button
-                      type="button"
-                      onClick={() => requestGps(true)}
-                      style={{
-                        background: '#334155',
-                        color: '#cbd5e1',
-                        border: '1px solid #475569',
-                        padding: '5px 8px',
-                        borderRadius: 6,
-                        fontSize: 10.5,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                      title="Use Cell/WiFi network location"
-                    >
-                      Network
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => requestGps(true)}
+                        style={{
+                          background: '#334155',
+                          color: '#cbd5e1',
+                          border: '1px solid #475569',
+                          padding: '5px 8px',
+                          borderRadius: 6,
+                          fontSize: 10.5,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        title="Use Cell/WiFi network location"
+                      >
+                        Network
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowCityPickerModal(true)}
+                        style={{
+                          background: '#059669',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '5px 9px',
+                          borderRadius: 6,
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                        title="Pick your city or area manually"
+                      >
+                        📍 Set Area
+                      </button>
+                    </>
                   )}
                 </div>
               )}
@@ -1440,6 +1635,40 @@ export function DriverRunSheetClient({
                 {gpsStatus === 'denied' ? 'How to allow browser location:' : 'GPS Connection Note:'}
               </div>
               <div>{gpsErrorText}</div>
+              <div style={{ marginTop: 6, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowGpsHelpModal(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: '#38bdf8',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  Step-by-step phone settings guide ↗
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCityPickerModal(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: '#34d399',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  Pick delivery city manually ↗
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -2134,6 +2363,304 @@ export function DriverRunSheetClient({
           order={viewPodOrder}
           onClose={() => setViewPodOrder(null)}
         />
+      )}
+
+      {/* ─── PWA INSTALL MODAL (iOS & Android Guide) ─── */}
+      {showIosInstallModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+          onClick={() => setShowIosInstallModal(false)}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 16,
+              padding: '20px',
+              maxWidth: 480,
+              width: '100%',
+              color: '#f8fafc',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Install Cedar on Your Phone</h3>
+              <button
+                type="button"
+                onClick={() => setShowIosInstallModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 20, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16, lineHeight: 1.45 }}>
+              Install Cedar Courier directly onto your phone&apos;s home screen to launch it anytime with 1-tap, just like a native app:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: '#0f172a', padding: '10px 12px', borderRadius: 10 }}>
+                <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>1</span>
+                <div style={{ fontSize: 13, lineHeight: 1.4 }}>
+                  <strong>In Safari (iPhone)</strong>, tap the <strong>Share</strong> button <span style={{ fontSize: 15 }}>⎋</span> (bottom bar). In Chrome (Android), tap the <strong>3 dots (⋮)</strong> menu.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: '#0f172a', padding: '10px 12px', borderRadius: 10 }}>
+                <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>2</span>
+                <div style={{ fontSize: 13, lineHeight: 1.4 }}>
+                  Scroll down the menu and tap <strong>Add to Home Screen</strong> <span style={{ fontSize: 15 }}>➕</span>.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: '#0f172a', padding: '10px 12px', borderRadius: 10 }}>
+                <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>3</span>
+                <div style={{ fontSize: 13, lineHeight: 1.4 }}>
+                  Tap <strong>Add</strong> in the top-right corner. The <strong>Cedar</strong> app icon will now appear on your home screen!
+                </div>
+              </div>
+            </div>
+
+            {isInAppBrowser && (
+              <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', borderRadius: 8, padding: '10px', fontSize: 12, color: '#fef08a', marginBottom: 16 }}>
+                <strong>Note:</strong> You are currently viewing inside WhatsApp. Please tap the 3 dots in the corner and choose <u>Open in Safari</u> or <u>Open in Chrome</u> first.
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowIosInstallModal(false)}
+              style={{
+                width: '100%',
+                background: '#10b981',
+                color: '#022c22',
+                border: 'none',
+                padding: '10px',
+                borderRadius: 8,
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MANUAL CITY / AREA PICKER MODAL ─── */}
+      {showCityPickerModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+          onClick={() => setShowCityPickerModal(false)}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 16,
+              padding: '20px',
+              maxWidth: 440,
+              width: '100%',
+              color: '#f8fafc',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Select Delivery Area</h3>
+              <button
+                type="button"
+                onClick={() => setShowCityPickerModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 20, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>
+              Choose your current delivery area in Lebanon. Drop-off distances and &quot;Sort Nearest&quot; will immediately calculate from this location:
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+              {LEBANON_QUICK_CITIES.map(city => (
+                <button
+                  key={city.name}
+                  type="button"
+                  onClick={() => handleSelectManualCity(city)}
+                  style={{
+                    background: '#0f172a',
+                    border: '1px solid #334155',
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                    color: '#f8fafc',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span style={{ color: '#10b981' }}>📍</span>
+                  <span>{city.name}</span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowCityPickerModal(false)}
+              style={{
+                width: '100%',
+                background: '#334155',
+                color: '#cbd5e1',
+                border: 'none',
+                padding: '8px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── PHONE GPS PERMISSION GUIDE MODAL ─── */}
+      {showGpsHelpModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+          onClick={() => setShowGpsHelpModal(false)}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 16,
+              padding: '20px',
+              maxWidth: 480,
+              width: '100%',
+              color: '#f8fafc',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Phone GPS &amp; Permission Guide</h3>
+              <button
+                type="button"
+                onClick={() => setShowGpsHelpModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 20, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {isInAppBrowser && (
+              <div style={{ background: 'rgba(245, 158, 11, 0.2)', border: '1px solid #f59e0b', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#fef08a', marginBottom: 14 }}>
+                <strong>⚠️ WhatsApp In-App Browser Warning:</strong> You are viewing inside WhatsApp. WhatsApp does NOT allow website GPS. Tap the 3 dots (⋮) in the corner and tap <u>Open in Safari</u> or <u>Open in Chrome</u>.
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>
+                🍏 iPhone (iOS Safari)
+              </div>
+              <ol style={{ fontSize: 12, color: '#cbd5e1', paddingLeft: 18, margin: 0, lineHeight: 1.6 }}>
+                <li>Open iPhone <strong>Settings</strong> $\rightarrow$ <strong>Privacy &amp; Security</strong> $\rightarrow$ <strong>Location Services</strong>.</li>
+                <li>Ensure the top switch is turned <strong>ON</strong>.</li>
+                <li>In that same list, tap <strong>Safari Websites</strong> $\rightarrow$ select <strong>&quot;While Using the App&quot;</strong> and turn <strong>&quot;Precise Location&quot; ON</strong>.</li>
+                <li>Return to Safari, tap the <strong>aA</strong> icon in the address bar $\rightarrow$ <strong>Website Settings</strong> $\rightarrow$ set Location to <strong>Allow</strong>.</li>
+              </ol>
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#34d399', marginBottom: 6 }}>
+                🤖 Android (Chrome)
+              </div>
+              <ol style={{ fontSize: 12, color: '#cbd5e1', paddingLeft: 18, margin: 0, lineHeight: 1.6 }}>
+                <li>Swipe down the top notification shade on your phone and ensure <strong>Location / GPS</strong> is <strong>ON</strong>.</li>
+                <li>In Chrome, tap the <strong>🔒 Lock icon</strong> in the address bar $\rightarrow$ <strong>Permissions</strong> $\rightarrow$ <strong>Location</strong> $\rightarrow$ set to <strong>Allow</strong>.</li>
+                <li>If still blocked, open phone <strong>Settings</strong> $\rightarrow$ <strong>Apps</strong> $\rightarrow$ <strong>Chrome</strong> $\rightarrow$ <strong>Permissions</strong> $\rightarrow$ <strong>Location</strong> $\rightarrow$ select <strong>Allow only while using the app</strong>.</li>
+              </ol>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowGpsHelpModal(false)
+                  requestGps(false)
+                }}
+                style={{
+                  flex: 1,
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '10px',
+                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: 12.5,
+                  cursor: 'pointer',
+                  minWidth: 120,
+                }}
+              >
+                Retry GPS Now
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowGpsHelpModal(false)
+                  setShowCityPickerModal(true)
+                }}
+                style={{
+                  flex: 1,
+                  background: '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '10px',
+                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: 12.5,
+                  cursor: 'pointer',
+                  minWidth: 120,
+                }}
+              >
+                📍 Pick City Instead
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
