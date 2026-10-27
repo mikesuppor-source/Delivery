@@ -53,7 +53,7 @@ export function NewOrderClient({
   const [areaId, setAreaId] = useState(areas[0]?.id || '')
   const [netItemUsd, setNetItemUsd] = useState('25')
   const [deliveryFeeUsd, setDeliveryFeeUsd] = useState(String(areas[0]?.fee_usd || '3'))
-  const [driverPayUsd, setDriverPayUsd] = useState(String(Math.max(1, (areas[0]?.fee_usd || 3) - 1)))
+  const [driverPayUsd, setDriverPayUsd] = useState('2.00')
   // Pricing Mode: 'added' (Fee added on top of net order for customer) vs 'free_delivery' (shop absorbs fee)
   const [pricingMode, setPricingMode] = useState<'added' | 'free_delivery'>('added')
   const [customCode, setCustomCode] = useState('')
@@ -126,7 +126,10 @@ export function NewOrderClient({
     const sel = areas.find(a => a.id === newAreaId)
     if (sel) {
       setDeliveryFeeUsd(String(sel.fee_usd))
-      setDriverPayUsd(String(Math.max(1, Number(sel.fee_usd) - 1)))
+      // Maintain user's courier pay, or default to 2.00 if unset
+      if (!driverPayUsd || driverPayUsd === '0') {
+        setDriverPayUsd('2.00')
+      }
     }
   }
 
@@ -154,10 +157,10 @@ export function NewOrderClient({
     setPhoneMatchedCustomer(null)
     setNetItemUsd('25')
     setPricingMode('added')
+    setDriverPayUsd('2.00')
     if (areas[0]) {
       setAreaId(areas[0].id)
       setDeliveryFeeUsd(String(areas[0].fee_usd))
-      setDriverPayUsd(String(Math.max(1, areas[0].fee_usd - 1)))
     }
   }
 
@@ -541,7 +544,7 @@ export function NewOrderClient({
                   >
                     Free Delivery / Shop Pays (توصيل مجاني - على المتجر)
                     <div style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--muted)', marginTop: 2 }}>
-                      Customer pays only goods (${netItemNum}). Fee deducted from shop payout (Shop gets <strong>${shopNetUsd}</strong>).
+                      Customer pays only goods (${netItemNum}). Fee deducted from shop payout (Shop gets <strong>{formatUSD(Math.max(0, netItemNum - feeUsdNum))}</strong>).
                     </div>
                   </button>
                 </div>
@@ -555,7 +558,7 @@ export function NewOrderClient({
                 <input
                   id="net-item-price"
                   type="number"
-                  step="0.5"
+                  step="0.01"
                   min="0"
                   value={netItemUsd}
                   onChange={e => setNetItemUsd(e.target.value)}
@@ -575,7 +578,7 @@ export function NewOrderClient({
                 <input
                   id="delivery-fee"
                   type="number"
-                  step="0.5"
+                  step="0.01"
                   min="0"
                   value={deliveryFeeUsd}
                   onChange={e => setDeliveryFeeUsd(e.target.value)}
@@ -602,13 +605,38 @@ export function NewOrderClient({
 
               {/* Courier Pay */}
               <div className="field">
-                <label htmlFor="courier-pay" style={{ fontWeight: 700, color: '#0f172a' }}>
-                  Courier Pay / Driver Commission (USD) <span style={{ color: 'var(--danger)' }}>*</span>
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
+                  <label htmlFor="courier-pay" style={{ fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                    Courier Pay / Driver Commission (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {['1.00', '1.50', '1.60', '2.00', '2.50'].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setDriverPayUsd(val)}
+                        style={{
+                          fontSize: 11,
+                          padding: '1px 6px',
+                          border: '1px solid',
+                          borderColor: Number(driverPayUsd) === Number(val) ? 'var(--brand)' : 'var(--line)',
+                          background: Number(driverPayUsd) === Number(val) ? 'var(--brand-light)' : 'var(--bg)',
+                          color: Number(driverPayUsd) === Number(val) ? 'var(--brand)' : 'var(--muted)',
+                          fontWeight: Number(driverPayUsd) === Number(val) ? 700 : 500,
+                          borderRadius: 4,
+                          cursor: 'pointer',
+                        }}
+                        title={`Set courier commission to $${val}`}
+                      >
+                        ${val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <input
                   id="courier-pay"
                   type="number"
-                  step="0.5"
+                  step="0.01"
                   min="0"
                   value={driverPayUsd}
                   onChange={e => setDriverPayUsd(e.target.value)}
@@ -616,7 +644,7 @@ export function NewOrderClient({
                   style={{ fontWeight: 700 }}
                 />
                 <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                  Courier run-sheet earning
+                  Courier run-sheet earning per order (Click preset above or type any custom amount like 1.60 or 2.00)
                 </span>
               </div>
 

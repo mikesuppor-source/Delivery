@@ -452,7 +452,10 @@ export function OrderListClient({
     const sel = areas.find(a => a.id === newAreaId)
     if (sel) {
       setDeliveryFeeUsd(String(sel.fee_usd))
-      setDriverPayUsd(String(Math.max(1, Number(sel.fee_usd) - 1)))
+      // Maintain user's courier pay, or default to 2.00 if unset
+      if (!driverPayUsd || driverPayUsd === '0') {
+        setDriverPayUsd('2.00')
+      }
     }
   }
 
@@ -1882,7 +1885,7 @@ export function OrderListClient({
               <label>Cash Collection (USD)</label>
               <input
                 type="number"
-                step="0.5"
+                step="0.01"
                 min="0"
                 value={editCollectionUsd}
                 onChange={e => setEditCollectionUsd(e.target.value)}
@@ -1894,7 +1897,7 @@ export function OrderListClient({
               <label>Delivery Fee (USD)</label>
               <input
                 type="number"
-                step="0.5"
+                step="0.01"
                 min="0"
                 value={editDeliveryFeeUsd}
                 onChange={e => setEditDeliveryFeeUsd(e.target.value)}
@@ -1903,10 +1906,35 @@ export function OrderListClient({
             </div>
 
             <div className="field">
-              <label>Driver Pay (USD)</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
+                <label style={{ margin: 0 }}>Driver Pay (USD)</label>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {['1.00', '1.50', '1.60', '2.00', '2.50'].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setEditDriverPayUsd(val)}
+                      style={{
+                        fontSize: 10.5,
+                        padding: '1px 5px',
+                        border: '1px solid',
+                        borderColor: Number(editDriverPayUsd) === Number(val) ? 'var(--brand)' : 'var(--line)',
+                        background: Number(editDriverPayUsd) === Number(val) ? 'var(--brand-light)' : 'var(--bg)',
+                        color: Number(editDriverPayUsd) === Number(val) ? 'var(--brand)' : 'var(--muted)',
+                        fontWeight: Number(editDriverPayUsd) === Number(val) ? 700 : 500,
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                      }}
+                      title={`Set courier commission to $${val}`}
+                    >
+                      ${val}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <input
                 type="number"
-                step="0.5"
+                step="0.01"
                 min="0"
                 value={editDriverPayUsd}
                 onChange={e => setEditDriverPayUsd(e.target.value)}
@@ -2233,7 +2261,7 @@ export function OrderListClient({
                 >
                   Free Delivery / Shop Pays (توصيل مجاني - على المتجر)
                   <div style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--muted)', marginTop: 2 }}>
-                    Customer pays only goods (${modalNetItemNum}). Fee deducted from shop payout (Shop gets <strong>${modalShopNetUsd}</strong>).
+                    Customer pays only goods (${modalNetItemNum}). Fee deducted from shop payout (Shop gets <strong>{formatUSD(Math.max(0, modalNetItemNum - modalFeeUsdNum))}</strong>).
                   </div>
                 </button>
               </div>
@@ -2245,7 +2273,7 @@ export function OrderListClient({
               </label>
               <input
                 type="number"
-                step="0.5"
+                step="0.01"
                 min="0"
                 value={netItemUsd}
                 onChange={e => setNetItemUsd(e.target.value)}
@@ -2263,7 +2291,7 @@ export function OrderListClient({
               </label>
               <input
                 type="number"
-                step="0.5"
+                step="0.01"
                 min="0"
                 value={deliveryFeeUsd}
                 onChange={e => setDeliveryFeeUsd(e.target.value)}
@@ -2288,12 +2316,37 @@ export function OrderListClient({
             </div>
 
             <div className="field">
-              <label style={{ fontWeight: 700, color: '#0f172a' }}>
-                Courier Pay / Driver Commission (USD) <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
+                <label style={{ fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  Courier Pay / Driver Commission (USD) <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {['1.00', '1.50', '1.60', '2.00', '2.50'].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setDriverPayUsd(val)}
+                      style={{
+                        fontSize: 10.5,
+                        padding: '1px 5px',
+                        border: '1px solid',
+                        borderColor: Number(driverPayUsd) === Number(val) ? 'var(--brand)' : 'var(--line)',
+                        background: Number(driverPayUsd) === Number(val) ? 'var(--brand-light)' : 'var(--bg)',
+                        color: Number(driverPayUsd) === Number(val) ? 'var(--brand)' : 'var(--muted)',
+                        fontWeight: Number(driverPayUsd) === Number(val) ? 700 : 500,
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                      }}
+                      title={`Set courier commission to $${val}`}
+                    >
+                      ${val}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <input
                 type="number"
-                step="0.5"
+                step="0.01"
                 min="0"
                 value={driverPayUsd}
                 onChange={e => setDriverPayUsd(e.target.value)}
@@ -2301,7 +2354,7 @@ export function OrderListClient({
                 style={{ fontWeight: 700 }}
               />
               <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                Courier run-sheet earning
+                Courier run-sheet earning per order (Click preset or type any custom amount like 1.60 or 2.00)
               </span>
             </div>
 
