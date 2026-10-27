@@ -5,6 +5,7 @@ import { generateUniqueOrderCode, formatOrderCode } from '@/lib/order-codes'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 import { findBestDriverForArea } from '@/lib/auto-dispatch'
+import { sendPushToDriver } from '@/lib/push'
 
 export const GET = api(async req => {
   const { client } = await authenticated()
@@ -52,6 +53,16 @@ export const POST = api(async req => {
     destination_town:textField(body.destinationTown, 'town', 100),
     notes:textField(body.notes,'notes',4000),created_by:user.id
   }).select(ORDER_SELECT).single())
+
+  if (resolvedDriverId) {
+    sendPushToDriver(resolvedDriverId, {
+      title: 'Cedar Delivery — New Order',
+      body: `New order #${order.code} assigned to you (${order.destination_town || order.recipient_address || 'Delivery'})`,
+      url: `/driver/${resolvedDriverId}`,
+      tag: `order-${order.code}`,
+    }).catch(e => console.error('[Push Dispatch Error]:', e))
+  }
+
   return NextResponse.json({success:true,order})
 })
 export const PATCH = api(async req => {
@@ -81,6 +92,14 @@ export const PATCH = api(async req => {
   if(!updated) throw new ApiError(404,'Order not found or update could not be completed')
   if(updated.status === 'delivered') {
     fulfillShopifyOrder(db, order.id).catch(e => console.error('Shopify fulfillment sync failed:', e))
+  }
+  if (updates.driver_id && updates.driver_id !== order.driver_id) {
+    sendPushToDriver(updates.driver_id, {
+      title: 'Cedar Delivery — New Order Assigned',
+      body: `Order #${updated.code} has been assigned to you (${updated.destination_town || updated.recipient_address || 'Delivery'})`,
+      url: `/driver/${updates.driver_id}`,
+      tag: `order-${updated.code}`,
+    }).catch(e => console.error('[Push Dispatch Error]:', e))
   }
   return NextResponse.json({success:true,order:updated})
 })

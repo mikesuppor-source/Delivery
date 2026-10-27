@@ -34,6 +34,8 @@ interface NewOrderClientProps {
   areas: DeliveryArea[]
   userRole: UserRole
   rate: number
+  defaultDriverPayUsd?: number | null
+  defaultDeliveryFeeUsd?: number | null
 }
 
 export function NewOrderClient({
@@ -44,16 +46,23 @@ export function NewOrderClient({
   areas,
   userRole: _userRole,
   rate,
+  defaultDriverPayUsd,
+  defaultDeliveryFeeUsd,
 }: NewOrderClientProps) {
   const router = useRouter()
+
+  const initialDriverPay = defaultDriverPayUsd != null ? String(defaultDriverPayUsd) : '2.00'
+  const initialDeliveryFee = areas[0]?.fee_usd != null 
+    ? String(areas[0].fee_usd) 
+    : (defaultDeliveryFeeUsd != null ? String(defaultDeliveryFeeUsd) : '3.50')
 
   // Form State
   const [shopId, setShopId] = useState(shops[0]?.id || '')
   const [driverId, setDriverId] = useState('')
   const [areaId, setAreaId] = useState(areas[0]?.id || '')
   const [netItemUsd, setNetItemUsd] = useState('25')
-  const [deliveryFeeUsd, setDeliveryFeeUsd] = useState(String(areas[0]?.fee_usd || '3'))
-  const [driverPayUsd, setDriverPayUsd] = useState('2.00')
+  const [deliveryFeeUsd, setDeliveryFeeUsd] = useState(initialDeliveryFee)
+  const [driverPayUsd, setDriverPayUsd] = useState(initialDriverPay)
   // Pricing Mode: 'added' (Fee added on top of net order for customer) vs 'free_delivery' (shop absorbs fee)
   const [pricingMode, setPricingMode] = useState<'added' | 'free_delivery'>('added')
   const [customCode, setCustomCode] = useState('')
@@ -126,10 +135,12 @@ export function NewOrderClient({
     const sel = areas.find(a => a.id === newAreaId)
     if (sel) {
       setDeliveryFeeUsd(String(sel.fee_usd))
-      // Maintain user's courier pay, or default to 2.00 if unset
+      // Maintain user's courier pay, or default if unset
       if (!driverPayUsd || driverPayUsd === '0') {
-        setDriverPayUsd('2.00')
+        setDriverPayUsd(initialDriverPay)
       }
+    } else {
+      setDeliveryFeeUsd(initialDeliveryFee)
     }
   }
 
@@ -157,10 +168,12 @@ export function NewOrderClient({
     setPhoneMatchedCustomer(null)
     setNetItemUsd('25')
     setPricingMode('added')
-    setDriverPayUsd('2.00')
+    setDriverPayUsd(initialDriverPay)
     if (areas[0]) {
       setAreaId(areas[0].id)
       setDeliveryFeeUsd(String(areas[0].fee_usd))
+    } else {
+      setDeliveryFeeUsd(initialDeliveryFee)
     }
   }
 

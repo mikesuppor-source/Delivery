@@ -28,6 +28,8 @@ export default async function SettingsPage() {
     slug: string
     usd_to_lbp: number
     currency: string
+    default_driver_pay_usd?: number | null
+    default_delivery_fee_usd?: number | null
   } | null
 
   if (!workspace) return null

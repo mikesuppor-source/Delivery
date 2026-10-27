@@ -88,3 +88,62 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
+
+// Push Event: Handle background push notifications when screen is locked or browser in background
+self.addEventListener('push', (event) => {
+  let data = {
+    title: 'Cedar Delivery',
+    body: 'New order update available',
+    url: '/driver',
+    tag: 'cedar-dispatch'
+  };
+
+  try {
+    if (event.data) {
+      data = Object.assign(data, event.data.json());
+    }
+  } catch (_e) {
+    if (event.data) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/logo.png',
+    badge: data.badge || '/logo.png',
+    vibrate: [200, 100, 200, 100, 200],
+    data: {
+      url: data.url || '/driver'
+    },
+    tag: data.tag || 'cedar-dispatch',
+    renotify: true,
+    requireInteraction: true
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Notification Click: Focus existing window or open the driver run sheet
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes('/driver') && 'focus' in client) {
+          if (targetUrl && client.url !== targetUrl && 'navigate' in client) {
+            client.navigate(targetUrl);
+          }
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

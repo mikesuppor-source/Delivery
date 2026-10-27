@@ -31,11 +31,17 @@ export default async function NewOrderPage() {
 
   const { data: wsData } = await supabase
     .from('workspaces')
-    .select('*')
+    .select('id, name, usd_to_lbp, default_driver_pay_usd, default_delivery_fee_usd')
     .eq('id', member.workspace_id)
     .single()
 
-  const workspace = wsData as { id: string; name: string; usd_to_lbp: number } | null
+  const workspace = wsData as {
+    id: string
+    name: string
+    usd_to_lbp: number
+    default_driver_pay_usd?: number | null
+    default_delivery_fee_usd?: number | null
+  } | null
   if (!workspace) {
     redirect('/onboarding')
   }
@@ -78,6 +84,8 @@ export default async function NewOrderPage() {
         areas={(areasRes.data as any) || []}
         userRole={member.role as UserRole}
         rate={Number(workspace.usd_to_lbp) || 89500}
+        defaultDriverPayUsd={workspace.default_driver_pay_usd}
+        defaultDeliveryFeeUsd={workspace.default_delivery_fee_usd}
       />
     </div>
   )

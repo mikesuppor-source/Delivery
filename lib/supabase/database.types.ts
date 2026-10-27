@@ -154,6 +154,47 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          driver_id: string
+          endpoint: string
+          id: string
+          last_used_at: string
+          p256dh: string
+          user_agent: string | null
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          driver_id: string
+          endpoint: string
+          id?: string
+          last_used_at?: string
+          p256dh: string
+          user_agent?: string | null
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          driver_id?: string
+          endpoint?: string
+          id?: string
+          last_used_at?: string
+          p256dh?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_push_subscriptions_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       oauth_states: {
         Row: {
           nonce: string
@@ -736,6 +777,8 @@ export type Database = {
         Row: {
           created_at: string
           currency: string
+          default_delivery_fee_usd: number | null
+          default_driver_pay_usd: number | null
           id: string
           name: string
           slug: string
@@ -744,6 +787,8 @@ export type Database = {
         Insert: {
           created_at?: string
           currency?: string
+          default_delivery_fee_usd?: number | null
+          default_driver_pay_usd?: number | null
           id?: string
           name: string
           slug: string
@@ -752,6 +797,8 @@ export type Database = {
         Update: {
           created_at?: string
           currency?: string
+          default_delivery_fee_usd?: number | null
+          default_driver_pay_usd?: number | null
           id?: string
           name?: string
           slug?: string

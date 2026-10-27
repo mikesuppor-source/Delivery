@@ -33,6 +33,7 @@ import {
 import { DeliveryPodModal } from './delivery-pod-modal'
 import { DeliveryFailModal } from './delivery-fail-modal'
 import { DeliveryPodViewModal } from './delivery-pod-view-modal'
+import { useDriverTranslation, type DriverLang } from '@/lib/driver-i18n'
 
 export interface DriverRunSheetOrder {
   id: string
@@ -126,12 +127,69 @@ export const LEBANON_QUICK_CITIES = [
   { name: 'Chouf / Aley', lat: 33.8058, lng: 35.6025 },
 ]
 
+const VAPID_PUBLIC_KEY =
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+  'BNuDgLL_EdWvNDLSM2vA5ER-OAsBwoKaT9JadeksO4nD5IHeE4HXX8TOg_uez1wiJ-PSslp1dKHejy-DxKbXuHw'
+
+function urlB64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+
 export function DriverRunSheetClient({
   driver,
   initialOrders,
   rate,
   workspaceName,
 }: DriverRunSheetClientProps) {
+  // Bilingual Arabic / English Support
+  const [lang, setLang] = useState<DriverLang>('en')
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cedar_driver_lang') as DriverLang | null
+      if (saved === 'ar' || saved === 'en') {
+        setLang(saved)
+      }
+    } catch (_e) {
+      void _e
+    }
+  }, [])
+
+  const toggleLang = () => {
+    const nextLang: DriverLang = lang === 'en' ? 'ar' : 'en'
+    setLang(nextLang)
+    try {
+      localStorage.setItem('cedar_driver_lang', nextLang)
+    } catch (_e) {
+      void _e
+    }
+  }
+
+  const t = useDriverTranslation(lang)
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return t('statusPending')
+      case 'assigned': return t('statusAssigned')
+      case 'picked_up': return t('statusPickedUp')
+      case 'delivered': return t('statusDelivered')
+      case 'failed': return t('statusFailed')
+      case 'returned': return t('statusReturned')
+      default: return ORDER_STATUS_LABELS[status] || status
+    }
+  }
+
+  // Background Web Push Notification State
+  const [pushSubscribed, setPushSubscribed] = useState<boolean>(false)
+  const [pushLoading, setPushLoading] = useState<boolean>(false)
+
   const [orders, setOrders] = useState<DriverRunSheetOrder[]>(initialOrders)
   const [filterTab, setFilterTab] = useState<'to_deliver' | 'all' | 'delivered' | 'failed'>('to_deliver')
   const [search, setSearch] = useState('')
@@ -651,23 +709,111 @@ export function DriverRunSheetClient({
     }
   }, [])
 
-  const handleEnableAlerts = async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        const perm = await Notification.requestPermission()
-        setAlertsEnabled(perm === 'granted')
-        playOrderChime()
-        triggerVibration()
-        showNotification('success', '✓ Audible chime & push notifications activated!')
-      } catch {
-        playOrderChime()
-        triggerVibration()
-      }
-    } else {
-      playOrderChime()
-      triggerVibration()
-      showNotification('success', '✓ Audible chime tested!')
+  // Check existing push subscription on load
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.ready.then(async reg => {
+        try {
+          const sub = await reg.pushManager.getSubscription()
+          if (sub) {
+            setPushSubscribed(true)
+            setAlertsEnabled(true)
+          }
+        } catch (_e) {
+          void _e
+        }
+      })
     }
+  }, [])
+
+  const handleSubscribePush = async () => {
+    setPushLoading(true)
+    playOrderChime()
+    triggerVibration()
+
+    try {
+      if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+        showNotification('error', 'Push is not supported on this device/browser.')
+        setPushLoading(false)
+        return
+      }
+
+      if ('Notification' in window) {
+        const perm = await Notification.requestPermission()
+        if (perm !== 'granted') {
+          showNotification('error', t('pushFailedToast'))
+          setPushLoading(false)
+          return
+        }
+      }
+
+      const reg = await navigator.serviceWorker.ready
+      if (!('pushManager' in reg)) {
+        showNotification('error', 'PushManager is not available on this device.')
+        setPushLoading(false)
+        return
+      }
+
+      let sub = await reg.pushManager.getSubscription()
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+        })
+      }
+
+      const res = await fetch('/api/driver/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: driver.id,
+          subscription: sub.toJSON(),
+        }),
+      })
+
+      if (res.ok) {
+        setPushSubscribed(true)
+        setAlertsEnabled(true)
+        showNotification('success', t('pushActiveToast'))
+      } else {
+        showNotification('error', t('pushFailedToast'))
+      }
+    } catch (err) {
+      console.warn('[Push Subscribe Error]:', err)
+      showNotification('error', t('pushFailedToast'))
+    } finally {
+      setPushLoading(false)
+    }
+  }
+
+  const handleTestPush = async () => {
+    setPushLoading(true)
+    playOrderChime()
+    triggerVibration()
+    try {
+      const res = await fetch('/api/driver/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: driver.id,
+          test: true,
+        }),
+      })
+      if (res.ok) {
+        showNotification('success', t('pushTestToast'))
+      } else {
+        showNotification('error', 'Failed to dispatch test alert.')
+      }
+    } catch (_e) {
+      void _e
+      showNotification('error', 'Failed to dispatch test alert.')
+    } finally {
+      setPushLoading(false)
+    }
+  }
+
+  const handleEnableAlerts = async () => {
+    await handleSubscribePush()
   }
 
   const handleSwitchCourier = async () => {
@@ -894,6 +1040,7 @@ export function DriverRunSheetClient({
 
   return (
     <div
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
       style={{
         minHeight: '100vh',
         background: '#0f172a',
@@ -954,25 +1101,47 @@ export function DriverRunSheetClient({
                     border: '1px solid #059669',
                   }}
                 >
-                  Courier Active
+                  {t('courierActive')}
                 </span>
               </div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                {workspaceName} · {new Date().toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric' })}
+                {workspaceName} · {new Date().toLocaleDateString(lang === 'ar' ? 'ar-LB' : 'en-GB', { weekday: 'short', month: 'short', day: 'numeric' })}
               </div>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Bilingual Arabic / English Switch */}
+            <button
+              type="button"
+              onClick={toggleLang}
+              title="Switch Language / تغيير اللغة"
+              style={{
+                background: '#1e293b',
+                color: '#38bdf8',
+                border: '1px solid #0284c7',
+                padding: '6px 10px',
+                borderRadius: 8,
+                fontSize: 11.5,
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                cursor: 'pointer',
+              }}
+            >
+              <span>{t('switchLang')}</span>
+            </button>
+
             {/* Quick Alert Chime Test */}
             <button
               type="button"
               onClick={handleEnableAlerts}
-              title={alertsEnabled ? 'Alert chime active (tap to test)' : 'Tap to enable loud alert sound & push notifications'}
+              title={pushSubscribed || alertsEnabled ? 'Alert chime active (tap to test)' : 'Tap to enable loud alert sound & push notifications'}
               style={{
-                background: alertsEnabled ? 'rgba(16, 185, 129, 0.15)' : '#1e293b',
-                color: alertsEnabled ? '#34d399' : '#94a3b8',
-                border: '1px solid ' + (alertsEnabled ? 'rgba(16, 185, 129, 0.3)' : '#334155'),
+                background: pushSubscribed || alertsEnabled ? 'rgba(16, 185, 129, 0.15)' : '#1e293b',
+                color: pushSubscribed || alertsEnabled ? '#34d399' : '#94a3b8',
+                border: '1px solid ' + (pushSubscribed || alertsEnabled ? 'rgba(16, 185, 129, 0.3)' : '#334155'),
                 padding: '6px 8px',
                 borderRadius: 8,
                 fontSize: 11,
@@ -983,7 +1152,7 @@ export function DriverRunSheetClient({
                 cursor: 'pointer',
               }}
             >
-              <span>{alertsEnabled ? '🔔 Sound ON' : '🔕 Sound'}</span>
+              <span>{pushSubscribed || alertsEnabled ? '🔔' : '🔕'}</span>
             </button>
 
             {/* Switch Courier Profile */}
@@ -1002,7 +1171,7 @@ export function DriverRunSheetClient({
                 cursor: 'pointer',
               }}
             >
-              Exit
+              {t('exit')}
             </button>
           </div>
         </div>
@@ -1039,11 +1208,11 @@ export function DriverRunSheetClient({
               <span>
                 {!isOnline ? (
                   <>
-                    <strong>Offline Mode:</strong> No internet connection. Deliveries and signatures will save locally.
+                    <strong>{t('offlineMode')}</strong>
                   </>
                 ) : (
                   <>
-                    <strong>{offlineQueue.length} pending offline deliver{offlineQueue.length > 1 ? 'ies' : 'y'}</strong> ready to upload to cloud.
+                    <strong>{offlineQueue.length} {t('pendingOffline')}</strong>
                   </>
                 )}
               </span>
@@ -1068,7 +1237,7 @@ export function DriverRunSheetClient({
                   gap: 5,
                 }}
               >
-                {isSyncing ? 'Syncing…' : `Sync Now (${offlineQueue.length})`}
+                {isSyncing ? t('syncing') : `${t('syncNow')} (${offlineQueue.length})`}
               </button>
             )}
           </div>
@@ -1117,10 +1286,10 @@ export function DriverRunSheetClient({
             }}
           >
             <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>⚠️ Viewing Inside WhatsApp Browser</span>
+              <span>⚠️ {t('whatsappBrowserWarn')}</span>
             </div>
             <div style={{ fontSize: 12, color: '#fef3c7', lineHeight: 1.45 }}>
-              WhatsApp&apos;s built-in browser blocks Phone GPS and prevents adding the app to your home screen.
+              {t('whatsappBrowserDesc')}
             </div>
             <div
               style={{
@@ -1133,12 +1302,12 @@ export function DriverRunSheetClient({
                 color: '#fde68a',
               }}
             >
-              👉 Tap the <strong>3 dots (⋮)</strong> or <strong>Share icon</strong> in the top or bottom corner and choose <u>Open in Safari</u> or <u>Open in Chrome</u>.
+              👉 {t('whatsappBrowserAction')}
             </div>
           </div>
         )}
 
-        {/* PWA Phone App Install Bar */}
+        {/* PWA Phone App Install Bar & Background Alerts */}
         <div
           style={{
             background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
@@ -1173,10 +1342,10 @@ export function DriverRunSheetClient({
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
-                {isStandaloneApp ? 'Cedar Courier App' : 'Install as Phone App'}
+                {isStandaloneApp ? t('cedarCourierApp') : t('installAsApp')}
               </div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                {isStandaloneApp ? 'Running in Fullscreen App Mode' : 'Add to Home Screen for fast 1-tap run sheet launch'}
+                {isStandaloneApp ? t('appModeFullscreen') : t('appModeDesc')}
               </div>
             </div>
           </div>
@@ -1200,27 +1369,66 @@ export function DriverRunSheetClient({
                   gap: 4,
                 }}
               >
-                <span>📲 Install App</span>
+                <span>{t('installAppBtn')}</span>
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleEnableAlerts}
-              style={{
-                background: alertsEnabled ? 'rgba(16, 185, 129, 0.2)' : '#059669',
-                color: alertsEnabled ? '#34d399' : '#ffffff',
-                border: alertsEnabled ? '1px solid rgba(16, 185, 129, 0.4)' : 'none',
-                padding: '6px 10px',
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {alertsEnabled ? '🔔 Alert Ready' : '🔔 Enable Sound'}
-            </button>
+            {pushSubscribed ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    color: '#34d399',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t('alertsReady')}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleTestPush}
+                  disabled={pushLoading}
+                  title="Test lock-screen notification"
+                  style={{
+                    background: '#334155',
+                    color: '#f8fafc',
+                    border: '1px solid #475569',
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {pushLoading ? '…' : t('testPush')}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubscribePush}
+                disabled={pushLoading}
+                style={{
+                  background: '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {pushLoading ? '…' : t('enableAlerts')}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1243,18 +1451,18 @@ export function DriverRunSheetClient({
             }}
           >
             <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              Pending Deliveries
+              {t('pendingDeliveries')}
             </span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
               <span style={{ fontSize: 26, fontWeight: 900, color: '#f8fafc' }}>
                 {stats.toDeliver}
               </span>
               <span style={{ fontSize: 12, color: '#64748b' }}>
-                / {stats.total} Total
+                / {stats.total}
               </span>
             </div>
             <div style={{ fontSize: 11, color: '#38bdf8', marginTop: 2, fontWeight: 600 }}>
-              {formatUSD(stats.pendingCashUsd)} COD to collect
+              {formatUSD(stats.pendingCashUsd)} {t('codToCollect')}
             </div>
           </div>
 
@@ -1268,7 +1476,7 @@ export function DriverRunSheetClient({
             }}
           >
             <span style={{ fontSize: 11, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              Collected in Hand (COD)
+              {t('cashInHand')}
             </span>
             <div style={{ fontSize: 24, fontWeight: 900, color: '#10b981', marginTop: 4 }}>
               {formatUSD(stats.cashCollectedUsd)}
@@ -1290,7 +1498,7 @@ export function DriverRunSheetClient({
           >
             <input
               type="text"
-              placeholder="Search by customer, phone, code, area…"
+              placeholder={t('searchPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{
@@ -1351,7 +1559,7 @@ export function DriverRunSheetClient({
                 whiteSpace: 'nowrap',
               }}
             >
-              To Deliver ({stats.toDeliver})
+              {t('toDeliverTab')} ({stats.toDeliver})
             </button>
             <button
               type="button"
@@ -1368,7 +1576,7 @@ export function DriverRunSheetClient({
                 whiteSpace: 'nowrap',
               }}
             >
-              Delivered ({stats.delivered})
+              {t('deliveredTab')} ({stats.delivered})
             </button>
             <button
               type="button"
@@ -1385,7 +1593,7 @@ export function DriverRunSheetClient({
                 whiteSpace: 'nowrap',
               }}
             >
-              All Stops ({stats.total})
+              {t('allTab')} ({stats.total})
             </button>
             {stats.failed > 0 && (
               <button
@@ -1403,7 +1611,7 @@ export function DriverRunSheetClient({
                   whiteSpace: 'nowrap',
                 }}
               >
-                Failed ({stats.failed})
+                {t('failedTab')} ({stats.failed})
               </button>
             )}
           </div>
@@ -1520,7 +1728,7 @@ export function DriverRunSheetClient({
                     }}
                   >
                     <NavigationIcon size={10} color={sortByNearest ? '#022c22' : '#94a3b8'} />
-                    <span>{sortByNearest ? 'Nearest First' : 'Sort Nearest'}</span>
+                    <span>{sortByNearest ? t('nearestFirst') : t('sortNearest')}</span>
                   </button>
                   <button
                     type="button"
@@ -1537,7 +1745,7 @@ export function DriverRunSheetClient({
                     }}
                     title="Change delivery area"
                   >
-                    Area ▾
+                    {t('area')} ▾
                   </button>
                 </div>
               ) : gpsStatus === 'requesting' ? (
@@ -1574,7 +1782,7 @@ export function DriverRunSheetClient({
                       cursor: 'pointer',
                     }}
                   >
-                    {gpsStatus === 'prompt' ? 'Enable GPS' : 'Retry GPS'}
+                    {gpsStatus === 'prompt' ? t('enableGps') : 'Retry GPS'}
                   </button>
                   {(gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'timeout') && (
                     <>
@@ -1610,7 +1818,7 @@ export function DriverRunSheetClient({
                         }}
                         title="Pick your city or area manually"
                       >
-                        📍 Set Area
+                        📍 {t('setArea')}
                       </button>
                     </>
                   )}
@@ -1689,12 +1897,12 @@ export function DriverRunSheetClient({
             >
               <PackageIcon size={36} color="#64748b" />
               <div style={{ fontSize: 15, fontWeight: 700, marginTop: 10, color: '#f8fafc' }}>
-                No packages in this tab
+                {t('noOrders')}
               </div>
               <p style={{ fontSize: 12, marginTop: 4, color: '#94a3b8' }}>
                 {filterTab === 'to_deliver'
-                  ? 'All assigned deliveries have been completed or no orders are currently out for delivery.'
-                  : 'Try selecting a different filter above.'}
+                  ? (lang === 'ar' ? 'تم تسليم جميع الطلبات المعينة أو لا توجد طرود حالياً.' : 'All assigned deliveries have been completed or no orders are currently out for delivery.')
+                  : (lang === 'ar' ? 'جرّب اختيار تبويب آخر من الأعلى.' : 'Try selecting a different filter above.')}
               </p>
             </div>
           ) : (
@@ -1775,7 +1983,7 @@ export function DriverRunSheetClient({
                             gap: 3,
                           }}
                         >
-                          <span>Pending Sync</span>
+                          <span>{t('pendingSync')}</span>
                         </span>
                       )}
 
@@ -1803,7 +2011,7 @@ export function DriverRunSheetClient({
                               : '#fca5a5',
                         }}
                       >
-                        {ORDER_STATUS_LABELS[order.status] || order.status}
+                        {getStatusLabel(order.status)}
                       </span>
                     </div>
                   </div>
@@ -1826,9 +2034,9 @@ export function DriverRunSheetClient({
                       }}
                     >
                       <div>
-                        <div>REPLACEMENT / تبديل</div>
+                        <div>{t('replacementTitle')}</div>
                         <div style={{ fontSize: 11, fontWeight: 500, color: '#fde68a' }}>
-                          Collect old item from customer before handing over this parcel!
+                          {t('replacementDesc')}
                         </div>
                       </div>
                     </div>
@@ -1851,9 +2059,9 @@ export function DriverRunSheetClient({
                       }}
                     >
                       <div>
-                        <div>RETURN PICKUP / استلام مرتجع</div>
+                        <div>{t('returnPickupTitle')}</div>
                         <div style={{ fontSize: 11, fontWeight: 500, color: '#d8b4fe' }}>
-                          Pick up package from client and return to hub/merchant.
+                          {t('returnPickupDesc')}
                         </div>
                       </div>
                     </div>
@@ -1890,7 +2098,7 @@ export function DriverRunSheetClient({
                           }}
                           title="Fragile / Breakable Content"
                         >
-                          FRAGILE / كسر
+                          {t('fragile')}
                         </span>
                       )}
                       {order.weight_kg && order.weight_kg > 1 && (
@@ -1930,7 +2138,7 @@ export function DriverRunSheetClient({
 
                     {order.notes && (
                       <div style={{ fontSize: 11, color: '#fde047', background: 'rgba(253, 224, 71, 0.1)', padding: '4px 8px', borderRadius: 6, marginTop: 6, border: '1px solid rgba(253, 224, 71, 0.2)' }}>
-                        Note: {order.notes}
+                        {t('notes')}: {order.notes}
                       </div>
                     )}
                   </div>
@@ -1949,7 +2157,7 @@ export function DriverRunSheetClient({
                   >
                     <div>
                       <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                        Cash to Collect (COD)
+                        {t('cod')}
                       </span>
                       <div style={{ fontSize: 18, fontWeight: 900, color: '#10b981' }}>
                         {formatUSD(Number(order.collection_usd || 0))}
@@ -1957,7 +2165,7 @@ export function DriverRunSheetClient({
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                        In Lebanese Pounds
+                        {t('inLbp')}
                       </span>
                       <div style={{ fontSize: 13, fontWeight: 800, color: '#cbd5e1' }}>
                         {formatLBP(usdToLbp(Number(order.collection_usd || 0), orderRate))}
@@ -1996,7 +2204,7 @@ export function DriverRunSheetClient({
                       title="Navigate with Waze"
                     >
                       <NavigationIcon size={12} color="#ffffff" />
-                      <span>Waze</span>
+                      <span>{t('waze')}</span>
                     </a>
 
                     {/* Google Maps Directions */}
@@ -2021,7 +2229,7 @@ export function DriverRunSheetClient({
                       title="Navigate with Google Maps"
                     >
                       <GoogleMapsIcon size={12} />
-                      <span>Maps</span>
+                      <span>{t('maps')}</span>
                     </a>
 
                     {/* WhatsApp Customer */}
@@ -2049,7 +2257,7 @@ export function DriverRunSheetClient({
                         title="Chat on WhatsApp"
                       >
                         <WhatsAppIcon size={12} color="#ffffff" />
-                        <span>Chat</span>
+                        <span>{t('whatsapp')}</span>
                       </a>
                     ) : (
                       <div
@@ -2068,7 +2276,7 @@ export function DriverRunSheetClient({
                         }}
                       >
                         <WhatsAppIcon size={12} color="#64748b" />
-                        <span>No Tel</span>
+                        <span>-</span>
                       </div>
                     )}
 
@@ -2093,7 +2301,7 @@ export function DriverRunSheetClient({
                         title="Call Customer"
                       >
                         <PhoneIcon size={12} color="#f8fafc" />
-                        <span>Call</span>
+                        <span>{t('call')}</span>
                       </a>
                     ) : (
                       <div
@@ -2112,7 +2320,7 @@ export function DriverRunSheetClient({
                         }}
                       >
                         <PhoneIcon size={12} color="#64748b" />
-                        <span>No Tel</span>
+                        <span>-</span>
                       </div>
                     )}
                   </div>
@@ -2202,7 +2410,7 @@ export function DriverRunSheetClient({
                         }}
                       >
                         <PackageIcon size={14} color="#fff" />
-                        <span>{isUpdating ? 'Updating…' : 'Pick Up from Store'}</span>
+                        <span>{isUpdating ? (lang === 'ar' ? 'جارِ التحديث…' : 'Updating…') : (lang === 'ar' ? 'استلام من المتجر' : 'Pick Up from Store')}</span>
                       </button>
                     )}
 
@@ -2230,7 +2438,7 @@ export function DriverRunSheetClient({
                           }}
                         >
                           <CheckIcon size={14} color="#fff" />
-                          <span>{isUpdating ? 'Saving…' : `Delivered & POD ($${Number(order.collection_usd).toFixed(2)})`}</span>
+                          <span>{isUpdating ? (lang === 'ar' ? 'جارِ الحفظ…' : 'Saving…') : (lang === 'ar' ? `تأكيد التسليم والتوقيع ($${Number(order.collection_usd).toFixed(2)})` : `Delivered & POD ($${Number(order.collection_usd).toFixed(2)})`)}</span>
                         </button>
 
                         <button
@@ -2249,7 +2457,7 @@ export function DriverRunSheetClient({
                             cursor: 'pointer',
                           }}
                         >
-                          ✕ Reschedule
+                          {lang === 'ar' ? '✕ مشكلة / تأجيل' : '✕ Reschedule'}
                         </button>
                       </>
                     )}
@@ -2259,7 +2467,7 @@ export function DriverRunSheetClient({
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 6 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 12, color: '#6ee7b7', fontWeight: 700 }}>
-                            ✓ Delivered on {order.delivered_at ? formatDate(order.delivered_at) : 'Today'}
+                            {lang === 'ar' ? `✓ تم التوصيل في ${order.delivered_at ? formatDate(order.delivered_at) : 'اليوم'}` : `✓ Delivered on ${order.delivered_at ? formatDate(order.delivered_at) : 'Today'}`}
                           </span>
                           {(order.pod_signature || order.pod_photo) && (
                             <button
@@ -2276,7 +2484,7 @@ export function DriverRunSheetClient({
                                 cursor: 'pointer',
                               }}
                             >
-                              View POD
+                              {t('viewPod')}
                             </button>
                           )}
                         </div>
@@ -2294,7 +2502,7 @@ export function DriverRunSheetClient({
                             cursor: 'pointer',
                           }}
                         >
-                          Revert to in-transit
+                          {lang === 'ar' ? 'إعادة إلى قيد التوصيل' : 'Revert to in-transit'}
                         </button>
                       </div>
                     )}
@@ -2303,7 +2511,7 @@ export function DriverRunSheetClient({
                     {isFailed && (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <span style={{ fontSize: 12, color: '#fca5a5', fontWeight: 700 }}>
-                          Attempted / Postponed
+                          {lang === 'ar' ? 'تمت المحاولة / مؤجل' : 'Attempted / Postponed'}
                         </span>
                         <button
                           type="button"
@@ -2320,7 +2528,7 @@ export function DriverRunSheetClient({
                             cursor: 'pointer',
                           }}
                         >
-                          Retry Delivery
+                          {lang === 'ar' ? 'إعادة المحاولة' : 'Retry Delivery'}
                         </button>
                       </div>
                     )}

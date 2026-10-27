@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { sendPushToDriver } from '@/lib/push'
 
 export interface AreaDriverSummary {
   areaId: string
@@ -185,6 +186,7 @@ export async function batchAutoAssignOrders(
   let assignedCount = 0
   const assignedCodes: string[] = []
   const areaCounts = new Map<string, number>()
+  const driverAssignedOrders = new Map<string, string[]>()
 
   for (const order of unassignedOrders) {
     if (!order.area_id || !areaPoolMap.has(order.area_id)) continue
@@ -223,7 +225,21 @@ export async function batchAutoAssignOrders(
       // Increment chosen driver load so the next order balances to the next courier
       driverLoads.set(chosenDriverId, (driverLoads.get(chosenDriverId) || 0) + 1)
       areaCounts.set(order.area_id, (areaCounts.get(order.area_id) || 0) + 1)
+      const list = driverAssignedOrders.get(chosenDriverId) || []
+      list.push(order.code)
+      driverAssignedOrders.set(chosenDriverId, list)
     }
+  }
+
+  // Dispatch background push notifications to all couriers assigned in this batch
+  for (const [dId, codes] of driverAssignedOrders.entries()) {
+    const count = codes.length
+    sendPushToDriver(dId, {
+      title: 'Cedar Delivery — New Orders Assigned',
+      body: `${count} new order${count === 1 ? '' : 's'} assigned to your run sheet (${codes.slice(0, 3).join(', ')}${count > 3 ? '...' : ''})`,
+      url: `/driver/${dId}`,
+      tag: `batch-dispatch-${dId}`,
+    }).catch(e => console.error('[Batch Push Error]:', e))
   }
 
   const areaSummaries: AreaDriverSummary[] = []

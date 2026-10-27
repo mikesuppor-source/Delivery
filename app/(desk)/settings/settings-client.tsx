@@ -9,6 +9,8 @@ interface SettingsClientProps {
     slug: string
     usd_to_lbp: number
     currency: string
+    default_driver_pay_usd?: number | null
+    default_delivery_fee_usd?: number | null
   }
   isOwner: boolean
 }
@@ -17,6 +19,8 @@ export function SettingsClient({ workspace, isOwner }: SettingsClientProps) {
   const [name, setName] = useState(workspace.name)
   const [currency, setCurrency] = useState(workspace.currency)
   const [usdToLbp, setUsdToLbp] = useState(String(workspace.usd_to_lbp))
+  const [defaultDriverPayUsd, setDefaultDriverPayUsd] = useState(String(workspace.default_driver_pay_usd ?? '2.00'))
+  const [defaultDeliveryFeeUsd, setDefaultDeliveryFeeUsd] = useState(String(workspace.default_delivery_fee_usd ?? '3.50'))
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
@@ -37,6 +41,8 @@ export function SettingsClient({ workspace, isOwner }: SettingsClientProps) {
           name,
           currency,
           usdToLbp: Number(usdToLbp),
+          defaultDriverPayUsd: Number(defaultDriverPayUsd),
+          defaultDeliveryFeeUsd: Number(defaultDeliveryFeeUsd),
         }),
       })
 
@@ -103,6 +109,36 @@ export function SettingsClient({ workspace, isOwner }: SettingsClientProps) {
                   disabled={!isOwner}
                   required
                 />
+              </div>
+
+              <div className="field">
+                <label>Default Courier Pay per Order (USD $)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  placeholder="2.00"
+                  value={defaultDriverPayUsd}
+                  onChange={e => setDefaultDriverPayUsd(e.target.value)}
+                  disabled={!isOwner}
+                  required
+                />
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>Pre-fills courier commission on new orders (e.g. $1.60 or $2.00)</small>
+              </div>
+
+              <div className="field">
+                <label>Default Standard Delivery Fee (USD $)</label>
+                <input
+                  type="number"
+                  step="0.10"
+                  min="0"
+                  placeholder="3.50"
+                  value={defaultDeliveryFeeUsd}
+                  onChange={e => setDefaultDeliveryFeeUsd(e.target.value)}
+                  disabled={!isOwner}
+                  required
+                />
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>Standard delivery charge for orders without an area fee</small>
               </div>
             </div>
 
