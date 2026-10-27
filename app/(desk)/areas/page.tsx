@@ -22,7 +22,7 @@ export default async function AreasPage() {
     allRows(
       supabase
         .from('delivery_areas')
-        .select('id, name, fee_usd, active, default_driver_id, default_driver:default_driver_id(id, name, phone)')
+        .select('id, name, fee_usd, active, default_driver_id, assigned_driver_ids, default_driver:default_driver_id(id, name, phone)')
         .eq('workspace_id', member.workspace_id)
         .order('name')
     ),

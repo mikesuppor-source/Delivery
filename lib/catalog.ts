@@ -8,7 +8,15 @@ export function createCatalog(table:Table) {
   const body=await req.json()
   const {db,workspaceId}=await workspaceAccess(body.workspaceId)
   const row:Record<string,unknown>={workspace_id:workspaceId,name:textField(body.name,'name',200,true)}
-  if(table==='delivery_areas')row.fee_usd=money(body.feeUsd,'fee')
+  if(table==='delivery_areas'){
+   row.fee_usd=money(body.feeUsd,'fee')
+   if(Array.isArray(body.assignedDriverIds)){
+    row.assigned_driver_ids = body.assignedDriverIds
+    if(!row.default_driver_id && body.assignedDriverIds.length > 0) {
+      row.default_driver_id = body.assignedDriverIds[0]
+    }
+   }
+  }
   else row.phone=textField(body.phone,'phone',40)
   if(table==='shops')row.address=textField(body.address,'address',1000)
   if(table==='drivers'&&body.userId){
@@ -39,6 +47,16 @@ export async function changeCatalog(req:NextRequest,table:Table,id?:string) {
    if(body.defaultDriverId!==undefined){
     await validateReferences(db,workspaceId,{drivers:body.defaultDriverId})
     updates.default_driver_id=body.defaultDriverId||null
+   }
+   if(body.assignedDriverIds!==undefined){
+    if(!Array.isArray(body.assignedDriverIds))throw new ApiError(400,'assignedDriverIds must be an array')
+    const validDriverIds = (body.assignedDriverIds as string[]).filter(Boolean)
+    updates.assigned_driver_ids = validDriverIds
+    if(validDriverIds.length > 0 && !updates.default_driver_id){
+      updates.default_driver_id = validDriverIds[0]
+    } else if(validDriverIds.length === 0){
+      updates.default_driver_id = null
+    }
    }
   }
  }

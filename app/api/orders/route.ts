@@ -4,6 +4,7 @@ import { authenticated, workspaceAccess, validateReferences } from '@/lib/access
 import { generateUniqueOrderCode, formatOrderCode } from '@/lib/order-codes'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
+import { findBestDriverForArea } from '@/lib/auto-dispatch'
 
 export const GET = api(async req => {
   const { client } = await authenticated()
@@ -26,13 +27,17 @@ export const GET = api(async req => {
 export const POST = api(async req => {
   const body=await req.json()
   const { db,user,workspaceId }=await workspaceAccess(body.workspaceId)
-  await validateReferences(db,workspaceId,{shops:body.shopId,drivers:body.driverId,delivery_areas:body.areaId})
+  let resolvedDriverId: string | null = (body.driverId && body.driverId !== 'auto') ? body.driverId : null
+  if ((!resolvedDriverId && body.areaId && body.driverId === 'auto') || (body.autoAssign && body.areaId && !resolvedDriverId)) {
+    resolvedDriverId = await findBestDriverForArea(db, workspaceId, body.areaId)
+  }
+  await validateReferences(db,workspaceId,{shops:body.shopId,drivers:resolvedDriverId,delivery_areas:body.areaId})
   const ws=checked(await db.from('workspaces').select('usd_to_lbp').eq('id',workspaceId).single())
   const code=body.code ? formatOrderCode(textField(body.code,'code',60,true)) : await generateUniqueOrderCode(db,'CD')
   if (!code) throw new ApiError(400,'Invalid tracking code')
   const order=checked(await db.from('orders').insert({
-    workspace_id:workspaceId,code,shop_id:body.shopId||null,driver_id:body.driverId||null,area_id:body.areaId||null,
-    status:body.driverId?'assigned':'pending',usd_to_lbp_rate:ws.usd_to_lbp,
+    workspace_id:workspaceId,code,shop_id:body.shopId||null,driver_id:resolvedDriverId||null,area_id:body.areaId||null,
+    status:resolvedDriverId?'assigned':'pending',usd_to_lbp_rate:ws.usd_to_lbp,
     collection_usd:money(body.collectionUsd,'collection'),delivery_fee_usd:money(body.deliveryFeeUsd,'delivery fee'),
     driver_pay_usd:money(body.driverPayUsd,'driver pay'),recipient_name:textField(body.recipientName,'recipient',200),
     recipient_phone:textField(body.recipientPhone,'phone',40),recipient_address:textField(body.recipientAddress,'address',1000),

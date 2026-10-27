@@ -2198,10 +2198,13 @@ export function OrderListClient({
                 Assign Driver <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
               </label>
               <select value={driverId} onChange={e => setDriverId(e.target.value)}>
+                <option value="auto">Auto-Assign from Area Pool (Least Busy)</option>
                 <option value="">Unassigned (Dispatch later)</option>
-                {drivers.map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
+                <optgroup label="Direct Courier Selection">
+                  {drivers.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 

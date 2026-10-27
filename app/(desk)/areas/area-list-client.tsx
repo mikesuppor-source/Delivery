@@ -19,6 +19,7 @@ interface Area {
   fee_usd: number
   active: boolean
   default_driver_id: string | null
+  assigned_driver_ids?: string[] | null
   default_driver?: Driver | null
 }
 
@@ -43,8 +44,13 @@ export function AreaListClient({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [autoAssigning, setAutoAssigning] = useState(false)
+  const [initializingZones, setInitializingZones] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [updatingAreaId, setUpdatingAreaId] = useState<string | null>(null)
+
+  // Multi-Courier Pool Management Modal State
+  const [managingArea, setManagingArea] = useState<Area | null>(null)
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([])
+  const [savingDrivers, setSavingDrivers] = useState(false)
 
   const canEdit = userRole === 'owner' || userRole === 'manager'
 
@@ -67,6 +73,7 @@ export function AreaListClient({
           workspaceId,
           name,
           feeUsd: Number(feeUsd),
+          assignedDriverIds: defaultDriverId ? [defaultDriverId] : [],
         }),
       })
 
@@ -75,7 +82,6 @@ export function AreaListClient({
 
       let createdArea = data.area
       if (defaultDriverId) {
-        // Update default driver if selected
         const patchRes = await fetch('/api/areas', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -83,6 +89,7 @@ export function AreaListClient({
             workspaceId,
             areaId: createdArea.id,
             defaultDriverId,
+            assignedDriverIds: [defaultDriverId],
           }),
         })
         const patchData = await patchRes.json()
@@ -104,37 +111,65 @@ export function AreaListClient({
     }
   }
 
-  // Handle changing default driver on an existing area
-  async function handleUpdateDefaultDriver(areaId: string, driverId: string) {
-    setUpdatingAreaId(areaId)
+  // Open Multi-Courier Fleet Pool Modal
+  function openManageCouriers(area: Area) {
+    setManagingArea(area)
+    const existing = area.assigned_driver_ids && area.assigned_driver_ids.length > 0
+      ? area.assigned_driver_ids
+      : (area.default_driver_id ? [area.default_driver_id] : [])
+    setSelectedDriverIds(existing)
+  }
+
+  function toggleDriver(driverId: string) {
+    setSelectedDriverIds(prev =>
+      prev.includes(driverId) ? prev.filter(id => id !== driverId) : [...prev, driverId]
+    )
+  }
+
+  function selectAllDrivers() {
+    setSelectedDriverIds(drivers.map(d => d.id))
+  }
+
+  function clearAllDrivers() {
+    setSelectedDriverIds([])
+  }
+
+  // Save Fleet Courier Pool
+  async function handleSaveCouriers() {
+    if (!managingArea) return
+    setSavingDrivers(true)
     try {
       const res = await fetch('/api/areas', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          areaId,
-          defaultDriverId: driverId || null,
+          areaId: managingArea.id,
+          assignedDriverIds: selectedDriverIds,
+          defaultDriverId: selectedDriverIds[0] || null,
         }),
       })
-
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to update courier assignment')
+      if (!res.ok) throw new Error(data.error || 'Failed to update courier pool')
 
-      const foundDriver = drivers.find(d => d.id === driverId) || null
       setAreas(prev =>
         prev.map(a =>
-          a.id === areaId
-            ? { ...a, default_driver_id: driverId || null, default_driver: foundDriver }
+          a.id === managingArea.id
+            ? {
+                ...a,
+                assigned_driver_ids: selectedDriverIds,
+                default_driver_id: selectedDriverIds[0] || null,
+                default_driver: drivers.find(d => d.id === selectedDriverIds[0]) || null,
+              }
             : a
         )
       )
-
-      showToast(`Default courier updated for this area!`, 'success')
+      setManagingArea(null)
+      showToast(`Updated courier pool for "${managingArea.name}" (${selectedDriverIds.length} couriers assigned)!`, 'success')
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Error updating area', 'error')
+      showToast(err instanceof Error ? err.message : 'Error updating courier pool', 'error')
     } finally {
-      setUpdatingAreaId(null)
+      setSavingDrivers(false)
     }
   }
 
@@ -181,12 +216,65 @@ export function AreaListClient({
     }
   }
 
+  // One-Click Initialize Standard Lebanese Zones with all fleet drivers
+  async function handleInitLebanonZones() {
+    if (!window.confirm('Create standard Lebanese delivery zones (Beirut Central, Greater Beirut, Metn, Keserwan, North/Tripoli, South/Saida, Bekaa/Zahle) with all fleet couriers assigned?')) {
+      return
+    }
+    setInitializingZones(true)
+    const standardZones = [
+      { name: 'Beirut Central (بيروت المركزية)', feeUsd: 3.00 },
+      { name: 'Greater Beirut & Suburbs (ضواحي بيروت)', feeUsd: 4.00 },
+      { name: 'Metn & Coast (المتن والساحل)', feeUsd: 4.50 },
+      { name: 'Keserwan & Jbeil (كسروان وجبيل)', feeUsd: 5.00 },
+      { name: 'Chouf & Aley (الشوف وعاليه)', feeUsd: 5.50 },
+      { name: 'North & Tripoli (طرابلس والشمال)', feeUsd: 7.00 },
+      { name: 'South & Saida / Tyre (صيدا وصور والجنوب)', feeUsd: 7.00 },
+      { name: 'Bekaa & Zahle (زحلة والبقاع)', feeUsd: 7.00 },
+      { name: 'Nabatieh & Border (النبطية والجنوب)', feeUsd: 8.00 },
+    ]
+
+    try {
+      const allDriverIds = drivers.map(d => d.id)
+      let addedCount = 0
+
+      for (const z of standardZones) {
+        const exists = areas.some(a => a.name.toLowerCase().includes(z.name.slice(0, 8).toLowerCase()))
+        if (!exists) {
+          const res = await fetch('/api/areas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              workspaceId,
+              name: z.name,
+              feeUsd: z.feeUsd,
+              assignedDriverIds: allDriverIds,
+            }),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            if (data.area) {
+              setAreas(prev => [...prev, data.area])
+              addedCount++
+            }
+          }
+        }
+      }
+
+      showToast(`Initialized ${addedCount} standard Lebanese delivery zones!`, 'success')
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Error initializing zones', 'error')
+    } finally {
+      setInitializingZones(false)
+    }
+  }
+
   return (
     <>
       <div className="page-heading">
         <div>
-          <h1>Delivery areas & Zone Dispatch</h1>
-          <p>Zone-based pricing and automated courier assignment for Lebanon</p>
+          <h1>Delivery Areas & Fleet Dispatch</h1>
+          <p>Zone tariffs and multi-courier pool auto-dispatching across Lebanon</p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -195,9 +283,20 @@ export function AreaListClient({
               <button
                 type="button"
                 className="btn btn-secondary"
+                disabled={initializingZones}
+                onClick={handleInitLebanonZones}
+                title="Create standard Lebanese delivery zones (Beirut, Metn, Tripoli, Saida, Bekaa)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>{initializingZones ? 'Setting up…' : 'Setup Lebanese Zones'}</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
                 disabled={autoAssigning}
                 onClick={handleAutoAssign}
-                title="Automatically assign all unassigned orders to their area courier"
+                title="Automatically assign pending orders fairly across their area courier pools"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
                 {autoAssigning && (
@@ -246,90 +345,138 @@ export function AreaListClient({
               <tr>
                 <th>Area Name / Zone</th>
                 <th>Standard Delivery Fee</th>
-                <th>Designated Courier (Auto-Dispatch)</th>
+                <th>Couriers Fleet Pool (Auto-Dispatch)</th>
                 <th>Status</th>
                 {canEdit && <th style={{ textAlign: 'right' }}>Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {areas.map(area => (
-                <tr key={area.id}>
-                  <td>
-                    <strong>{area.name}</strong>
-                  </td>
-                  <td>
-                    <strong>{formatUSD(Number(area.fee_usd))}</strong>
-                  </td>
-                  <td>
-                    {canEdit ? (
-                      <select
-                        value={area.default_driver_id || ''}
-                        disabled={updatingAreaId === area.id}
-                        onChange={e => handleUpdateDefaultDriver(area.id, e.target.value)}
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: 6,
-                          border: '1px solid var(--line)',
-                          background: 'var(--surface)',
-                          color: 'var(--ink)',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          maxWidth: 220,
-                        }}
-                      >
-                        <option value="">— Unassigned (Manual) —</option>
-                        {drivers.map(d => (
-                          <option key={d.id} value={d.id}>
-                            {d.name} {d.phone ? `(${d.phone})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                        {area.default_driver?.name || 'Manual dispatch'}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`badge ${area.active ? 'badge-delivered' : 'badge-returned'}`}>
-                      {area.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  {canEdit && (
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => handleDeleteArea(area.id, area.name)}
-                        style={{
-                          fontSize: 11,
-                          padding: '4px 8px',
-                          color: '#dc2626',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 5,
-                        }}
-                        title="Delete delivery area"
-                      >
-                        <TrashIcon size={12} color="#dc2626" />
-                        <span>Delete</span>
-                      </button>
+              {areas.map(area => {
+                const poolIds = area.assigned_driver_ids && area.assigned_driver_ids.length > 0
+                  ? area.assigned_driver_ids
+                  : (area.default_driver_id ? [area.default_driver_id] : [])
+                const poolDrivers = drivers.filter(d => poolIds.includes(d.id))
+
+                return (
+                  <tr key={area.id}>
+                    <td>
+                      <strong style={{ fontSize: 13.5 }}>{area.name}</strong>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td>
+                      <strong style={{ color: 'var(--brand)' }}>{formatUSD(Number(area.fee_usd))}</strong>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          {poolDrivers.length > 0 ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                background: '#ecfdf5',
+                                color: '#065f46',
+                                border: '1px solid #a7f3d0',
+                                padding: '2px 8px',
+                                borderRadius: 99,
+                                fontSize: 11,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {poolDrivers.length} {poolDrivers.length === 1 ? 'Courier Pool' : 'Couriers Pool (Load-Balanced)'}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                              No couriers in pool
+                            </span>
+                          )}
+
+                          {canEdit && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => openManageCouriers(area)}
+                              style={{
+                                fontSize: 11,
+                                padding: '2px 8px',
+                                border: '1px solid var(--line)',
+                                color: 'var(--brand)',
+                                fontWeight: 600,
+                                background: 'var(--surface)',
+                              }}
+                            >
+                              {poolDrivers.length > 0 ? 'Manage Fleet' : '+ Assign Fleet'}
+                            </button>
+                          )}
+                        </div>
+
+                        {poolDrivers.length > 0 && (
+                          <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {poolDrivers.slice(0, 5).map(d => (
+                              <span
+                                key={d.id}
+                                style={{
+                                  background: 'var(--bg)',
+                                  border: '1px solid var(--line)',
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  color: 'var(--text)',
+                                }}
+                              >
+                                {d.name}
+                              </span>
+                            ))}
+                            {poolDrivers.length > 5 && (
+                              <span style={{ color: 'var(--brand)', fontWeight: 700, alignSelf: 'center' }}>
+                                +{poolDrivers.length - 5} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`badge ${area.active ? 'badge-delivered' : 'badge-returned'}`}>
+                        {area.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    {canEdit && (
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => handleDeleteArea(area.id, area.name)}
+                          style={{
+                            fontSize: 11,
+                            padding: '4px 8px',
+                            color: '#dc2626',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                          }}
+                          title="Delete delivery area"
+                        >
+                          <TrashIcon size={12} color="#dc2626" />
+                          <span>Delete</span>
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
 
           {areas.length === 0 && (
             <div className="empty">
               <h3>No delivery areas yet</h3>
-              <p>Add pricing zones (e.g. Beirut Central, Metn, Keserwan, South).</p>
+              <p>Click "Setup Lebanese Zones" to quickly configure standard Lebanese delivery zones.</p>
             </div>
           )}
         </div>
       </div>
 
+      {/* ─── MODAL: ADD AREA ─── */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Delivery Area">
         <form onSubmit={handleAddArea}>
           <div className="form-grid">
@@ -349,7 +496,7 @@ export function AreaListClient({
               <label>Standard Delivery Fee (USD)</label>
               <input
                 type="number"
-                step="0.25"
+                step="0.01"
                 min="0"
                 value={feeUsd}
                 onChange={e => setFeeUsd(e.target.value)}
@@ -358,21 +505,12 @@ export function AreaListClient({
             </div>
 
             <div className="field full">
-              <label>Designated Courier (Optional)</label>
+              <label>Designated Courier (Initial assignment)</label>
               <select
                 value={defaultDriverId}
                 onChange={e => setDefaultDriverId(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: '1px solid var(--line)',
-                  background: 'var(--surface)',
-                  color: 'var(--ink)',
-                  fontSize: 14,
-                }}
               >
-                <option value="">— None (Manual assignment) —</option>
+                <option value="">— Unassigned (Add couriers later) —</option>
                 {drivers.map(d => (
                   <option key={d.id} value={d.id}>
                     {d.name} {d.phone ? `(${d.phone})` : ''}
@@ -380,7 +518,7 @@ export function AreaListClient({
                 ))}
               </select>
               <small style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4, display: 'block' }}>
-                Orders in this area can be auto-dispatched to this courier with 1 click.
+                You can add multiple couriers to this area's pool after creating it.
               </small>
             </div>
           </div>
@@ -397,6 +535,110 @@ export function AreaListClient({
           </div>
         </form>
       </Modal>
+
+      {/* ─── MODAL: MANAGE MULTI-COURIER FLEET POOL ─── */}
+      {managingArea && (
+        <Modal
+          isOpen={!!managingArea}
+          onClose={() => setManagingArea(null)}
+          title={`Fleet Couriers for ${managingArea.name}`}
+        >
+          <div>
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+              Select all couriers who handle deliveries in <strong>{managingArea.name}</strong>. Orders for this area will automatically be load-balanced fairly across the selected team.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                {selectedDriverIds.length} of {drivers.length} Couriers Selected
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={selectAllDrivers}
+                  style={{ fontSize: 11, padding: '2px 8px', color: 'var(--brand)', fontWeight: 600 }}
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={clearAllDrivers}
+                  style={{ fontSize: 11, padding: '2px 8px', color: '#dc2626' }}
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                maxHeight: 320,
+                overflowY: 'auto',
+                border: '1px solid var(--line)',
+                borderRadius: 8,
+                padding: '6px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: 8,
+                background: 'var(--bg)',
+              }}
+            >
+              {drivers.map(driver => {
+                const isSelected = selectedDriverIds.includes(driver.id)
+                return (
+                  <label
+                    key={driver.id}
+                    onClick={() => toggleDriver(driver.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '8px 10px',
+                      borderRadius: 6,
+                      border: '1.5px solid',
+                      borderColor: isSelected ? 'var(--brand)' : 'var(--line)',
+                      background: isSelected ? 'var(--brand-light)' : 'var(--surface)',
+                      cursor: 'pointer',
+                      margin: 0,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => {}} // handled by parent onClick
+                      style={{ width: 16, height: 16, accentColor: 'var(--brand)' }}
+                    />
+                    <div style={{ lineHeight: 1.2 }}>
+                      <strong style={{ fontSize: 12.5, color: isSelected ? 'var(--brand)' : 'var(--text)', display: 'block' }}>
+                        {driver.name}
+                      </strong>
+                      <small style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        {driver.phone || 'No phone'}
+                      </small>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+
+            <div className="form-actions" style={{ marginTop: 20 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setManagingArea(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={savingDrivers}
+                onClick={handleSaveCouriers}
+              >
+                {savingDrivers ? 'Saving fleet pool…' : `Save ${selectedDriverIds.length} Couriers`}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </>
   )
 }

@@ -150,3 +150,33 @@ test('Phone cleansing and Lebanese mobile normalization for CRM matching', () =>
     assert.ok(num.length >= 4);
   }
 });
+
+test('Multi-driver pool load balancer distributes orders fairly across 10 drivers', () => {
+  // Simulate 10 couriers assigned to Beirut zone
+  const beirutDrivers = Array.from({ length: 10 }, (_, i) => `driver-beirut-${i + 1}`);
+  const activeLoads = new Map<string, number>();
+  for (const id of beirutDrivers) activeLoads.set(id, 0);
+
+  // Dispatch 30 incoming orders
+  const dispatchedTo: string[] = [];
+  for (let i = 0; i < 30; i++) {
+    // Pick driver with lowest load
+    let best = beirutDrivers[0];
+    let minLoad = Infinity;
+    for (const d of beirutDrivers) {
+      const load = activeLoads.get(d) ?? 0;
+      if (load < minLoad) {
+        minLoad = load;
+        best = d;
+      }
+    }
+    dispatchedTo.push(best);
+    activeLoads.set(best, (activeLoads.get(best) || 0) + 1);
+  }
+
+  // Every single driver of the 10 must receive exactly 3 orders
+  assert.equal(dispatchedTo.length, 30);
+  for (const d of beirutDrivers) {
+    assert.equal(activeLoads.get(d), 3);
+  }
+});

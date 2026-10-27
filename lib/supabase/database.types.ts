@@ -263,6 +263,7 @@ export type Database = {
           active: boolean
           created_at: string
           default_driver_id: string | null
+          assigned_driver_ids: string[]
           fee_usd: number
           id: string
           name: string
@@ -272,6 +273,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           default_driver_id?: string | null
+          assigned_driver_ids?: string[]
           fee_usd?: number
           id?: string
           name: string
@@ -281,6 +283,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           default_driver_id?: string | null
+          assigned_driver_ids?: string[]
           fee_usd?: number
           id?: string
           name?: string

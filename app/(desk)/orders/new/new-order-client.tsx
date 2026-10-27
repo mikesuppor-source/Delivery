@@ -466,12 +466,15 @@ export function NewOrderClient({
                   Assign Driver <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
                 </label>
                 <select id="driver-id" value={driverId} onChange={e => setDriverId(e.target.value)}>
+                  <option value="auto">Auto-Assign from Area Pool (Least Busy)</option>
                   <option value="">Unassigned (Dispatch later)</option>
-                  {drivers.map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} {d.phone ? `(${d.phone})` : ''}
-                    </option>
-                  ))}
+                  <optgroup label="Direct Courier Selection">
+                    {drivers.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} {d.phone ? `(${d.phone})` : ''}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
