@@ -20,6 +20,9 @@ export function createCatalog(table:Table) {
   }
   else row.phone=textField(body.phone,'phone',40)
   if(table==='shops')row.address=textField(body.address,'address',1000)
+  if(table==='drivers'){
+    row.pin_code=body.pinCode?textField(body.pinCode,'PIN code',10):'1234'
+  }
   if(table==='drivers'&&body.userId){
    const member=checked(await db.from('workspace_members').select('id').eq('workspace_id',workspaceId).eq('user_id',uuid(body.userId)).eq('role','driver').maybeSingle())
    if(!member)throw new ApiError(400,'Select an invited driver in this workspace')
@@ -39,6 +42,7 @@ export async function changeCatalog(req:NextRequest,table:Table,id?:string) {
   if(body.name!==undefined)updates.name=textField(body.name,'name',200,true)
   if(body.phone!==undefined)updates.phone=textField(body.phone,'phone',40)
   if(body.address!==undefined)updates.address=textField(body.address,'address',1000)
+  if(table==='drivers'&&body.pinCode!==undefined)updates.pin_code=textField(body.pinCode,'PIN code',10,true)
   if(body.active!==undefined){
    if(typeof body.active!=='boolean')throw new ApiError(400,'Invalid active flag')
    updates.active=body.active

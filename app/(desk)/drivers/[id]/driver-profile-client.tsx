@@ -478,11 +478,12 @@ export function DriverProfileClient({
 
             {driver.phone && (
               <a
-                href={`https://wa.me/${driver.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                href={getWhatsAppUrl(
+                  driver.phone,
                   `Marhaba ${driver.name}, here is your active Cedar Delivery Daily Run Sheet:\n\n${
                     typeof window !== 'undefined' ? window.location.origin : ''
                   }/driver/${driver.id}\n\nPlease update order statuses live as you deliver.`
-                )}`}
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-primary"

@@ -46,6 +46,7 @@ export function DriverListClient({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [pinCode, setPinCode] = useState('1234')
   const [userId, setUserId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -65,6 +66,7 @@ export function DriverListClient({
           workspaceId,
           name,
           phone,
+          pinCode: pinCode.trim() || '1234',
           userId: userId || null,
         }),
       })
@@ -76,6 +78,7 @@ export function DriverListClient({
       setIsModalOpen(false)
       setName('')
       setPhone('')
+      setPinCode('1234')
       setUserId('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error adding driver')
@@ -159,16 +162,21 @@ export function DriverListClient({
                   </td>
                   <td>
                     {driver.phone ? (
-                      <a
-                        href={getWhatsAppUrl(driver.phone, `Hello ${driver.name}, Cedar Delivery dispatch here.`)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="whatsapp-badge"
-                        title="Message courier on WhatsApp"
-                      >
-                        <WhatsAppIcon size={13} />
-                        <span>{driver.phone}</span>
-                      </a>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <a
+                          href={getWhatsAppUrl(driver.phone, `Hello ${driver.name}, Cedar Delivery dispatch here.`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="whatsapp-badge"
+                          title="Message courier on WhatsApp"
+                        >
+                          <WhatsAppIcon size={13} />
+                          <span>{driver.phone}</span>
+                        </a>
+                        <small style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 600 }}>
+                          PIN: <span style={{ color: 'var(--text)', fontWeight: 700 }}>{driver.pin_code || '1234'}</span>
+                        </small>
+                      </div>
                     ) : '—'}
                   </td>
                   <td>
@@ -299,11 +307,22 @@ export function DriverListClient({
               <label>Phone Number</label>
               <input
                 type="tel"
-                placeholder="e.g. +961 3 987654"
+                placeholder="e.g. +961 71 123456"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 required
               />
+            </div>
+            <div className="field">
+              <label>Courier Mobile PIN</label>
+              <input
+                type="text"
+                maxLength={6}
+                placeholder="1234"
+                value={pinCode}
+                onChange={e => setPinCode(e.target.value)}
+              />
+              <small style={{ color: 'var(--muted)', fontSize: 11 }}>Used by courier to sign in on their mobile phone</small>
             </div>
             <div className="field">
               <label>Link Staff Login Account (Optional)</label>

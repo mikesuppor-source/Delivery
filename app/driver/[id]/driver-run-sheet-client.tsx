@@ -19,6 +19,7 @@ import {
   formatDistance,
   getLebanonAreaCoordinates,
 } from '@/lib/maps'
+import { normalizePhoneForWhatsApp } from '@/lib/whatsapp'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import {
@@ -2026,7 +2027,7 @@ export function DriverRunSheetClient({
                     {/* WhatsApp Customer */}
                     {order.recipient_phone ? (
                       <a
-                        href={`https://wa.me/${order.recipient_phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        href={`https://wa.me/${normalizePhoneForWhatsApp(order.recipient_phone)}?text=${encodeURIComponent(
                           `Hello ${order.recipient_name || 'Customer'}! I am your Cedar courier with delivery #${order.code}. I am heading to your location.`
                         )}`}
                         target="_blank"
@@ -2120,7 +2121,7 @@ export function DriverRunSheetClient({
                   {order.recipient_phone && (
                     <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
                       <a
-                        href={`https://wa.me/${order.recipient_phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        href={`https://wa.me/${normalizePhoneForWhatsApp(order.recipient_phone)}?text=${encodeURIComponent(
                           `Hello ${order.recipient_name || 'Customer'}! I am your Cedar courier with delivery #${order.code}. Could you please send me your WhatsApp location pin to reach you quickly?`
                         )}`}
                         target="_blank"
@@ -2148,7 +2149,7 @@ export function DriverRunSheetClient({
                       </a>
 
                       <a
-                        href={`https://wa.me/${order.recipient_phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        href={`https://wa.me/${normalizePhoneForWhatsApp(order.recipient_phone)}?text=${encodeURIComponent(
                           `Hello ${order.recipient_name || 'Customer'}! I have arrived outside with your package #${order.code}. COD total: ${formatUSD(order.collection_usd)} (${formatLBP(usdToLbp(order.collection_usd, order.usd_to_lbp_rate || 89500))}). Please meet me outside.`
                         )}`}
                         target="_blank"
