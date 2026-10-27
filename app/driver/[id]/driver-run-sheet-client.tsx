@@ -435,8 +435,9 @@ export function DriverRunSheetClient({
     }
   }
 
-  const handleSwitchCourier = () => {
+  const handleSwitchCourier = async () => {
     try {
+      await fetch('/api/driver/auth', { method: 'DELETE' }).catch(() => {})
       localStorage.removeItem('cedar_saved_driver_id')
       document.cookie = 'cedar_saved_driver_id=; path=/; max-age=0'
     } catch {}

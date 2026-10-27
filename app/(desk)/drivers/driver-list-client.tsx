@@ -13,6 +13,7 @@ interface Driver {
   id: string
   name: string
   phone: string | null
+  pin_code?: string | null
   active: boolean
   cash_held_usd: number
   pay_owed_usd: number
@@ -234,16 +235,16 @@ export function DriverListClient({
                         <a
                           href={getWhatsAppUrl(
                             driver.phone,
-                            `Hello ${driver.name}, here is your Cedar live run sheet link: https://delivery-five-roan.vercel.app/driver/${driver.id}`
+                            `Hello ${driver.name}, here is your Cedar Courier App login:\n📱 Phone: ${driver.phone}\n🔑 PIN: ${driver.pin_code || '1234'}\n🚀 App: https://delivery-five-roan.vercel.app/driver`
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-secondary"
                           style={{ fontSize: 11, padding: '4px 8px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                          title="Send Run Sheet app link to courier on WhatsApp"
+                          title="Send Courier login credentials on WhatsApp"
                         >
                           <WhatsAppIcon size={11} color="#25D366" />
-                          <span>Send Link</span>
+                          <span>Send Login</span>
                         </a>
                       )}
                       <Link

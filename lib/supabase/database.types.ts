@@ -319,6 +319,7 @@ export type Database = {
           name: string
           pay_owed_usd: number
           phone: string | null
+          pin_code: string | null
           user_id: string | null
           workspace_id: string
         }
@@ -334,6 +335,7 @@ export type Database = {
           name: string
           pay_owed_usd?: number
           phone?: string | null
+          pin_code?: string | null
           user_id?: string | null
           workspace_id: string
         }
@@ -349,6 +351,7 @@ export type Database = {
           name?: string
           pay_owed_usd?: number
           phone?: string | null
+          pin_code?: string | null
           user_id?: string | null
           workspace_id?: string
         }

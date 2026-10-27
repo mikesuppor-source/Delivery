@@ -20,7 +20,7 @@ export default async function DriversPage() {
     allRows(
       supabase
         .from('drivers')
-        .select('id, name, phone, active, cash_held_usd, pay_owed_usd, current_lat, current_lng, last_location_at')
+        .select('id, name, phone, pin_code, active, cash_held_usd, pay_owed_usd, current_lat, current_lng, last_location_at')
         .eq('workspace_id', member.workspace_id)
         .order('name')
     ),
