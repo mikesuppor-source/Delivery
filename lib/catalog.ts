@@ -11,9 +11,10 @@ export function createCatalog(table:Table) {
   if(table==='delivery_areas'){
    row.fee_usd=money(body.feeUsd,'fee')
    if(Array.isArray(body.assignedDriverIds)){
-    row.assigned_driver_ids = body.assignedDriverIds
-    if(!row.default_driver_id && body.assignedDriverIds.length > 0) {
-      row.default_driver_id = body.assignedDriverIds[0]
+    const cleanDriverIds = body.assignedDriverIds.filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+    row.assigned_driver_ids = cleanDriverIds
+    if(!row.default_driver_id && cleanDriverIds.length > 0) {
+      row.default_driver_id = cleanDriverIds[0]
     }
    }
   }

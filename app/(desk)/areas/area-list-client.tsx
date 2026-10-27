@@ -239,8 +239,8 @@ export function AreaListClient({
       let addedCount = 0
 
       for (const z of standardZones) {
-        const exists = areas.some(a => a.name.toLowerCase().includes(z.name.slice(0, 8).toLowerCase()))
-        if (!exists) {
+        const existingArea = areas.find(a => a.name.toLowerCase().includes(z.name.slice(0, 8).toLowerCase()))
+        if (!existingArea) {
           const res = await fetch('/api/areas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -258,10 +258,29 @@ export function AreaListClient({
               addedCount++
             }
           }
+        } else {
+          // If already exists, ensure it has fleet drivers assigned
+          const poolIds = existingArea.assigned_driver_ids || []
+          if (poolIds.length === 0 && allDriverIds.length > 0) {
+            const res = await fetch('/api/areas', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                workspaceId,
+                areaId: existingArea.id,
+                assignedDriverIds: allDriverIds,
+                defaultDriverId: allDriverIds[0] || null,
+              }),
+            })
+            if (res.ok) {
+              setAreas(prev => prev.map(a => a.id === existingArea.id ? { ...a, assigned_driver_ids: allDriverIds } : a))
+              addedCount++
+            }
+          }
         }
       }
 
-      showToast(`Initialized ${addedCount} standard Lebanese delivery zones!`, 'success')
+      showToast(`Configured ${addedCount} Lebanese delivery zones with your couriers fleet!`, 'success')
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Error initializing zones', 'error')
     } finally {
@@ -351,7 +370,7 @@ export function AreaListClient({
               </tr>
             </thead>
             <tbody>
-              {areas.map(area => {
+              {areas.filter(a => a.active).map(area => {
                 const poolIds = area.assigned_driver_ids && area.assigned_driver_ids.length > 0
                   ? area.assigned_driver_ids
                   : (area.default_driver_id ? [area.default_driver_id] : [])
@@ -467,7 +486,7 @@ export function AreaListClient({
             </tbody>
           </table>
 
-          {areas.length === 0 && (
+          {areas.filter(a => a.active).length === 0 && (
             <div className="empty">
               <h3>No delivery areas yet</h3>
               <p>Click "Setup Lebanese Zones" to quickly configure standard Lebanese delivery zones.</p>

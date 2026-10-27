@@ -24,6 +24,7 @@ export default async function AreasPage() {
         .from('delivery_areas')
         .select('id, name, fee_usd, active, default_driver_id, assigned_driver_ids, default_driver:default_driver_id(id, name, phone)')
         .eq('workspace_id', member.workspace_id)
+        .eq('active', true)
         .order('name')
     ),
     allRows(
