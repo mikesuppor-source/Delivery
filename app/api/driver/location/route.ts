@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { api, ApiError, uuid } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { driverAccess } from '@/lib/access'
 
 export const POST = api(async req => {

@@ -1,6 +1,6 @@
 import { allRows } from '@/lib/pagination'
 import { notFound } from 'next/navigation'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { DriverRunSheetClient } from './driver-run-sheet-client'
 import type { Metadata } from 'next'
 

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { TruckIcon, PhoneIcon } from '@/components/icons'
+import { TruckIcon } from '@/components/icons'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 
 export function DriverLoginClient() {
@@ -32,7 +32,9 @@ export function DriverLoginClient() {
       // Save locally as well
       try {
         localStorage.setItem('cedar_saved_driver_id', data.driverId)
-      } catch {}
+      } catch (_e) {
+        void _e
+      }
 
       // Redirect immediately to driver's run sheet
       router.push(`/driver/${data.driverId}`)

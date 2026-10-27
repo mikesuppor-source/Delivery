@@ -281,7 +281,9 @@ export function DriverRunSheetClient({
     try {
       localStorage.setItem('cedar_saved_driver_id', driver.id)
       document.cookie = `cedar_saved_driver_id=${driver.id}; path=/; max-age=31536000; SameSite=Lax`
-    } catch {}
+    } catch (_e) {
+      void _e
+    }
 
     // 1. Initial connectivity check
     setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true)
@@ -401,7 +403,9 @@ export function DriverRunSheetClient({
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate([200, 100, 200, 100, 400])
-      } catch {}
+      } catch (_e) {
+        void _e
+      }
     }
   }, [])
 
@@ -412,7 +416,9 @@ export function DriverRunSheetClient({
           body: `Area: ${order.area?.name || 'Assigned Area'} | COD: $${Number(order.collection_usd || 0).toFixed(2)}`,
           icon: '/logo.png',
         })
-      } catch {}
+      } catch (_e) {
+        void _e
+      }
     }
   }, [])
 
@@ -440,7 +446,9 @@ export function DriverRunSheetClient({
       await fetch('/api/driver/auth', { method: 'DELETE' }).catch(() => {})
       localStorage.removeItem('cedar_saved_driver_id')
       document.cookie = 'cedar_saved_driver_id=; path=/; max-age=0'
-    } catch {}
+    } catch (_e) {
+      void _e
+    }
     window.location.href = '/driver'
   }
 

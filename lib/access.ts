@@ -32,7 +32,7 @@ export async function shopAccess(shopId?: unknown) {
   return { user, shop, db }
 }
 export async function driverAccess(driverId: unknown) {
-  let user: User | null = null
+  let user: User | null
   try {
     const supabase = await createClient()
     const { data } = await supabase.auth.getUser()
