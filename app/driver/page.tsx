@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { DriverLoginClient } from './driver-login-client'
 import type { Metadata } from 'next'
 
@@ -15,7 +15,7 @@ export default async function DriverPortalIndexPage() {
   const userSupabase = await createClient()
   const { data: { user } } = await userSupabase.auth.getUser()
 
-  const serviceSupabase = await createClient()
+  const serviceSupabase = createServiceClient()
 
   // 1. If logged in via user account, check if user is directly linked to a driver
   if (user?.id) {

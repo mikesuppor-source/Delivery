@@ -1,6 +1,6 @@
 import { allRows } from '@/lib/pagination'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { DriverRunSheetClient } from './driver-run-sheet-client'
 import type { Metadata } from 'next'
 
@@ -10,7 +10,7 @@ interface DriverRunSheetPageProps {
 
 export async function generateMetadata({ params }: DriverRunSheetPageProps): Promise<Metadata> {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const { data: driver } = await supabase
     .from('drivers')
     .select('name')
@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function DriverRunSheetPage({ params }: DriverRunSheetPageProps) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   // 1. Fetch driver details
   const { data: driver, error: driverErr } = await supabase
