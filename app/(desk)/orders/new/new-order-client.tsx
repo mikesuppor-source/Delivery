@@ -559,14 +559,16 @@ export function NewOrderClient({
             <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
               2. Merchant & Package Specifications
             </h3>
-            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Sender store, waybill tracking code, service type, and courier handling</span>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+              Sender store, tracking code, service classification, and courier handling
+            </span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
             {/* Select Shop */}
             <div className="field">
               <label htmlFor="shop-id">
-                Select Shop / Merchant <span style={{ color: 'var(--danger)' }}>*</span>
+                Merchant Store <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select
                 id="shop-id"
@@ -606,12 +608,12 @@ export function NewOrderClient({
                     type="button"
                     className="btn btn-ghost btn-sm"
                     onClick={() => {
-                      const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase()
+                      const randomHex = Math.random().toString(16).substring(2, 8).toUpperCase()
                       setCustomCode(`CD-${randomHex}`)
                     }}
                     style={{ fontSize: 10.5, padding: '2px 8px' }}
                   >
-                    Auto CD-XXXX
+                    Auto Code
                   </button>
                   {customCode && (
                     <button
@@ -628,7 +630,7 @@ export function NewOrderClient({
               <input
                 id="custom-code"
                 type="text"
-                placeholder="Leave blank for auto-generated tracking token"
+                placeholder="Auto-generated if blank"
                 value={customCode}
                 onChange={e => setCustomCode(e.target.value)}
                 style={{ fontFamily: 'monospace', fontWeight: 600 }}
@@ -637,13 +639,13 @@ export function NewOrderClient({
 
             {/* Assign Driver */}
             <div className="field">
-              <label htmlFor="driver-id">Assign Courier / Driver (Optional)</label>
+              <label htmlFor="driver-id">Assign Courier (Optional)</label>
               <select
                 id="driver-id"
                 value={driverId}
                 onChange={e => setDriverId(e.target.value)}
               >
-                <option value="">Unassigned (Dispatch Later / Auto-Route)</option>
+                <option value="">Unassigned (Dispatch Later)</option>
                 {drivers.map(d => (
                   <option key={d.id} value={d.id}>
                     {d.name} {d.phone ? `(${d.phone})` : ''}
@@ -654,97 +656,48 @@ export function NewOrderClient({
           </div>
 
           {/* Service Type Selector */}
-          <div style={{ marginTop: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <label style={{ fontWeight: 700, color: 'var(--brand)', margin: 0 }}>
-                Service Type / نوع الطلب
-              </label>
-              {/* Quick Preset for Retail Return / Refund */}
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setNetItemUsd('0')
-                  setDeliveryFeeUsd('2')
-                  setDriverPayUsd('1')
-                  setPricingMode('added')
-                  setNotes('Retail return pickup ($2 fee)')
-                  setServiceType('pickup')
-                }}
-                style={{ fontSize: 11, padding: '3px 10px', borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 600 }}
-              >
-                Apply $2 Return Pickup Preset
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-              <button
-                type="button"
-                onClick={() => setServiceType('delivery')}
-                style={{
-                  padding: '12px 10px',
-                  borderRadius: 10,
-                  border: '1.5px solid',
-                  borderColor: serviceType === 'delivery' ? 'var(--brand)' : 'var(--line)',
-                  background: serviceType === 'delivery' ? 'var(--brand-light)' : 'var(--surface)',
-                  color: serviceType === 'delivery' ? 'var(--brand)' : 'var(--text)',
-                  fontWeight: serviceType === 'delivery' ? 700 : 500,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Standard Delivery
-                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>توصيل طلب عادي</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setServiceType('replacement')}
-                style={{
-                  padding: '12px 10px',
-                  borderRadius: 10,
-                  border: '1.5px solid',
-                  borderColor: serviceType === 'replacement' ? '#d97706' : 'var(--line)',
-                  background: serviceType === 'replacement' ? 'rgba(217, 119, 6, 0.12)' : 'var(--surface)',
-                  color: serviceType === 'replacement' ? '#b45309' : 'var(--text)',
-                  fontWeight: serviceType === 'replacement' ? 700 : 500,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Replacement
-                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>تبديل بضاعة</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setServiceType('pickup')}
-                style={{
-                  padding: '12px 10px',
-                  borderRadius: 10,
-                  border: '1.5px solid',
-                  borderColor: serviceType === 'pickup' ? '#7c3aed' : 'var(--line)',
-                  background: serviceType === 'pickup' ? 'rgba(124, 58, 237, 0.12)' : 'var(--surface)',
-                  color: serviceType === 'pickup' ? '#7c3aed' : 'var(--text)',
-                  fontWeight: serviceType === 'pickup' ? 700 : 500,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Return Pickup
-                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>استرجاع مرتجع</div>
-              </button>
+          <div style={{ marginTop: 16 }}>
+            <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+              Service Type
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {[
+                { id: 'delivery', label: 'Standard Delivery', sub: 'Standard outbound delivery to customer' },
+                { id: 'replacement', label: 'Replacement (Swap)', sub: 'Collect exchange item from customer first' },
+                { id: 'pickup', label: 'Return Pickup', sub: 'Reverse logistics / collect return parcel' },
+              ].map(item => {
+                const isActive = serviceType === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setServiceType(item.id as any)}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      border: '1.5px solid',
+                      borderColor: isActive ? 'var(--brand)' : 'var(--line)',
+                      background: isActive ? 'var(--brand-light)' : 'var(--surface)',
+                      color: isActive ? 'var(--brand)' : 'var(--text)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: isActive ? 700 : 600 }}>
+                      {item.label}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      {item.sub}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          {/* Physical Attributes */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginTop: 18 }}>
+          {/* Physical Attributes: Weight, Fragile Flag, 3PL Tracking */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginTop: 16, alignItems: 'flex-start' }}>
             <div className="field">
               <label htmlFor="package-weight">Package Weight (KG)</label>
               <input
@@ -757,36 +710,54 @@ export function NewOrderClient({
               />
             </div>
 
-            <div className="field" style={{ justifyContent: 'center' }}>
-              <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, margin: 0, height: '100%', padding: '8px 12px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--line)' }}>
-                <input
-                  type="checkbox"
-                  checked={isBreakable}
-                  onChange={e => setIsBreakable(e.target.checked)}
-                  style={{ width: 20, height: 20, accentColor: '#ea580c' }}
-                />
-                <div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: isBreakable ? '#ea580c' : 'var(--text)' }}>
-                    Fragile / Breakable (قابل للكسر)
-                  </span>
-                  <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11 }}>
-                    Prints prominent fragile warning on thermal AWB label
-                  </small>
-                </div>
-              </label>
-            </div>
-
             <div className="field">
               <label htmlFor="carrier-tracking">
-                3PL Carrier Tracking Code <span style={{ color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
+                3PL Carrier Tracking <span style={{ color: 'var(--muted)', fontSize: 11 }}>(Optional)</span>
               </label>
               <input
                 id="carrier-tracking"
                 type="text"
-                placeholder="e.g. OCT-8942, ARAMEX-4421, DHL-019"
+                placeholder="e.g. ARAMEX-4421, DHL-019"
                 value={carrierTrackingCode}
                 onChange={e => setCarrierTrackingCode(e.target.value)}
               />
+            </div>
+
+            <div className="field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                Special Handling
+              </label>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 12px',
+                  borderRadius: 8,
+                  border: '1.5px solid',
+                  borderColor: isBreakable ? '#ef4444' : 'var(--line)',
+                  background: isBreakable ? 'rgba(239, 68, 68, 0.06)' : 'var(--bg)',
+                  cursor: 'pointer',
+                  margin: 0,
+                  height: 42,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isBreakable}
+                  onChange={e => setIsBreakable(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#dc2626' }}
+                />
+                <div style={{ lineHeight: 1.2 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: isBreakable ? '#dc2626' : 'var(--text)' }}>
+                    Fragile / Breakable
+                  </span>
+                  <span style={{ display: 'block', fontSize: 10.5, color: 'var(--muted)' }}>
+                    Prints prominent caution on AWB
+                  </span>
+                </div>
+              </label>
             </div>
           </div>
         </div>
@@ -795,22 +766,22 @@ export function NewOrderClient({
         <div
           style={{
             background: 'var(--surface)',
-            border: '2px solid #3b82f6',
+            border: '1.5px solid var(--line)',
             borderRadius: 16,
             padding: '24px 22px',
-            boxShadow: '0 8px 30px rgba(59, 130, 246, 0.08)',
+            boxShadow: 'var(--shadow)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <div>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--text)' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
                 3. Cash Collection & Financial Settlement
               </h3>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                COD cash collection at doorstep and automatic merchant/courier splits
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                Doorstep cash-on-delivery collection and merchant / courier financial ledger splits
               </span>
             </div>
-            <div style={{ fontSize: 12, background: 'var(--bg)', padding: '4px 10px', borderRadius: 6, fontWeight: 600, color: 'var(--brand)' }}>
+            <div style={{ fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)', padding: '5px 12px', borderRadius: 8, fontWeight: 600, color: 'var(--muted)' }}>
               Rate: 1 USD = {rate.toLocaleString()} LBP
             </div>
           </div>
@@ -819,83 +790,88 @@ export function NewOrderClient({
           <div
             style={{
               background: 'var(--bg)',
-              border: '1.5px solid var(--line)',
+              border: '1px solid var(--line)',
               borderRadius: 12,
-              padding: '14px 16px',
-              marginBottom: 20,
+              padding: '12px 16px',
+              marginBottom: 18,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 12,
             }}
           >
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--brand)', marginBottom: 8 }}>
-              Pricing & Delivery Fee Allocation / طريقة احتساب كلفة التوصيل
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+            <div>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', display: 'block' }}>
+                Delivery Fee Settlement Mode
+              </span>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                {pricingMode === 'added'
+                  ? 'Delivery fee is added to customer doorstep COD. Merchant receives 100% of net item value.'
+                  : 'Free Shipping Promo: Merchant absorbs shipping fee. Customer pays only net item value.'}
+              </span>
+            </div>
+
+            <div style={{ display: 'inline-flex', background: 'var(--surface)', padding: 3, borderRadius: 8, border: '1.5px solid var(--line)', gap: 4 }}>
               <button
                 type="button"
                 onClick={() => setPricingMode('added')}
                 style={{
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  border: '2px solid',
-                  borderColor: pricingMode === 'added' ? '#2563eb' : 'var(--line)',
-                  background: pricingMode === 'added' ? 'rgba(37, 99, 235, 0.08)' : 'var(--surface)',
-                  color: pricingMode === 'added' ? '#1d4ed8' : 'var(--text)',
+                  padding: '6px 14px',
+                  borderRadius: 6,
+                  border: 'none',
+                  fontSize: 12,
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  textAlign: 'left',
+                  background: pricingMode === 'added' ? 'var(--brand)' : 'transparent',
+                  color: pricingMode === 'added' ? '#ffffff' : 'var(--muted)',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 800, fontSize: 13.5 }}>
-                  <span>Delivery Fee Added to Customer (كلفة التوصيل على الزبون)</span>
-                  {pricingMode === 'added' && <span style={{ color: '#2563eb', fontSize: 12, fontWeight: 700 }}>[Active]</span>}
-                </div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
-                  <strong>Standard E-commerce:</strong> Delivery fee is added on top of the goods. Customer pays Total COD at door ($25 Net + $3 Fee = <strong>$28.00</strong>). Shop receives full <strong>$25.00</strong>.
-                </div>
+                Fee Added to Customer (Standard)
               </button>
-
               <button
                 type="button"
                 onClick={() => setPricingMode('free_delivery')}
                 style={{
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  border: '2px solid',
-                  borderColor: pricingMode === 'free_delivery' ? '#059669' : 'var(--line)',
-                  background: pricingMode === 'free_delivery' ? 'rgba(5, 150, 105, 0.08)' : 'var(--surface)',
-                  color: pricingMode === 'free_delivery' ? '#047857' : 'var(--text)',
+                  padding: '6px 14px',
+                  borderRadius: 6,
+                  border: 'none',
+                  fontSize: 12,
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  textAlign: 'left',
+                  background: pricingMode === 'free_delivery' ? 'var(--brand)' : 'transparent',
+                  color: pricingMode === 'free_delivery' ? '#ffffff' : 'var(--muted)',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 800, fontSize: 13.5 }}>
-                  <span>Free Delivery / Shop Pays (توصيل مجاني - كلفة التوصيل على المتجر)</span>
-                  {pricingMode === 'free_delivery' && <span style={{ color: '#059669', fontSize: 12, fontWeight: 700 }}>[Active]</span>}
-                </div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
-                  <strong>Free Shipping Promo:</strong> Customer only pays the goods price ($25.00). Delivery fee is deducted from shop payout (Shop receives <strong>$22.00</strong>).
-                </div>
+                Free Delivery (Shop Pays)
               </button>
             </div>
           </div>
 
-          {/* 4 Financial Metric Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-            {/* Input 1: Net Item Value / Goods Price */}
+          {/* 4 Financial Accounting Inputs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+            {/* Box 1: Net Item Value */}
             <div
               className="field"
               style={{
-                background: '#f8fafc',
-                border: '1.5px solid #cbd5e1',
+                background: 'var(--surface)',
+                border: '1.5px solid var(--line)',
                 borderRadius: 12,
                 padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
               }}
             >
-              <label htmlFor="net-item-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
-                Net Item Price / سعر البضاعة (USD) <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
-                صافي قيمة البضاعة المستحقة للمتجر
+              <div>
+                <label htmlFor="net-item-usd" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 12.5, marginBottom: 2 }}>
+                  Net Goods Price ($) <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+                  Merchandise value
+                </div>
               </div>
               <input
                 id="net-item-usd"
@@ -905,28 +881,33 @@ export function NewOrderClient({
                 value={netItemUsd}
                 onChange={e => setNetItemUsd(e.target.value)}
                 required
-                style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}
+                style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}
               />
-              <div style={{ fontSize: 11.5, color: '#0284c7', marginTop: 6, fontWeight: 600 }}>
-                Shop payout: {formatUSD(netItemNum)}
+              <div style={{ fontSize: 11.5, color: '#047857', marginTop: 8, fontWeight: 600 }}>
+                Shop Payout: {formatUSD(netItemNum)}
               </div>
             </div>
 
-            {/* Input 2: Delivery Fee Charged to Area */}
+            {/* Box 2: Delivery Fee */}
             <div
               className="field"
               style={{
-                background: '#f8fafc',
-                border: '1.5px solid #cbd5e1',
+                background: 'var(--surface)',
+                border: '1.5px solid var(--line)',
                 borderRadius: 12,
                 padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
               }}
             >
-              <label htmlFor="delivery-fee-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
-                Delivery Fee / كلفة التوصيل (USD) <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
-                كلفة التوصيل للمنطقة ({currentArea?.name || 'Area Tariff'})
+              <div>
+                <label htmlFor="delivery-fee-usd" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 12.5, marginBottom: 2 }}>
+                  Delivery Fee ($) <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+                  {currentArea?.name || 'Tariff zone'}
+                </div>
               </div>
               <input
                 id="delivery-fee-usd"
@@ -936,56 +917,62 @@ export function NewOrderClient({
                 value={deliveryFeeUsd}
                 onChange={e => setDeliveryFeeUsd(e.target.value)}
                 required
-                style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}
+                style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}
               />
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>
-                Standard: ${currentArea?.fee_usd || 3} ({currentArea?.name || 'Zone'})
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>
+                Tariff: ${currentArea?.fee_usd || 3} ({currentArea?.name || 'Zone'})
               </div>
             </div>
 
-            {/* Input 3: Total COD to Collect at Doorstep (Prominently Highlighted!) */}
+            {/* Box 3: Total Doorstep COD */}
             <div
               className="field"
               style={{
-                background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
-                border: '2px solid #22c55e',
+                background: 'rgba(4, 120, 87, 0.04)',
+                border: '1.5px solid #059669',
                 borderRadius: 12,
                 padding: '14px',
-                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.12)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
               }}
             >
-              <label htmlFor="total-cod-display" style={{ color: '#166534', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
-                Total COD to Collect at Doorstep <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
-              <div style={{ fontSize: 11, color: '#15803d', fontWeight: 600, marginBottom: 6 }}>
-                المبلغ المطلوب تحصيله من الزبون عند الاستلام
+              <div>
+                <label style={{ color: '#047857', fontWeight: 800, fontSize: 12.5, marginBottom: 2 }}>
+                  Total Doorstep COD ($) <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <div style={{ fontSize: 11, color: '#059669', marginBottom: 8 }}>
+                  Cash collected at door
+                </div>
               </div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: '#166534', letterSpacing: '-0.5px' }}>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#047857', letterSpacing: '-0.5px' }}>
                 {formatUSD(codUsdNum)}
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#0284c7', marginTop: 4 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', marginTop: 8 }}>
                 ≈ L.L. {codLbpApprox.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-              </div>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: '#15803d', marginTop: 4, background: 'rgba(34, 197, 94, 0.15)', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>
-                {pricingMode === 'added' ? `Formula: $${netItemNum} Net + $${feeUsdNum} Fee = $${codUsdNum}` : `Formula: Free Delivery ($${netItemNum} Goods only)`}
               </div>
             </div>
 
-            {/* Input 4: Courier Pay / Driver Commission */}
+            {/* Box 4: Courier Pay */}
             <div
               className="field"
               style={{
-                background: '#f8fafc',
-                border: '1.5px solid #cbd5e1',
+                background: 'var(--surface)',
+                border: '1.5px solid var(--line)',
                 borderRadius: 12,
                 padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
               }}
             >
-              <label htmlFor="driver-pay-usd" style={{ color: '#0f172a', fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
-                Courier Pay / أجرة السائق (USD) <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
-                أجرة الدليفري ({currentDriver?.name || 'Assigned Courier'})
+              <div>
+                <label htmlFor="driver-pay-usd" style={{ color: 'var(--text)', fontWeight: 700, fontSize: 12.5, marginBottom: 2 }}>
+                  Courier Pay ($) <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+                  Driver commission
+                </div>
               </div>
               <input
                 id="driver-pay-usd"
@@ -995,111 +982,61 @@ export function NewOrderClient({
                 value={driverPayUsd}
                 onChange={e => setDriverPayUsd(e.target.value)}
                 required
-                style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}
+                style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}
               />
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>
-                Courier run-sheet earning
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>
+                Run-sheet payout
               </div>
             </div>
           </div>
 
-          {/* ─── LIVE FINANCIAL SETTLEMENT BREAKDOWN RECEIPT ─── */}
+          {/* ─── LIVE FINANCIAL SETTLEMENT SUMMARY ─── */}
           <div
             style={{
-              marginTop: 20,
-              padding: '18px 22px',
-              background: '#090d16',
-              color: '#ffffff',
-              borderRadius: 14,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              marginTop: 18,
+              padding: '16px 20px',
+              background: 'var(--bg)',
+              borderRadius: 12,
+              border: '1px solid var(--line)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #1e293b', paddingBottom: 8 }}>
-              <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8', fontWeight: 800 }}>
-                Live Accounting & Settlement Breakdown / كشف الحساب الفوري
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid var(--line)', paddingBottom: 8 }}>
+              <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--muted)', fontWeight: 800 }}>
+                Financial Settlement Summary
               </span>
-              <span style={{ fontSize: 12, color: '#38bdf8', fontWeight: 600 }}>
-                {pricingMode === 'added' ? 'Delivery Added to Customer' : 'Free Delivery (Shop Pays)'}
+              <span style={{ fontSize: 11.5, color: 'var(--brand)', fontWeight: 700 }}>
+                {pricingMode === 'added' ? 'Delivery Fee Added to Doorstep COD' : 'Free Delivery (Deducted from Merchant Payout)'}
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 18 }}>
-              {/* Box A: Net Item Price */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 14 }}>
               <div>
-                <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
-                  Net Goods Price (سعر البضاعة):
-                </span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: '#ffffff' }}>
-                  {formatUSD(netItemNum)}
-                </span>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                  Base merchandise value
-                </div>
+                <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>Net Goods Value</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{formatUSD(netItemNum)}</span>
               </div>
-
-              {/* Box B: Delivery Fee */}
               <div>
-                <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
-                  {pricingMode === 'added' ? 'Delivery Fee (Paid by Customer):' : 'Delivery Fee (Absorbed by Shop):'}
+                <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>Delivery Fee</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: pricingMode === 'added' ? '#2563eb' : '#dc2626' }}>
+                  {pricingMode === 'added' ? `+${formatUSD(feeUsdNum)}` : `-${formatUSD(feeUsdNum)}`}
                 </span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: pricingMode === 'added' ? '#38bdf8' : '#f87171' }}>
-                  {pricingMode === 'added' ? `+ ${formatUSD(feeUsdNum)}` : `- ${formatUSD(feeUsdNum)}`}
-                </span>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                  {pricingMode === 'added' ? 'Added on top of COD' : 'Deducted from merchant payout'}
-                </div>
               </div>
-
-              {/* Box C: Total Collected at Doorstep */}
-              <div style={{ borderLeft: '1px solid #334155', paddingLeft: 16 }}>
-                <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 700, display: 'block' }}>
-                  Collected at Doorstep (COD):
-                </span>
-                <span style={{ fontSize: 22, fontWeight: 900, color: '#4ade80' }}>
-                  {formatUSD(codUsdNum)}
-                </span>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                  ≈ L.L. {codLbpApprox.toLocaleString()}
-                </div>
-              </div>
-
-              {/* Box D: Shop Net Payout */}
-              <div style={{ borderLeft: '1px solid #334155', paddingLeft: 16 }}>
-                <span style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700, display: 'block' }}>
-                  Net Payout to {currentShop?.name || 'Shop'}:
-                </span>
-                <span style={{ fontSize: 22, fontWeight: 900, color: shopNetUsd >= 0 ? '#4ade80' : '#f87171' }}>
-                  {formatUSD(shopNetUsd)}
-                </span>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                  {pricingMode === 'added' ? '100% full net payout' : 'Net minus delivery fee'}
-                </div>
-              </div>
-
-              {/* Box E: Courier Pay */}
               <div>
-                <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
-                  Courier Pay to {currentDriver?.name || 'Driver'}:
-                </span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: '#facc15' }}>
-                  {formatUSD(driverPayNum)}
-                </span>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                  (Driver Run Sheet Pay)
-                </div>
+                <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>Customer COD</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#047857' }}>{formatUSD(codUsdNum)}</span>
               </div>
-
-              {/* Box F: Company Margin */}
               <div>
-                <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>
-                  Company Margin:
-                </span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: companyMarginUsd >= 0 ? '#60a5fa' : '#f87171' }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>Merchant Payout</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#047857' }}>{formatUSD(shopNetUsd)}</span>
+              </div>
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>Courier Pay</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{formatUSD(driverPayNum)}</span>
+              </div>
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>Company Margin</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: companyMarginUsd >= 0 ? 'var(--brand)' : '#dc2626' }}>
                   {formatUSD(companyMarginUsd)}
                 </span>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                  (Fee ${feeUsdNum} - Pay ${driverPayNum})
-                </div>
               </div>
             </div>
           </div>
