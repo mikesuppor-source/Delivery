@@ -33,8 +33,8 @@ export interface DriverPushPayload {
 export async function sendPushToDriver(
   driverId: string,
   payload: DriverPushPayload
-): Promise<{ sent: number; failed: number }> {
-  if (!driverId) return { sent: 0, failed: 0 }
+): Promise<{ sent: number; failed: number; errors?: string[] }> {
+  if (!driverId) return { sent: 0, failed: 0, errors: ['No driverId provided'] }
 
   const supabase = createServiceClient()
   const { data: subs, error } = await supabase
@@ -43,7 +43,7 @@ export async function sendPushToDriver(
     .eq('driver_id', driverId)
 
   if (error || !subs || subs.length === 0) {
-    return { sent: 0, failed: 0 }
+    return { sent: 0, failed: 0, errors: [error?.message || 'No subscriptions found for driver'] }
   }
 
   const notificationData = JSON.stringify({
@@ -57,6 +57,7 @@ export async function sendPushToDriver(
 
   let sent = 0
   let failed = 0
+  const errorDetails: string[] = []
   const staleSubIds: string[] = []
 
   await Promise.allSettled(
@@ -87,7 +88,9 @@ export async function sendPushToDriver(
       } catch (err: any) {
         failed++
         const statusCode = err?.statusCode || err?.status
-        console.error('[WebPush Dispatch Failed]:', statusCode, err?.body || err?.message)
+        const detail = `${statusCode || 'unknown'}: ${err?.body || err?.message || JSON.stringify(err)}`
+        errorDetails.push(detail)
+        console.error('[WebPush Dispatch Failed]:', detail)
         if (statusCode === 404 || statusCode === 410) {
           // Push subscription is no longer valid or user revoked permissions
           staleSubIds.push(sub.id)
@@ -100,5 +103,5 @@ export async function sendPushToDriver(
     await supabase.from('driver_push_subscriptions').delete().in('id', staleSubIds)
   }
 
-  return { sent, failed }
+  return { sent, failed, errors: errorDetails }
 }

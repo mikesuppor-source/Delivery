@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
         url: `/driver/${driverId}`,
         tag: 'test-notification',
       })
-      return NextResponse.json({ success: true, sent: res.sent, failed: res.failed })
+      return NextResponse.json({ success: true, sent: res.sent, failed: res.failed, errors: res.errors })
     }
 
     if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
