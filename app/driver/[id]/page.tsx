@@ -23,6 +23,8 @@ export async function generateMetadata({ params }: DriverRunSheetPageProps): Pro
   }
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function DriverRunSheetPage({ params }: DriverRunSheetPageProps) {
   const { id } = await params
   const supabase = await createClient()

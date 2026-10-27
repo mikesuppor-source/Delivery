@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: 'Enter your phone number and PIN to access your daily run sheet.',
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function DriverPortalIndexPage() {
   const userSupabase = await createClient()
   const { data: { user } } = await userSupabase.auth.getUser()
