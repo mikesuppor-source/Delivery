@@ -50,7 +50,6 @@ export async function middleware(request: NextRequest) {
     ].includes(path) ||
     path.startsWith('/track/') ||
     path.startsWith('/invite/') ||
-    path.startsWith('/print/order/') ||
     path === '/driver' ||
     path.startsWith('/driver/') ||
     path.startsWith('/api/driver/')

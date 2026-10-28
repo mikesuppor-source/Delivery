@@ -1,6 +1,7 @@
 import { allRows } from '@/lib/pagination'
-import { notFound } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
+import { notFound, redirect } from 'next/navigation'
+import { ApiError } from '@/lib/api'
+import { driverAccess } from '@/lib/access'
 import { DriverRunSheetClient } from './driver-run-sheet-client'
 import type { Metadata } from 'next'
 
@@ -8,37 +9,27 @@ interface DriverRunSheetPageProps {
   params: Promise<{ id: string }>
 }
 
-export async function generateMetadata({ params }: DriverRunSheetPageProps): Promise<Metadata> {
-  const { id } = await params
-  const supabase = createServiceClient()
-  const { data: driver } = await supabase
-    .from('drivers')
-    .select('name')
-    .eq('id', id)
-    .maybeSingle()
-
-  return {
-    title: driver?.name ? `Driver Run Sheet — ${driver.name} | Cedar Delivery` : 'Courier Run Sheet',
-    description: 'Real-time mobile delivery manifest and navigation for Cedar couriers.',
-  }
+export const metadata: Metadata = {
+  title: 'Courier Run Sheet | Cedar Delivery',
+  description: 'Real-time mobile delivery manifest and navigation for Cedar couriers.',
 }
 
 export const dynamic = 'force-dynamic'
 
 export default async function DriverRunSheetPage({ params }: DriverRunSheetPageProps) {
   const { id } = await params
-  const supabase = createServiceClient()
 
-  // 1. Fetch driver details
-  const { data: driver, error: driverErr } = await supabase
-    .from('drivers')
-    .select('id, workspace_id, name, phone, cash_held_usd, pay_owed_usd, active')
-    .eq('id', id)
-    .maybeSingle()
-
-  if (driverErr || !driver) {
+  // 1. Only the signed-in courier (or their dispatch managers) can open this run sheet
+  let access: Awaited<ReturnType<typeof driverAccess>>
+  try {
+    access = await driverAccess(id)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) redirect('/driver')
     notFound()
   }
+  const { db: supabase } = access
+  const { workspace_id, name, phone, cash_held_usd, pay_owed_usd, active } = access.driver
+  const driver = { id: access.driver.id, workspace_id, name, phone, cash_held_usd, pay_owed_usd, active }
 
   // 2. Fetch workspace info
   const { data: workspace } = await supabase

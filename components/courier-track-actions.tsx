@@ -14,6 +14,7 @@ interface Driver {
 }
 
 interface CourierTrackActionsProps {
+  workspaceId: string
   orderId: string
   orderCode: string
   currentStatus: string
@@ -26,6 +27,7 @@ interface CourierTrackActionsProps {
 }
 
 export function CourierTrackActions({
+  workspaceId,
   orderId,
   orderCode,
   currentStatus,
@@ -54,6 +56,7 @@ export function CourierTrackActions({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          workspaceId,
           orderId,
           status: actionStatus || currentStatus,
           driverId: customDriverId !== undefined ? customDriverId : (selectedDriverId || null),

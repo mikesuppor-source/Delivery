@@ -1,79 +1,63 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { api, ApiError } from '@/lib/api'
-
-function cleanPhone(p: string): string {
-  const digits = p.replace(/\D/g, '')
-  if (digits.startsWith('961') && digits.length >= 10) {
-    return digits.slice(3)
-  }
-  if (digits.startsWith('0') && digits.length >= 8) {
-    return digits.slice(1)
-  }
-  return digits
-}
+import { api, ApiError, checked } from '@/lib/api'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
+import {
+  DRIVER_SESSION_MAX_AGE,
+  LEGACY_DRIVER_COOKIE,
+  DRIVER_SESSION_COOKIE,
+  driverSessionCookie,
+  driverSessionSecret,
+  signDriverSession,
+} from '@/lib/driver-session'
 
 export const POST = api(async req => {
   const body = await req.json()
-  const rawPhone = String(body.phone || '').trim()
-  const pin = String(body.pin || '').trim()
+  const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : ''
+  const pin = typeof body.pin === 'string' ? body.pin.trim().slice(0, 8) : ''
 
-  if (!rawPhone || !pin) {
+  if (!phone || !pin) {
     throw new ApiError(400, 'Please enter your mobile phone number and PIN')
   }
 
-  const normalizedInput = cleanPhone(rawPhone)
-  if (normalizedInput.length < 6) {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length < 7) {
     throw new ApiError(400, 'Invalid phone number format')
   }
 
+  // 5 attempts per number and 20 per network each minute
+  await rateLimit('driver-login:' + digits.slice(-8), 5)
+  await rateLimit('driver-login-ip:' + clientIp(req), 20)
+
   const db = createServiceClient()
+  const matches = checked(await db.rpc('verify_driver_login', { p_phone: phone, p_pin: pin }))
 
-  // Query active drivers
-  const { data: drivers, error } = await db
-    .from('drivers')
-    .select('id, name, phone, pin_code, active')
-    .eq('active', true)
-
-  if (error || !drivers) {
-    throw new ApiError(500, 'Database error verifying credentials')
+  if (matches.length > 1) {
+    throw new ApiError(409, 'This phone number is registered with more than one company. Contact dispatch.')
   }
-
-  const matchedDriver = drivers.find(d => {
-    if (!d.phone) return false
-    const dPhone = cleanPhone(d.phone)
-    return (
-      (dPhone === normalizedInput || d.phone.replace(/\D/g, '').includes(normalizedInput)) &&
-      (d.pin_code || '1234') === pin
-    )
-  })
-
-  if (!matchedDriver) {
+  const driver = matches[0]
+  if (!driver) {
     throw new ApiError(401, 'Invalid phone number or PIN. Contact dispatch for your login code.')
   }
 
-  // Create response and set persistent cookie for mobile session
+  const token = signDriverSession(
+    { driverId: driver.driver_id, version: driver.session_version, expiresAt: Date.now() + DRIVER_SESSION_MAX_AGE * 1000 },
+    driverSessionSecret()
+  )
+
   const res = NextResponse.json({
     success: true,
-    driverId: matchedDriver.id,
-    name: matchedDriver.name,
+    driverId: driver.driver_id,
+    name: driver.name,
   })
-
-  res.cookies.set('cedar_saved_driver_id', matchedDriver.id, {
-    path: '/',
-    maxAge: 60 * 60 * 24 * 365, // 1 year
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  })
-
+  res.cookies.set(driverSessionCookie(token))
+  res.cookies.delete(LEGACY_DRIVER_COOKIE)
   return res
 })
 
 export const DELETE = api(async () => {
   const res = NextResponse.json({ success: true, message: 'Logged out successfully' })
-  res.cookies.set('cedar_saved_driver_id', '', {
-    path: '/',
-    maxAge: 0,
-  })
+  res.cookies.delete(DRIVER_SESSION_COOKIE)
+  res.cookies.delete(LEGACY_DRIVER_COOKIE)
   return res
 })

@@ -2,7 +2,10 @@
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
-import { formatLebanesePhone } from '@/lib/phone'
+import { headers } from 'next/headers'
+import { formatLebanesePhone, isValidLebanesePhone } from '@/lib/phone'
+import { formatOrderCode } from '@/lib/order-codes'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { PackageIcon } from '@/components/icons'
 import type { Metadata } from 'next'
@@ -39,7 +42,7 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
     const { data: directOrder } = await supabase
       .from('orders')
       .select('code')
-      .ilike('code', input)
+      .eq('code', formatOrderCode(input))
       .maybeSingle()
 
     if (directOrder) {
@@ -60,34 +63,30 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
   let phoneOrders: any[] | null = null
   let searchedPhoneFormatted = ''
 
+  let phoneNotice = ''
+
   if (rawPhone) {
-    const supabase = createServiceClient()
     const digits = rawPhone.replace(/\D/g, '')
-    let core = digits
-    if (core.startsWith('961')) core = core.slice(3)
-    if (core.startsWith('0')) core = core.slice(1)
-
     searchedPhoneFormatted = formatLebanesePhone(digits) || digits
+    phoneOrders = []
 
-    const { data: rawOrders } = await supabase
-      .from('orders')
-      .select(`
-        id, code, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
-        recipient_name, recipient_phone, recipient_address,
-        shop:shop_id(name, phone),
-        area:area_id(name),
-        driver:driver_id(id, name, phone)
-      `)
-      .or(`recipient_phone.ilike.%${core}%,recipient_phone.ilike.%${digits}%`)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    phoneOrders = (rawOrders || []).map((o: any) => ({
-      ...o,
-      shop: Array.isArray(o.shop) ? o.shop[0] : o.shop,
-      area: Array.isArray(o.area) ? o.area[0] : o.area,
-      driver: Array.isArray(o.driver) ? o.driver[0] : o.driver,
-    }))
+    // Exact number only, 10 searches a minute per network, and no addresses in the results
+    if (isValidLebanesePhone(rawPhone)) {
+      let allowed = true
+      try {
+        await rateLimit('track-phone:' + clientIp({ headers: await headers() }), 10)
+      } catch {
+        allowed = false
+      }
+      if (allowed) {
+        const { data } = await createServiceClient().rpc('track_orders_by_phone', { p_phone: digits })
+        phoneOrders = Array.isArray(data) ? data : []
+      } else {
+        phoneNotice = 'Too many searches from your network. Please try again in a minute.'
+      }
+    } else {
+      phoneNotice = 'Enter your full mobile number to see your packages.'
+    }
   }
 
   return (
@@ -191,8 +190,12 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
               <PackageIcon size={36} color="var(--muted)" style={{ margin: '0 auto 12px' }} />
               <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>No Active Shipments Found</h3>
               <p style={{ color: 'var(--muted)', fontSize: 13, maxWidth: 420, margin: '0 auto 18px' }}>
-                We couldn&apos;t find any current packages registered for <strong>{searchedPhoneFormatted}</strong>.
-                If you have a tracking code, try entering it directly above.
+                {phoneNotice || (
+                  <>
+                    We couldn&apos;t find any current packages registered for <strong>{searchedPhoneFormatted}</strong>.
+                    If you have a tracking code, try entering it directly above.
+                  </>
+                )}
               </p>
               <a
                 href={`https://wa.me/96170000000?text=${encodeURIComponent(
@@ -352,15 +355,6 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
                       </span>
 
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <Link
-                          href={`/print/order/${ord.code}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-secondary btn-sm"
-                          style={{ fontSize: 11, padding: '5px 10px' }}
-                        >
-                          ≡ƒº╛ Receipt Slip
-                        </Link>
                         <Link
                           href={`/track/${ord.code}`}
                           className="btn btn-primary btn-sm"

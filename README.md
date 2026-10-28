@@ -48,8 +48,7 @@ npm install
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to **SQL Editor** and run the migrations in order:
-   - `supabase/migrations/001_schema.sql`
-   - `supabase/migrations/002_rls.sql`
+   - every file in `supabase/migrations/`, from `001_schema.sql` to the highest number
 
 3. In **Auth > URL Configuration**:
    - Site URL: `https://your-app.vercel.app`
@@ -153,6 +152,10 @@ cedar/
 ## Security Notes
 
 - **Never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.** It bypasses all RLS.
-- RLS policies enforce data access at the database level — even if API code has bugs, data won't leak.
+- RLS policies enforce data access for the browser and user-scoped clients. Server routes that use the service role bypass RLS, so every such route must check access itself (`workspaceAccess`, `shopAccess`, `driverAccess` in `lib/access.ts`).
+- Courier PINs are stored as bcrypt hashes in `driver_credentials`, which app users cannot read. Dispatch sees a PIN only once, when it is issued; a forgotten PIN is reset, which also signs the courier out of every device.
+- The courier app uses a signed, `httpOnly` session cookie (`DRIVER_SESSION_SECRET`). A courier ID on its own grants nothing.
+- Public pages (`/track`) match exact order codes and exact phone numbers, are rate limited, and never show delivery addresses for a phone search. Waybills (`/print/order/...`) require sign-in.
+- Merchant payouts are requested and paid through database functions that lock the shop or request row, so they cannot overdraw a balance or be paid twice.
 - The audit log can only be written by the service role — users cannot tamper with it.
 - Owner accounts cannot be deleted or demoted via the UI/API.

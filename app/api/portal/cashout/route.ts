@@ -56,51 +56,15 @@ export const POST = api(async (req) => {
   const accountDetails = textField(body.accountDetails, 'account details / recipient phone', 500, true);
   const notes = textField(body.notes, 'notes', 1000);
 
-  // Calculate current available balance from materialized shop balance minus pending cashouts
-  const currentShopBalance = Number(shop.balance_usd) || 0;
-
-  const { data: requests } = await db
-    .from('cashout_requests')
-    .select('amount_usd, status')
-    .eq('shop_id', shop.id);
-
-  const pendingCashoutsUsd = (requests || [])
-    .filter((r) => r.status === 'pending' || r.status === 'approved')
-    .reduce((sum, r) => sum + (Number(r.amount_usd) || 0), 0);
-
-  const availableUsd = Math.max(0, Math.round((currentShopBalance - pendingCashoutsUsd) * 100) / 100);
-
-  if (amountUsd > availableUsd) {
-    throw new ApiError(
-      400,
-      `Requested amount ($${amountUsd.toFixed(2)}) exceeds eligible available balance ($${availableUsd.toFixed(2)}).`
-    );
-  }
-
-  const { data: ws } = await db
-    .from('workspaces')
-    .select('usd_to_lbp')
-    .eq('id', shop.workspace_id)
-    .single();
-
-  const rate = Number(ws?.usd_to_lbp) || 89500;
-  const amountLbp = Math.round(amountUsd * rate);
-
+  // Balance check and insert happen in one locked transaction, so parallel requests cannot overdraw.
   const cashout = checked(
-    await db
-      .from('cashout_requests')
-      .insert({
-        workspace_id: shop.workspace_id,
-        shop_id: shop.id,
-        amount_usd: amountUsd,
-        amount_lbp: amountLbp,
-        method,
-        account_details: accountDetails,
-        notes,
-        status: 'pending',
-      })
-      .select('*')
-      .single()
+    await db.rpc('request_shop_cashout', {
+      p_shop: shop.id,
+      p_amount: amountUsd,
+      p_method: method,
+      p_details: accountDetails,
+      p_notes: notes,
+    })
   );
 
   return NextResponse.json({

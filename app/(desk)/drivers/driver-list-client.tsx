@@ -13,7 +13,7 @@ interface Driver {
   id: string
   name: string
   phone: string | null
-  pin_code?: string | null
+  has_pin?: boolean
   active: boolean
   cash_held_usd: number
   pay_owed_usd: number
@@ -46,7 +46,9 @@ export function DriverListClient({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [pinCode, setPinCode] = useState('1234')
+  const [pinCode, setPinCode] = useState('')
+  const [issuedLogin, setIssuedLogin] = useState<{ name: string; phone: string | null; pin: string } | null>(null)
+  const [resettingId, setResettingId] = useState<string | null>(null)
   const [userId, setUserId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -66,7 +68,7 @@ export function DriverListClient({
           workspaceId,
           name,
           phone,
-          pinCode: pinCode.trim() || '1234',
+          pinCode: pinCode.trim() || undefined,
           userId: userId || null,
         }),
       })
@@ -76,14 +78,38 @@ export function DriverListClient({
 
       setDrivers(prev => [data.driver, ...prev])
       setIsModalOpen(false)
+      setIssuedLogin({ name: data.driver.name, phone: data.driver.phone, pin: data.pin })
       setName('')
       setPhone('')
-      setPinCode('1234')
+      setPinCode('')
       setUserId('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error adding driver')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // PINs are stored hashed, so a forgotten PIN is replaced rather than shown.
+  async function handleResetPin(driver: Driver) {
+    if (!window.confirm(`Issue a new PIN for ${driver.name}? Their old PIN stops working and they are signed out of the courier app.`)) {
+      return
+    }
+    setResettingId(driver.id)
+    try {
+      const res = await fetch(`/api/drivers/${driver.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, resetPin: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to reset PIN')
+      setDrivers(prev => prev.map(d => (d.id === driver.id ? { ...d, has_pin: true } : d)))
+      setIssuedLogin({ name: driver.name, phone: driver.phone, pin: data.pin })
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error resetting PIN')
+    } finally {
+      setResettingId(null)
     }
   }
 
@@ -95,6 +121,8 @@ export function DriverListClient({
     try {
       const res = await fetch(`/api/drivers/${driverId}`, {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to delete driver')
@@ -174,7 +202,7 @@ export function DriverListClient({
                           <span>{driver.phone}</span>
                         </a>
                         <small style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 600 }}>
-                          PIN: <span style={{ color: 'var(--text)', fontWeight: 700 }}>{driver.pin_code || '1234'}</span>
+                          {driver.has_pin ? 'PIN set' : <span style={{ color: '#b45309', fontWeight: 700 }}>No PIN, cannot sign in</span>}
                         </small>
                       </div>
                     ) : '—'}
@@ -239,21 +267,17 @@ export function DriverListClient({
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                      {driver.phone && (
-                        <a
-                          href={getWhatsAppUrl(
-                            driver.phone,
-                            `Hello ${driver.name}, here is your Cedar Courier App login:\n📱 Phone: ${driver.phone}\n🔑 PIN: ${driver.pin_code || '1234'}\n🚀 App: https://delivery-five-roan.vercel.app/driver`
-                          )}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      {canEdit && (
+                        <button
+                          type="button"
                           className="btn btn-secondary"
-                          style={{ fontSize: 11, padding: '4px 8px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                          title="Send Courier login credentials on WhatsApp"
+                          style={{ fontSize: 11, padding: '4px 8px' }}
+                          onClick={() => handleResetPin(driver)}
+                          disabled={resettingId === driver.id}
+                          title="Issue a new courier app PIN"
                         >
-                          <WhatsAppIcon size={11} color="#25D366" />
-                          <span>Send Login</span>
-                        </a>
+                          {resettingId === driver.id ? 'Issuing…' : driver.has_pin ? 'Reset PIN' : 'Issue PIN'}
+                        </button>
                       )}
                       <Link
                         href={`/drivers/${driver.id}`}
@@ -317,12 +341,13 @@ export function DriverListClient({
               <label>Courier Mobile PIN</label>
               <input
                 type="text"
-                maxLength={6}
-                placeholder="1234"
+                inputMode="numeric"
+                maxLength={8}
+                placeholder="Leave blank to generate one"
                 value={pinCode}
-                onChange={e => setPinCode(e.target.value)}
+                onChange={e => setPinCode(e.target.value.replace(/\D/g, ''))}
               />
-              <small style={{ color: 'var(--muted)', fontSize: 11 }}>Used by courier to sign in on their mobile phone</small>
+              <small style={{ color: 'var(--muted)', fontSize: 11 }}>4 to 8 digits. Shown once after saving, then stored encrypted.</small>
             </div>
             <div className="field">
               <label>Link Staff Login Account (Optional)</label>
@@ -348,6 +373,43 @@ export function DriverListClient({
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={!!issuedLogin} onClose={() => setIssuedLogin(null)} title="Courier app login" maxWidth="min(92vw, 440px)">
+        {issuedLogin && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <p style={{ margin: 0 }}>
+              Give these details to <strong>{issuedLogin.name}</strong>. The PIN is only shown now. If it is lost, issue a new one.
+            </p>
+            <div style={{ background: 'var(--surface-hover)', borderRadius: 8, padding: 12, fontSize: 14 }}>
+              <div>Phone: <strong>{issuedLogin.phone || '—'}</strong></div>
+              <div>PIN: <strong style={{ fontSize: 20, letterSpacing: 3 }}>{issuedLogin.pin}</strong></div>
+            </div>
+            <div className="form-actions">
+              {issuedLogin.phone && (
+                <a
+                  href={getWhatsAppUrl(
+                    issuedLogin.phone,
+                    `Hello ${issuedLogin.name}, here is your Cedar Courier App login:
+📱 Phone: ${issuedLogin.phone}
+🔑 PIN: ${issuedLogin.pin}
+🚀 App: ${window.location.origin}/driver`
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+                >
+                  <WhatsAppIcon size={13} color="#25D366" />
+                  <span>Send on WhatsApp</span>
+                </a>
+              )}
+              <button type="button" className="btn btn-primary" onClick={() => setIssuedLogin(null)}>
+                Done
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   )
