@@ -8,6 +8,7 @@ import { formatOrderCode } from '@/lib/order-codes'
 import { clientIp, rateLimit } from '@/lib/rate-limit'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { PackageIcon } from '@/components/icons'
+import { SUPPORT_WHATSAPP, supportWhatsAppUrl } from '@/lib/support'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -197,18 +198,18 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
                   </>
                 )}
               </p>
-              <a
-                href={`https://wa.me/96170000000?text=${encodeURIComponent(
-                  `Hello Cedar Delivery, I am checking my packages for phone number ${searchedPhoneFormatted}. Could you please assist me?`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="whatsapp-btn"
-                style={{ display: 'inline-flex', margin: '0 auto' }}
-              >
-                <WhatsAppIcon size={14} color="#fff" />
-                <span>Ask Cedar Dispatch on WhatsApp</span>
-              </a>
+              {SUPPORT_WHATSAPP && (
+                <a
+                  href={supportWhatsAppUrl(`Hello Cedar Delivery, I am checking my packages for phone number ${searchedPhoneFormatted}. Could you please assist me?`)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="whatsapp-btn"
+                  style={{ display: 'inline-flex', margin: '0 auto' }}
+                >
+                  <WhatsAppIcon size={14} color="#fff" />
+                  <span>Ask Cedar Dispatch on WhatsApp</span>
+                </a>
+              )}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -394,18 +395,20 @@ export default async function TrackPortalPage({ searchParams }: TrackPortalProps
       </div>
 
       {/* Help Bar */}
-      <div className="track-support-bar" style={{ marginTop: 24 }}>
-        <span>Have questions or need to reschedule a delivery?</span>
-        <a
-          href="https://wa.me/96170000000?text=Hello%20Cedar%20Delivery,%20I%20have%20a%20question%20regarding%20my%20shipment."
-          target="_blank"
-          rel="noopener noreferrer"
-          className="whatsapp-btn"
-        >
-          <WhatsAppIcon size={14} color="#fff" />
-          <span>Chat on WhatsApp</span>
-        </a>
-      </div>
+      {SUPPORT_WHATSAPP && (
+        <div className="track-support-bar" style={{ marginTop: 24 }}>
+          <span>Have questions or need to reschedule a delivery?</span>
+          <a
+            href={supportWhatsAppUrl('Hello Cedar Delivery, I have a question regarding my shipment.')!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="whatsapp-btn"
+          >
+            <WhatsAppIcon size={14} color="#fff" />
+            <span>Chat on WhatsApp</span>
+          </a>
+        </div>
+      )}
     </div>
   )
 }
