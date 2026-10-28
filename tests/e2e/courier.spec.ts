@@ -34,11 +34,15 @@ test('a courier signs in with phone and PIN and can only reach their own run she
 test('wrong PINs are refused and repeated guesses are rate limited', async ({ request }) => {
   // A number nobody uses, so earlier runs in the same minute do not interfere
   const phone = '79' + String(Math.floor(Math.random() * 1e6)).padStart(6, '0')
-  const statuses = []
-  for (let i = 0; i < 6; i++) {
+  // The limit (5 per number) counts per calendar minute. If the guesses straddle a
+  // minute boundary the count restarts once, so a block must come within 11 tries.
+  const statuses: number[] = []
+  for (let i = 0; i < 11 && !statuses.includes(429); i++) {
     statuses.push((await request.post('/api/driver/auth', { data: { phone, pin: String(500000 + i) } })).status())
   }
-  expect(statuses).toEqual([401, 401, 401, 401, 401, 429])
+  expect(statuses.at(-1)).toBe(429)
+  expect(statuses.slice(0, -1).every(s => s === 401)).toBe(true)
+  expect(statuses.length).toBeGreaterThanOrEqual(6)
   expect((await request.post('/api/driver/auth', { data: { phone: '+961 70 222 333', pin: '1234' } })).status()).toBe(401)
 })
 

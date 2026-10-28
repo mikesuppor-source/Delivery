@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import '@/components/ui/ui.css'
 
 export const viewport: Viewport = {
   themeColor: '#10b981',

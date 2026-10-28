@@ -1,0 +1,238 @@
+/*
+ * Shared UI kit. Components read --ui-* tokens, so the same markup works in the
+ * light desk theme (defaults below) and the dark courier app (.theme-courier).
+ */
+:root {
+  --ui-surface: var(--surface);
+  --ui-border: var(--line);
+  --ui-text: var(--text);
+  --ui-muted: var(--muted);
+  --ui-primary: var(--info);
+  --ui-success: var(--brand);
+  --ui-success-soft: var(--brand-light);
+  --ui-success-strong: var(--brand);
+  --ui-warning: #f59e0b;
+  --ui-warning-text: #1f2937;
+  --ui-danger: var(--danger);
+  --ui-info-text: var(--info);
+  --ui-info-border: var(--info);
+}
+
+.theme-courier {
+  --ui-surface: #1e293b;
+  --ui-border: #334155;
+  --ui-text: #f8fafc;
+  --ui-muted: #94a3b8;
+  --ui-primary: #2563eb;
+  --ui-success: #059669;
+  --ui-success-soft: rgba(16, 185, 129, 0.15);
+  --ui-success-strong: #10b981;
+  --ui-warning: #fbbf24;
+  --ui-warning-text: #0f172a;
+  --ui-danger: #dc2626;
+  --ui-info-text: #38bdf8;
+  --ui-info-border: #0284c7;
+}
+
+/* ── Button ─────────────────────────────────────────────── */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.05s ease;
+}
+.ui-btn:active:not(:disabled) { transform: scale(0.98); }
+.ui-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.ui-btn:focus-visible { outline: 2px solid var(--ui-info-text); outline-offset: 2px; }
+.ui-btn--sm { padding: 6px 10px; font-size: 11.5px; border-radius: 6px; }
+
+.ui-btn--primary { background: var(--ui-primary); color: #fff; }
+.ui-btn--success { background: var(--ui-success); color: #fff; }
+.ui-btn--warning { background: var(--ui-warning); color: var(--ui-warning-text); }
+.ui-btn--danger { background: var(--ui-danger); color: #fff; }
+.ui-btn--neutral { background: var(--ui-surface); color: var(--ui-muted); border-color: var(--ui-border); font-weight: 700; }
+.ui-btn--subtle { background: rgba(255, 255, 255, 0.08); color: var(--ui-muted); border-color: #475569; font-weight: 700; }
+.ui-btn--info { background: var(--ui-surface); color: var(--ui-info-text); border-color: var(--ui-info-border); }
+.ui-btn--on { background: var(--ui-success-soft); color: #34d399; border-color: rgba(16, 185, 129, 0.3); font-weight: 700; }
+
+/* ── Pill ───────────────────────────────────────────────── */
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ui-pill--success { background: #064e3b; color: #6ee7b7; border-color: #059669; }
+.ui-pill--success-soft { background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4); border-radius: 6px; padding: 6px 8px; font-size: 11px; }
+.ui-pill--tag { background: rgba(16, 185, 129, 0.25); color: #6ee7b7; border-color: #10b981; border-radius: 4px; }
+
+/* ── Panel ──────────────────────────────────────────────── */
+.ui-panel {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+/* ── Notice ─────────────────────────────────────────────── */
+.ui-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1.5px solid;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.ui-notice__title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; }
+.ui-notice__body { margin: 0; font-size: 12px; line-height: 1.45; }
+.ui-notice__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.ui-notice--warning {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(180, 83, 9, 0.25) 100%);
+  border-color: #f59e0b;
+  gap: 4px;
+}
+.ui-notice--warning .ui-notice__title { color: #fef08a; }
+.ui-notice--warning .ui-notice__body { color: #fef3c7; }
+.ui-notice--info {
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.45) 0%, rgba(15, 23, 42, 0.9) 100%);
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+.ui-notice--info .ui-notice__title { color: #93c5fd; }
+.ui-notice--info .ui-notice__body { color: #cbd5e1; }
+
+/* ── Stat card ──────────────────────────────────────────── */
+.ui-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.ui-stat {
+  display: block;
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+button.ui-stat { cursor: pointer; transition: transform 0.1s ease; }
+button.ui-stat:active { transform: scale(0.98); }
+button.ui-stat:focus-visible { outline: 2px solid var(--ui-info-text); outline-offset: 2px; }
+.ui-stat__head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.ui-stat__label { font-size: 11px; font-weight: 700; color: var(--ui-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.ui-stat__value { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; font-size: 26px; font-weight: 900; color: var(--ui-text); }
+.ui-stat__suffix { font-size: 12px; font-weight: 400; color: #64748b; }
+.ui-stat__foot { margin-top: 2px; font-size: 11px; color: var(--ui-muted); }
+.ui-stat__foot--accent { color: var(--ui-info-text); font-weight: 600; }
+.ui-stat--success {
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+  border: 1.5px solid var(--ui-success);
+}
+.ui-stat--success .ui-stat__label { color: #6ee7b7; }
+.ui-stat--success .ui-stat__value { font-size: 24px; color: var(--ui-success-strong); }
+
+/* ── Toast ──────────────────────────────────────────────── */
+.ui-toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 90%;
+  padding: 10px 18px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ui-toast--success { background: #065f46; }
+.ui-toast--error { background: #991b1b; }
+
+/* Toggle (aria-pressed) and text-link buttons */
+.ui-btn--toggle { background: var(--ui-surface); color: var(--ui-muted); border-color: var(--ui-border); }
+.ui-btn--toggle[aria-pressed='true'] { background: var(--ui-success-strong); color: #022c22; border-color: var(--ui-success-strong); }
+.ui-btn--link { background: none; border: none; padding: 0; color: var(--ui-info-text); text-decoration: underline; font-size: 11px; font-weight: 700; }
+
+/* ── Status panel + dot ─────────────────────────────────── */
+.ui-status { display: flex; flex-direction: column; gap: 8px; border: 1px solid; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.ui-status--ok { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); }
+.ui-status--busy { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3); }
+.ui-status--error { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); }
+.ui-status--idle { background: rgba(30, 41, 59, 0.6); border-color: var(--ui-border); }
+.ui-status__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+/* The message keeps a usable width; on narrow phones the actions wrap below it */
+.ui-status__message { display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 0; font-size: 12px; }
+.ui-status__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ui-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: #64748b; }
+.ui-dot--ok { background: #10b981; box-shadow: 0 0 8px #10b981; }
+.ui-dot--busy { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+.ui-dot--error { background: #ef4444; }
+
+/* Large full-width action buttons (order workflow) */
+.ui-btn--lg { padding: 10px 14px; font-size: 13px; border-radius: 8px; }
+.ui-btn--grow { flex: 1; }
+.ui-btn--alert { background: #334155; color: #f87171; border-color: #475569; font-weight: 700; }
+
+/* ── Card ───────────────────────────────────────────────── */
+.ui-card { background: var(--ui-surface); border: 1.5px solid var(--ui-border); border-radius: 12px; padding: 14px 16px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2); }
+.ui-card--success { background: #0f291e; border-color: var(--ui-success); }
+.ui-card--danger { background: #27171a; border-color: var(--ui-danger); }
+
+/* ── Tag (small square badge) ───────────────────────────── */
+.ui-tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border: 1px solid transparent; border-radius: 4px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.ui-tag--info { background: #172554; color: #60a5fa; font-size: 11px; }
+.ui-tag--danger { background: #7f1d1d; color: #fca5a5; border-color: #dc2626; font-weight: 800; }
+.ui-tag--neutral { background: #334155; color: #cbd5e1; }
+.ui-tag--success { background: #064e3b; color: #34d399; }
+.ui-tag--success-soft { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3); font-weight: 800; }
+.ui-tag--warning { background: #78350f; color: #fef08a; border-color: #ca8a04; border-radius: 99px; padding: 2px 7px; font-size: 10px; font-weight: 800; }
+
+/* Order status chip */
+.ui-chip { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 99px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.ui-chip--delivered { background: #064e3b; color: #6ee7b7; }
+.ui-chip--picked_up { background: #1e3a8a; color: #93c5fd; }
+.ui-chip--assigned { background: #3730a3; color: #c7d2fe; }
+.ui-chip--pending, .ui-chip--failed, .ui-chip--returned, .ui-chip--cancelled { background: #7f1d1d; color: #fca5a5; }
+
+/* ── Callout (inline coloured note) ─────────────────────── */
+.ui-callout { padding: 6px 10px; margin-bottom: 10px; border: 1px solid; border-radius: 6px; font-size: 12px; font-weight: 800; }
+.ui-callout small { display: block; font-size: 11px; font-weight: 500; }
+.ui-callout--warning { background: rgba(245, 158, 11, 0.15); border-color: #f59e0b; color: #fef08a; }
+.ui-callout--warning small { color: #fde68a; }
+.ui-callout--purple { background: rgba(168, 85, 247, 0.15); border-color: #a855f7; color: #e9d5ff; }
+.ui-callout--purple small { color: #d8b4fe; }
+.ui-callout--note { background: rgba(253, 224, 71, 0.1); border-color: rgba(253, 224, 71, 0.2); color: #fde047; font-size: 11px; font-weight: 400; padding: 4px 8px; margin: 6px 0 0; }
+
+/* ── Action tiles (icon + label links in a grid) ────────── */
+.ui-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+.ui-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 8px; color: #fff; font-size: 11px; font-weight: 700; text-align: center; text-decoration: none; }
+.ui-tile--waze { background: #0369a1; }
+.ui-tile--maps { background: #1d4ed8; }
+.ui-tile--whatsapp { background: #047857; }
+.ui-tile--neutral { background: #334155; color: #f8fafc; }
+.ui-tile--disabled { background: #334155; color: #64748b; }
+
+/* Soft link buttons (WhatsApp presets) */
+.ui-soft-link { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; border: 1px solid; border-radius: 6px; font-size: 11px; font-weight: 600; text-align: center; text-decoration: none; }
+.ui-soft-link--green { background: rgba(37, 211, 102, 0.1); border-color: rgba(37, 211, 102, 0.3); color: #4ade80; }
+.ui-soft-link--blue { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3); color: #60a5fa; }
