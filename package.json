@@ -10,7 +10,8 @@
     "types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > lib/supabase/database.types.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "tsx --test tests/*.test.ts",
-    "test:db": "node --test tests/database.test.mjs"
+    "test:db": "node --test tests/database.test.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -23,7 +24,8 @@
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.11",

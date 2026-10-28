@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server'
-import { api, ApiError, checked, textField, money } from '@/lib/api'
+import { api, checked } from '@/lib/api'
+import { money, parseBody, requiredText, text, z } from '@/lib/validation'
 import { authenticated } from '@/lib/access'
 import { createServiceClient } from '@/lib/supabase/server'
+
+const NewWorkspace = z.object({
+  name: requiredText(100),
+  displayName: text(200),
+  usdToLbp: money(89500),
+  currency: z.enum(['USD', 'LBP']).catch('USD'),
+})
 
 // POST /api/workspace — Create a new workspace and set the caller as Owner
 export const POST = api(async req => {
   const { user } = await authenticated()
-  const body = await req.json()
-  const name = textField(body.name, 'workspace name', 100, true)
+  const body = await parseBody(req, NewWorkspace)
+  const name = body.name
   const slug = name
     .toLowerCase()
     .trim()
@@ -22,8 +30,8 @@ export const POST = api(async req => {
     .insert({
       name,
       slug,
-      usd_to_lbp: money(body.usdToLbp, 'exchange rate', 89500),
-      currency: ['USD', 'LBP'].includes(body.currency) ? body.currency : 'USD',
+      usd_to_lbp: body.usdToLbp,
+      currency: body.currency,
     })
     .select('id, name')
     .single())
@@ -35,7 +43,7 @@ export const POST = api(async req => {
       workspace_id: ws.id,
       user_id: user.id,
       role: 'owner',
-      display_name: textField(body.displayName, 'display name', 200) || user.email?.split('@')[0] || 'Owner',
+      display_name: body.displayName || user.email?.split('@')[0] || 'Owner',
       joined_at: new Date().toISOString(),
     })
     .select('id')

@@ -16,3 +16,37 @@ jobs:
    - run: npm run test:db
    - run: npm run build
    - run: npm audit --omit=dev
+ e2e:
+  # Browser tests against a throwaway local Supabase with every migration applied
+  runs-on: ubuntu-latest
+  steps:
+   - uses: actions/checkout@v4
+   - uses: actions/setup-node@v4
+     with:
+      node-version: 22
+      cache: npm
+   - run: npm ci
+   - run: npx supabase start -x studio,postgres-meta,imgproxy,edge-runtime,logflare,vector,supavisor
+   - name: Point the app at the local Supabase
+     run: |
+      npx supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=' | sed 's/"//g' > supabase.env
+      . ./supabase.env
+      secret=$(openssl rand -hex 32)
+      echo "::add-mask::$secret"
+      {
+       echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+       echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+       echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+       echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
+       echo "DRIVER_SESSION_SECRET=$secret"
+      } >> "$GITHUB_ENV"
+   - run: node scripts/seed-local.mjs
+   - run: npx playwright install --with-deps chromium
+   - run: npm run test:e2e
+     env:
+      CI: true
+   - uses: actions/upload-artifact@v4
+     if: failure()
+     with:
+      name: playwright-report
+      path: playwright-report

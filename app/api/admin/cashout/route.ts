@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
-import { api, ApiError, checked, textField, uuid } from '@/lib/api';
+import { api, ApiError, checked } from '@/lib/api';
+import { id, parseBody, text, z } from '@/lib/validation';
+
+const CashoutDecision = z.object({
+  workspaceId: id,
+  requestId: id,
+  action: z.enum(['approve', 'reject', 'mark_paid']),
+  notes: text(500),
+});
 import { workspaceAccess } from '@/lib/access';
 
 export const GET = api(async (req) => {
@@ -19,10 +27,9 @@ export const GET = api(async (req) => {
 });
 
 export const PATCH = api(async (req) => {
-  const body = await req.json();
+  const body = await parseBody(req, CashoutDecision);
   const { db, user, workspaceId } = await workspaceAccess(body.workspaceId);
-  const requestId = uuid(body.requestId, 'cashout request ID');
-  const action = textField(body.action, 'action', 20); // 'approve', 'reject', 'mark_paid'
+  const { requestId, action } = body;
 
   const request = checked(
     await db
@@ -39,7 +46,7 @@ export const PATCH = api(async (req) => {
       .from('cashout_requests')
       .update({
         status: 'rejected',
-        notes: body.notes ? `[Rejected: ${textField(body.notes, 'rejection reason', 500)}] ` + (request.notes || '') : request.notes,
+        notes: body.notes ? `[Rejected: ${body.notes}] ` + (request.notes || '') : request.notes,
         processed_by: user.id,
         processed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

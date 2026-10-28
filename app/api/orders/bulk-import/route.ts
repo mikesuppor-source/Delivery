@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
-import { api, ApiError, checked, money, textField } from '@/lib/api'
+import { api, checked, money, textField } from '@/lib/api'
+import { id, parseBody, z } from '@/lib/validation'
 import { workspaceAccess, validateReferences } from '@/lib/access'
 import { matchArea } from '@/lib/import-orders'
 import { generateUniqueOrderCode, formatOrderCode } from '@/lib/order-codes'
+const ImportBatch=z.object({workspaceId:id,shopId:id,orders:z.array(z.record(z.string(),z.any())).min(1).max(200)})
 export const POST=api(async req=>{
- const body=await req.json()
+ const body=await parseBody(req,ImportBatch)
  const {db,user,workspaceId}=await workspaceAccess(body.workspaceId)
  await validateReferences(db,workspaceId,{shops:body.shopId})
- if(!body.shopId || !Array.isArray(body.orders)||!body.orders.length||body.orders.length>200)throw new ApiError(400,'Select a shop and 1–200 orders')
  const ws=checked(await db.from('workspaces').select('usd_to_lbp').eq('id',workspaceId).single())
  const areas=checked(await db.from('delivery_areas').select('id,name,fee_usd,default_driver_id').eq('workspace_id',workspaceId).eq('active',true))
  const rows=[]

@@ -1,15 +1,11 @@
-import { ApiError } from './api'
+import { ApiError, checked } from './api'
 import { shopifyFetch, SHOPIFY_VERSION, siteUrl } from './shopify-security'
 import { createServiceClient } from './supabase/server'
 export async function installShopify(shopId:string,domain:string,token:string) {
  const db=createServiceClient()
- try {
-  await db.from('shop_integrations').upsert({shop_id:shopId,access_token:token,updated_at:new Date().toISOString()},{onConflict:'shop_id'})
- } catch (e) { void e }
- const updateWithToken = await (db.from('shops') as any).update({shopify_domain:domain,shopify_access_token:token}).eq('id',shopId)
- if (updateWithToken.error) {
-  await db.from('shops').update({shopify_domain:domain}).eq('id',shopId)
- }
+ // The token goes to shop_integrations (service role only); the shop row keeps just the domain
+ checked(await db.from('shop_integrations').upsert({shop_id:shopId,access_token:token,updated_at:new Date().toISOString()},{onConflict:'shop_id'}).select('shop_id'))
+ checked(await db.from('shops').update({shopify_domain:domain}).eq('id',shopId).select('id'))
  const parsed=token.startsWith('{')?JSON.parse(token).access_token:token
  const headers={'Content-Type':'application/json','X-Shopify-Access-Token':parsed}
  const address=siteUrl()+'/api/webhooks/shopify'

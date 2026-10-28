@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { api, textField } from '@/lib/api';
+import { api } from '@/lib/api';
+import { ilikeAny, searchTerm } from '@/lib/validation';
 import { authenticated } from '@/lib/access';
 
 export const GET = api(async (req) => {
@@ -33,7 +34,7 @@ export const GET = api(async (req) => {
 
   // Multi-result autocomplete query
   if (query) {
-    const q = textField(query, 'search query', 60);
+    const q = searchTerm(query, 60);
     const cleanQ = q.replace(/[^0-9+]/g, '');
 
     let builder = client
@@ -43,7 +44,7 @@ export const GET = api(async (req) => {
       .limit(6);
 
     if (cleanQ.length >= 3) {
-      builder = builder.or(`phone.ilike.%${cleanQ}%,name.ilike.%${q}%`);
+      builder = builder.or(ilikeAny(['phone'], cleanQ) + ',' + ilikeAny(['name'], q));
     } else {
       builder = builder.ilike('name', `%${q}%`);
     }

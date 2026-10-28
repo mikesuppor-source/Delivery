@@ -33,8 +33,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
   let rawOrder = null
 
   if (isHexHash) {
-    try {
-      const res = await supabase
+    const res = await supabase
         .from('orders')
         .select(`
           id, workspace_id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
@@ -46,10 +45,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
         `)
         .eq('tracking_token', trimmed.toLowerCase())
         .maybeSingle()
-      rawOrder = res.data
-    } catch {
-      // fallback
-    }
+    rawOrder = res.data
   }
   const openedWithToken = rawOrder != null
 

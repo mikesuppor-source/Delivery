@@ -1,8 +1,20 @@
 import type { Database } from './supabase/database.types'
 import { NextResponse, NextRequest } from 'next/server'
-import { api,ApiError,checked,money,textField,uuid } from './api'
+import { api,ApiError,checked,uuid } from './api'
 import { authenticated,workspaceAccess,validateReferences } from './access'
 import { driverPin,generateDriverPin } from './driver-session'
+import { id,money,optionalId,parseBody,requiredText,text,z } from './validation'
+// One schema covers shops, drivers and areas; each table only reads its own fields.
+const CreateCatalog=z.object({
+ workspaceId:id,name:requiredText(200),phone:text(40),address:text(1000),
+ pinCode:z.string().optional(),userId:optionalId,feeUsd:money(),assignedDriverIds:z.array(z.unknown()).optional(),
+})
+const ChangeCatalog=z.object({
+ workspaceId:id,id:id.optional(),areaId:id.optional(),
+ name:requiredText(200).optional(),phone:text(40).optional(),address:text(1000).optional(),
+ pinCode:z.string().optional(),resetPin:z.boolean().optional(),active:z.boolean().optional(),
+ feeUsd:money().optional(),defaultDriverId:optionalId.optional(),assignedDriverIds:z.array(z.unknown()).optional(),
+})
 type Db=Awaited<ReturnType<typeof workspaceAccess>>['db']
 // Area driver pools may only contain this workspace's couriers.
 async function workspaceDriverIds(db:Db,workspaceId:string,value:unknown){
@@ -22,12 +34,12 @@ async function issuePin(db:Db,driverId:string,requested:unknown){
 type Table='shops'|'drivers'|'delivery_areas'
 export function createCatalog(table:Table) {
  return api(async req=>{
-  const body=await req.json()
+  const body=await parseBody(req,CreateCatalog)
   const {db,workspaceId}=await workspaceAccess(body.workspaceId)
-  const row:Record<string,unknown>={workspace_id:workspaceId,name:textField(body.name,'name',200,true)}
+  const row:Record<string,unknown>={workspace_id:workspaceId,name:body.name}
   if(table==='delivery_areas'){
-   row.fee_usd=money(body.feeUsd,'fee')
-   if(Array.isArray(body.assignedDriverIds)){
+   row.fee_usd=body.feeUsd
+   if(body.assignedDriverIds){
     const cleanDriverIds = await workspaceDriverIds(db,workspaceId,body.assignedDriverIds)
     row.assigned_driver_ids = cleanDriverIds
     if(!row.default_driver_id && cleanDriverIds.length > 0) {
@@ -35,12 +47,12 @@ export function createCatalog(table:Table) {
     }
    }
   }
-  else row.phone=textField(body.phone,'phone',40)
-  if(table==='shops')row.address=textField(body.address,'address',1000)
+  else row.phone=body.phone
+  if(table==='shops')row.address=body.address
   // Validate the PIN before creating the courier so a weak PIN never leaves a half-made record
   if(table==='drivers'&&body.pinCode)driverPin(body.pinCode)
   if(table==='drivers'&&body.userId){
-   const member=checked(await db.from('workspace_members').select('id').eq('workspace_id',workspaceId).eq('user_id',uuid(body.userId)).eq('role','driver').maybeSingle())
+   const member=checked(await db.from('workspace_members').select('id').eq('workspace_id',workspaceId).eq('user_id',body.userId).eq('role','driver').maybeSingle())
    if(!member)throw new ApiError(400,'Select an invited driver in this workspace')
    row.user_id=body.userId
   }
@@ -53,26 +65,23 @@ export function createCatalog(table:Table) {
   return NextResponse.json({success:true,[table==='delivery_areas'?'area':table.slice(0,-1)]:record})
  })
 }
-export async function changeCatalog(req:NextRequest,table:Table,id?:string) {
- const body=await req.json()
- const target=uuid(id||body.areaId||body.id)
+export async function changeCatalog(req:NextRequest,table:Table,recordId?:string) {
+ const body=await parseBody(req,ChangeCatalog)
+ const target=uuid(recordId||body.areaId||body.id)
  const {db,workspaceId}=await workspaceAccess(body.workspaceId)
  const updates:Record<string,unknown>={}
  if(req.method==='DELETE')updates.active=false
  else{
-  if(body.name!==undefined)updates.name=textField(body.name,'name',200,true)
-  if(body.phone!==undefined)updates.phone=textField(body.phone,'phone',40)
-  if(body.address!==undefined)updates.address=textField(body.address,'address',1000)
+  if(body.name!==undefined)updates.name=body.name
+  if(body.phone!==undefined)updates.phone=body.phone
+  if(body.address!==undefined)updates.address=body.address
   if(table==='drivers'&&body.pinCode)driverPin(body.pinCode)
-  if(body.active!==undefined){
-   if(typeof body.active!=='boolean')throw new ApiError(400,'Invalid active flag')
-   updates.active=body.active
-  }
+  if(body.active!==undefined)updates.active=body.active
   if(table==='delivery_areas'){
-   if(body.feeUsd!==undefined)updates.fee_usd=money(body.feeUsd,'fee')
+   if(body.feeUsd!==undefined)updates.fee_usd=body.feeUsd
    if(body.defaultDriverId!==undefined){
     await validateReferences(db,workspaceId,{drivers:body.defaultDriverId})
-    updates.default_driver_id=body.defaultDriverId||null
+    updates.default_driver_id=body.defaultDriverId
    }
    if(body.assignedDriverIds!==undefined){
     const validDriverIds = await workspaceDriverIds(db,workspaceId,body.assignedDriverIds)

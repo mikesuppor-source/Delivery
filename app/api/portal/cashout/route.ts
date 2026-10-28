@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
-import { api, ApiError, checked, money, textField } from '@/lib/api';
+import { api, ApiError, checked } from '@/lib/api';
+import { money, parseBody, requiredText, text, z } from '@/lib/validation';
+
+const CashoutRequest = z.object({
+  amountUsd: money(),
+  method: text(50),
+  accountDetails: requiredText(500),
+  notes: text(1000),
+});
 import { shopAccess } from '@/lib/access';
 
 export const GET = api(async () => {
@@ -45,23 +53,15 @@ export const GET = api(async () => {
 
 export const POST = api(async (req) => {
   const { db, shop } = await shopAccess();
-  const body = await req.json();
-
-  const amountUsd = money(body.amountUsd, 'requested USD amount');
-  if (amountUsd <= 0) {
-    throw new ApiError(400, 'Requested amount must be greater than $0.00');
-  }
-
-  const method = textField(body.method, 'transfer method', 50) || 'whish';
-  const accountDetails = textField(body.accountDetails, 'account details / recipient phone', 500, true);
-  const notes = textField(body.notes, 'notes', 1000);
+  // Zero/negative amounts and overdrafts are refused inside request_shop_cashout
+  const { amountUsd, method, accountDetails, notes } = await parseBody(req, CashoutRequest);
 
   // Balance check and insert happen in one locked transaction, so parallel requests cannot overdraw.
   const cashout = checked(
     await db.rpc('request_shop_cashout', {
       p_shop: shop.id,
       p_amount: amountUsd,
-      p_method: method,
+      p_method: method || 'whish',
       p_details: accountDetails,
       p_notes: notes,
     })
