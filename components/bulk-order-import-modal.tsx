@@ -185,7 +185,8 @@ export function BulkOrderImportModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          shopId,
+          // The shop picked in this dialog (pre-filled from the shopId prop when there is one)
+          shopId: selectedShopId,
           orders: parsedRows,
         }),
       })

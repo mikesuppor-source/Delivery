@@ -154,8 +154,9 @@ export function PortalClient({
           setCashoutAvailableUsd(d.availableUsd || 0)
           setCashoutAvailableLbp(d.availableLbp || 0)
           setCashoutHistory(d.requests || [])
-          if (d.availableUsd > 0 && !cashoutAmountUsd) {
-            setCashoutAmountUsd(String(d.availableUsd))
+          // Suggest the full balance only if the merchant has not typed an amount while this loaded
+          if (d.availableUsd > 0) {
+            setCashoutAmountUsd(current => current || String(d.availableUsd))
           }
         }
       })
