@@ -1,0 +1,60 @@
+name: Nightly database backup
+# Encrypted dump of the LIVE Supabase database, kept for 30 days as a workflow artifact.
+# The repository is public, so the dump is encrypted before upload; without the
+# passphrase the artifact is unreadable.
+#
+# Setup (GitHub → Settings → Secrets and variables → Actions → New repository secret):
+#   SUPABASE_DB_URL     Supabase → project → Connect → "Session pooler" connection string
+#                       (IPv4; the direct connection is IPv6-only and fails on GitHub runners)
+#   BACKUP_PASSPHRASE   A long random passphrase. Store it somewhere safe: it is the only way to decrypt.
+# Until both are set, the job skips itself.
+#
+# Restore: download the artifact, then
+#   gpg --decrypt cedar-backup-YYYY-MM-DD.tgz.gpg > backup.tgz && tar xzf backup.tgz
+#   psql "$TARGET_DB_URL" -f roles.sql -f schema.sql -f data.sql
+on:
+ schedule:
+  - cron: '0 1 * * *' # 01:00 UTC, 03:00–04:00 in Beirut
+ workflow_dispatch:
+jobs:
+ backup:
+  runs-on: ubuntu-latest
+  steps:
+   - name: Check configuration
+     id: config
+     env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+     run: |
+      if [ -z "$DB_URL" ] || [ -z "$PASSPHRASE" ]; then
+       echo "::notice::Backup secrets are not set yet; skipping."
+       echo "ready=false" >> "$GITHUB_OUTPUT"
+      else
+       echo "ready=true" >> "$GITHUB_OUTPUT"
+      fi
+   - uses: supabase/setup-cli@v1
+     if: steps.config.outputs.ready == 'true'
+     with:
+      version: latest
+   - name: Dump and encrypt
+     if: steps.config.outputs.ready == 'true'
+     env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+     run: |
+      set -euo pipefail
+      supabase db dump --db-url "$DB_URL" --role-only -f roles.sql
+      supabase db dump --db-url "$DB_URL" -f schema.sql
+      supabase db dump --db-url "$DB_URL" --data-only --use-copy -f data.sql
+      tar czf backup.tgz roles.sql schema.sql data.sql
+      out="cedar-backup-$(date -u +%F).tgz.gpg"
+      gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 -o "$out" backup.tgz
+      rm -f roles.sql schema.sql data.sql backup.tgz
+      echo "Encrypted backup: $out ($(du -h "$out" | cut -f1))"
+   - uses: actions/upload-artifact@v4
+     if: steps.config.outputs.ready == 'true'
+     with:
+      name: cedar-backup-${{ github.run_id }}
+      path: cedar-backup-*.tgz.gpg
+      retention-days: 30
+      if-no-files-found: error
