@@ -125,10 +125,15 @@ export function Card({ tone = 'default', className, ...rest }: HTMLAttributes<HT
   return <div className={cx('ui-card', tone !== 'default' && 'ui-card--' + tone, className)} {...rest} />
 }
 
-export type TagTone = 'info' | 'danger' | 'neutral' | 'success' | 'success-soft' | 'warning'
+export type TagTone = 'info' | 'sky' | 'danger' | 'neutral' | 'success' | 'success-soft' | 'warning' | 'violet'
 
-export function Tag({ tone, className, ...rest }: HTMLAttributes<HTMLSpanElement> & { tone: TagTone }) {
-  return <span className={cx('ui-tag', 'ui-tag--' + tone, className)} {...rest} />
+export function Tag({ tone, pill, className, ...rest }: HTMLAttributes<HTMLSpanElement> & { tone: TagTone; pill?: boolean }) {
+  return <span className={cx('ui-tag', 'ui-tag--' + tone, pill && 'ui-tag--pill', className)} {...rest} />
+}
+
+/** A Tag that is also a link (e.g. a map or tracking shortcut). */
+export function TagLink({ tone, className, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { tone: TagTone }) {
+  return <a className={cx('ui-tag', 'ui-tag--' + tone, className)} {...rest} />
 }
 
 /** Order status chip; colours follow the status name (delivered, picked_up, assigned, failed, ...). */

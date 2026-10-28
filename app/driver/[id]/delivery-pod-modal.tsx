@@ -305,7 +305,7 @@ export function DeliveryPodModal({
                 </label>
                 <input
                   type="number"
-                  step="0.5"
+                  step="0.01"
                   value={collectedUsd}
                   onChange={e => setCollectedUsd(e.target.value)}
                   style={{

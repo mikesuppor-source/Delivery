@@ -3,7 +3,7 @@
  * light desk theme (defaults below) and the dark courier app (.theme-courier).
  */
 :root {
-  --ui-surface: var(--surface);
+  --ui-surface: var(--bg);
   --ui-border: var(--line);
   --ui-text: var(--text);
   --ui-muted: var(--muted);
@@ -16,6 +16,7 @@
   --ui-danger: var(--danger);
   --ui-info-text: var(--info);
   --ui-info-border: var(--info);
+  --ui-toggle-on-text: #fff;
 }
 
 .theme-courier {
@@ -32,6 +33,7 @@
   --ui-danger: #dc2626;
   --ui-info-text: #38bdf8;
   --ui-info-border: #0284c7;
+  --ui-toggle-on-text: #022c22;
 }
 
 /* ── Button ─────────────────────────────────────────────── */
@@ -170,7 +172,8 @@ button.ui-stat:focus-visible { outline: 2px solid var(--ui-info-text); outline-o
 
 /* Toggle (aria-pressed) and text-link buttons */
 .ui-btn--toggle { background: var(--ui-surface); color: var(--ui-muted); border-color: var(--ui-border); }
-.ui-btn--toggle[aria-pressed='true'] { background: var(--ui-success-strong); color: #022c22; border-color: var(--ui-success-strong); }
+.ui-btn--toggle[aria-pressed='true'] { background: var(--ui-success-strong); color: var(--ui-toggle-on-text); border-color: var(--ui-success-strong); }
+.ui-btn--pill { border-radius: 99px; padding: 4px 11px; font-size: 12px; font-weight: 600; }
 .ui-btn--link { background: none; border: none; padding: 0; color: var(--ui-info-text); text-decoration: underline; font-size: 11px; font-weight: 700; }
 
 /* ── Status panel + dot ─────────────────────────────────── */
@@ -200,12 +203,24 @@ button.ui-stat:focus-visible { outline: 2px solid var(--ui-info-text); outline-o
 
 /* ── Tag (small square badge) ───────────────────────────── */
 .ui-tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border: 1px solid transparent; border-radius: 4px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
-.ui-tag--info { background: #172554; color: #60a5fa; font-size: 11px; }
-.ui-tag--danger { background: #7f1d1d; color: #fca5a5; border-color: #dc2626; font-weight: 800; }
-.ui-tag--neutral { background: #334155; color: #cbd5e1; }
-.ui-tag--success { background: #064e3b; color: #34d399; }
-.ui-tag--success-soft { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3); font-weight: 800; }
-.ui-tag--warning { background: #78350f; color: #fef08a; border-color: #ca8a04; border-radius: 99px; padding: 2px 7px; font-size: 10px; font-weight: 800; }
+/* Desk (light) tones */
+.ui-tag--info { background: rgba(37, 99, 235, 0.1); color: #2563eb; border-color: rgba(37, 99, 235, 0.25); }
+.ui-tag--sky { background: #f0f9ff; color: #0284c7; border-color: #bae6fd; }
+.ui-tag--danger { background: rgba(220, 38, 38, 0.12); color: #dc2626; border-color: rgba(220, 38, 38, 0.25); }
+.ui-tag--neutral { background: var(--ui-surface); color: var(--ui-muted); border-color: var(--ui-border); font-weight: 600; }
+.ui-tag--success { background: rgba(150, 191, 54, 0.15); color: #5e8e3e; border-color: rgba(150, 191, 54, 0.3); }
+.ui-tag--success-soft { background: var(--ui-success-soft); color: var(--ui-success); }
+.ui-tag--warning { background: rgba(217, 119, 6, 0.15); color: #b45309; border-color: rgba(217, 119, 6, 0.3); }
+.ui-tag--violet { background: rgba(124, 58, 237, 0.15); color: #7c3aed; border-color: rgba(124, 58, 237, 0.3); }
+.ui-tag--pill { border-radius: 99px; padding: 2px 8px; font-size: 11px; }
+a.ui-tag { text-decoration: none; }
+/* Courier (dark) tones */
+.theme-courier .ui-tag--info { background: #172554; color: #60a5fa; border-color: transparent; font-size: 11px; }
+.theme-courier .ui-tag--danger { background: #7f1d1d; color: #fca5a5; border-color: #dc2626; font-weight: 800; }
+.theme-courier .ui-tag--neutral { background: #334155; color: #cbd5e1; border-color: transparent; font-weight: 700; }
+.theme-courier .ui-tag--success { background: #064e3b; color: #34d399; border-color: transparent; }
+.theme-courier .ui-tag--success-soft { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3); font-weight: 800; }
+.theme-courier .ui-tag--warning { background: #78350f; color: #fef08a; border-color: #ca8a04; border-radius: 99px; padding: 2px 7px; font-size: 10px; font-weight: 800; }
 
 /* Order status chip */
 .ui-chip { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 99px; font-size: 11px; font-weight: 800; white-space: nowrap; }
@@ -236,3 +251,10 @@ button.ui-stat:focus-visible { outline: 2px solid var(--ui-info-text); outline-o
 .ui-soft-link { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; border: 1px solid; border-radius: 6px; font-size: 11px; font-weight: 600; text-align: center; text-decoration: none; }
 .ui-soft-link--green { background: rgba(37, 211, 102, 0.1); border-color: rgba(37, 211, 102, 0.3); color: #4ade80; }
 .ui-soft-link--blue { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3); color: #60a5fa; }
+
+/* ── Desk table helpers ─────────────────────────────────── */
+/* Small select inside a table cell (e.g. quick courier assignment) */
+.ui-inline-select { max-width: 140px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--muted); font-size: 11px; cursor: pointer; }
+.ui-inline-select--attention { padding: 3px 8px; border: 1.5px solid #f59e0b; background: rgba(245, 158, 11, 0.08); color: #b45309; font-weight: 600; }
+/* Row-level action buttons */
+.btn.btn-compact { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: 11px; }
