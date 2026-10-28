@@ -105,5 +105,61 @@ test('migrations, isolation, atomic accounting, and idempotency',async t=>{
   assert.equal(Number(row.delivery_fee_usd), 3.00)
   assert.equal(Number(row.shop_balance_usd), 25.00) // Exact Net Item Value!
  })
+ await t.test('courier PINs are hashed, matched on the exact phone, and hidden from app users',async()=>{
+  assert.equal((await db.query("select count(*) from information_schema.columns where table_name='drivers' and column_name='pin_code'")).rows[0].count,0)
+  await db.query("update drivers set phone='+961 71 123 456' where id=$1",[drv])
+  await db.query("select set_driver_pin($1,'482913')",[drv])
+  const cred=(await db.query('select pin_hash,session_version from driver_credentials where driver_id=$1',[drv])).rows[0]
+  assert.notEqual(cred.pin_hash,'482913');assert.equal(cred.session_version,1)
+  const login=async(phone,pin)=>(await db.query('select * from verify_driver_login($1,$2)',[phone,pin])).rows
+  for(const phone of ['71123456','071 123 456','+96171123456'])assert.equal((await login(phone,'482913'))[0]?.driver_id,drv,phone)
+  assert.equal((await login('71123456','000000')).length,0)
+  assert.equal((await login('1123456','482913')).length,0) // part of a number no longer matches
+  await db.query("update drivers set active=false where id=$1",[drv])
+  assert.equal((await login('71123456','482913')).length,0)
+  await db.query("update drivers set active=true where id=$1",[drv])
+  await db.query("select set_driver_pin($1,'735190')",[drv])
+  assert.equal((await db.query('select session_version from driver_credentials where driver_id=$1',[drv])).rows[0].session_version,2)
+  assert.equal((await login('71123456','482913')).length,0)
+  assert.equal((await login('71123456','735190'))[0].session_version,2)
+  await assert.rejects(db.query("select set_driver_pin($1,'12ab')",[drv]),/4 to 8 digits/)
+  await db.query("select set_config('test.user_id',$1,false)",[owner]);await db.exec('set role authenticated')
+  await assert.rejects(db.query('select * from driver_credentials'),/permission denied/)
+  await assert.rejects(db.query("select * from verify_driver_login('71123456','735190')"),/permission denied/)
+  await db.exec('reset role')
+ })
+ await t.test('public phone tracking needs the exact number and never returns addresses',async()=>{
+  await db.query("insert into orders(workspace_id,shop_id,driver_id,usd_to_lbp_rate,recipient_phone,recipient_address) values($1,$2,$3,100000,'+961 3 123 456','Secret street 5')",[a,shop,drv])
+  const track=async phone=>(await db.query('select track_orders_by_phone($1) as r',[phone])).rows[0].r
+  const found=await track('03123456')
+  assert.equal(found.length,1)
+  assert.equal(JSON.stringify(found).includes('Secret street'),false)
+  assert.equal(found[0].driver.id,undefined)
+  assert.deepEqual(await track('123'),[])
+  assert.deepEqual(await track('3123'),[])
+  await db.exec('set role anon')
+  await assert.rejects(db.query("select track_orders_by_phone('03123456')"),/permission denied/)
+  await db.exec('reset role')
+ })
+ await t.test('merchant payouts cannot overdraw, be written directly, or be paid twice',async()=>{
+  await db.query('update shops set balance_usd=50 where id=$1',[shop])
+  const request=async amount=>(await db.query("select (request_shop_cashout($1,$2,'whish','71123456','')).id",[shop,amount])).rows[0].id
+  const first=await request(30)
+  await assert.rejects(request(30),/exceeds eligible available balance/)
+  await request(20)
+  await assert.rejects(request(0.01),/exceeds/)
+  await db.query("select set_config('test.user_id',$1,false)",[merchant]);await db.exec('set role authenticated')
+  await assert.rejects(db.query("insert into cashout_requests(workspace_id,shop_id,amount_usd,account_details,status) values($1,$2,999,'x','approved')",[a,shop]),/permission denied/)
+  await db.exec('reset role')
+  await db.query("select set_config('test.user_id',$1,false)",[driver]);await db.exec('set role authenticated')
+  assert.equal((await db.query('select count(*) from cashout_requests')).rows[0].count,0) // couriers cannot see payout details
+  await db.exec('reset role')
+  await assert.rejects(db.query('select mark_cashout_paid($1,$2,$3)',[first,b,owner]),/not found/)
+  await db.query('select mark_cashout_paid($1,$2,$3)',[first,a,owner])
+  await assert.rejects(db.query('select mark_cashout_paid($1,$2,$3)',[first,a,owner]),/already paid/)
+  assert.equal((await db.query('select count(*) from settlements where idempotency_key=$1',[first])).rows[0].count,1)
+  assert.equal(Number((await db.query('select balance_usd from shops where id=$1',[shop])).rows[0].balance_usd),20)
+  assert.equal((await db.query('select status from cashout_requests where id=$1',[first])).rows[0].status,'paid')
+ })
  }finally{await db.close()}
 })

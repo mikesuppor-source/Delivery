@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { sessionDriverId } from '@/lib/access'
 import { DriverLoginClient } from './driver-login-client'
 import type { Metadata } from 'next'
 
@@ -30,9 +30,8 @@ export default async function DriverPortalIndexPage() {
     }
   }
 
-  // 2. Persistent Mobile App Session: If this device already has a saved courier cookie, open directly!
-  const cookieStore = await cookies()
-  const savedDriverId = cookieStore.get('cedar_saved_driver_id')?.value
+  // 2. Persistent Mobile App Session: a valid signed courier session on this device opens directly
+  const savedDriverId = await sessionDriverId(serviceSupabase).catch(() => null)
   if (savedDriverId) {
     const { data: savedDriver } = await serviceSupabase
       .from('drivers')

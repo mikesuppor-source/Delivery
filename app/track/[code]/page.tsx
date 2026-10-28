@@ -6,6 +6,7 @@ import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, formatDisplayAddress } from '@/lib/maps'
 import { CourierTrackActions } from '@/components/courier-track-actions'
+import { formatOrderCode } from '@/lib/order-codes'
 import { CustomerGpsShare } from '@/components/customer-gps-share'
 import type { Metadata } from 'next'
 
@@ -36,7 +37,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
       const res = await supabase
         .from('orders')
         .select(`
-          id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
+          id, workspace_id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
           recipient_name, recipient_phone, recipient_address, service_type, is_breakable, weight_kg, carrier_tracking_code,
           driver_id,
           shop:shop_id(name, phone),
@@ -50,35 +51,49 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
       // fallback
     }
   }
+  const openedWithToken = rawOrder != null
 
   if (!rawOrder) {
     const res = await supabase
       .from('orders')
       .select(`
-        id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
+        id, workspace_id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
         recipient_name, recipient_phone, recipient_address, service_type, is_breakable, weight_kg, carrier_tracking_code,
         driver_id,
         shop:shop_id(name, phone),
         area:area_id(name),
         driver:driver_id(id, name, phone)
       `)
-      .ilike('code', trimmed)
+      .eq('code', formatOrderCode(trimmed))
       .maybeSingle()
     rawOrder = res.data
   }
 
+  // Dispatch tools only for owners/managers of this order's workspace, with that workspace's couriers
   let drivers: Array<{ id: string; name: string; phone?: string | null }> = []
-  if (user) {
-    const { data } = await supabase
-      .from('drivers')
-      .select('id, name, phone')
-      .eq('active', true)
-      .order('name')
-    drivers = data || []
+  let canDispatch = false
+  if (user && rawOrder) {
+    const { data: member } = await supabase
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', rawOrder.workspace_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    canDispatch = member?.role === 'owner' || member?.role === 'manager'
+    if (canDispatch) {
+      const { data } = await supabase
+        .from('drivers')
+        .select('id, name, phone')
+        .eq('workspace_id', rawOrder.workspace_id)
+        .eq('active', true)
+        .order('name')
+      drivers = data || []
+    }
   }
 
   const order = rawOrder as {
     id: string
+    workspace_id: string
     code: string
     tracking_token?: string
     status: OrderStatus
@@ -244,21 +259,23 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Link
-              href={`/print/order/${order.code}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: 11, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              title="View & Print Official Waybill Receipt Slip with Barcode & QR Code"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 6 2 18 2 18 9" />
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                <rect x="6" y="14" width="12" height="8" />
-              </svg>
-              <span>Receipt Slip</span>
-            </Link>
+            {user && (
+              <Link
+                href={`/print/order/${order.code}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 11, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                title="View & Print Official Waybill Receipt Slip with Barcode & QR Code"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 6 2 18 2 18 9" />
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                  <rect x="6" y="14" width="12" height="8" />
+                </svg>
+                <span>Receipt Slip</span>
+              </Link>
+            )}
             <span className={`badge badge-${order.status} track-status-badge`}>
               {order.status === 'picked_up'
                 ? 'Out for Delivery'
@@ -414,8 +431,9 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           )}
         </div>
 
-        {/* Live GPS Pin Sharing for Lebanese Customer Addresses */}
-        {order.status !== 'delivered' && (
+        {/* Live GPS Pin Sharing for Lebanese Customer Addresses.
+            Only on the private /track/<token> link: the printed order code must not let anyone move the pin. */}
+        {openedWithToken && order.status !== 'delivered' && (
           <CustomerGpsShare
             orderId={order.id}
             orderCode={order.code}
@@ -486,8 +504,9 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
         </div>
 
         {/* Courier Dispatch & Check-In Action Hub (Authenticated Staff Only) */}
-        {user && (
+        {canDispatch && (
           <CourierTrackActions
+            workspaceId={order.workspace_id}
             orderId={order.id}
             orderCode={order.code}
             currentStatus={order.status}

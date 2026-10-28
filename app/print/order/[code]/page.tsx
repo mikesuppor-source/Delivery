@@ -1,7 +1,8 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { OrderReceiptSlip } from '@/components/order-receipt-slip'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { formatOrderCode } from '@/lib/order-codes'
 import type { Metadata } from 'next'
 
 interface PrintOrderPageProps {
@@ -20,7 +21,10 @@ export async function generateMetadata({ params }: PrintOrderPageProps): Promise
 export default async function PrintOrderPage({ params, searchParams }: PrintOrderPageProps) {
   const { code } = await params
   const { print } = await searchParams
-  const supabase = createServiceClient()
+  // Waybills are for staff and the merchant who owns the order; row-level security decides which
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: rawOrder } = await supabase
     .from('orders')
@@ -30,18 +34,18 @@ export default async function PrintOrderPage({ params, searchParams }: PrintOrde
       driver:driver_id(id, name, phone),
       area:area_id(id, name)
     `)
-    .ilike('code', code.trim())
+    .eq('code', formatOrderCode(code))
     .maybeSingle()
 
   if (!rawOrder) {
     notFound()
   }
 
-  // Get workspace info
-  const { data: ws } = await supabase
+  // Get the order's own workspace (not just the first one in the database)
+  const { data: ws } = await createServiceClient()
     .from('workspaces')
     .select('name, usd_to_lbp')
-    .limit(1)
+    .eq('id', rawOrder.workspace_id)
     .single()
 
   const order = rawOrder as any

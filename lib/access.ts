@@ -1,6 +1,8 @@
 import { createClient, createServiceClient } from './supabase/server'
 import { ApiError, checked, uuid } from './api'
 import type { User } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
+import { DRIVER_SESSION_COOKIE, driverSessionSecret, verifyDriverSession } from './driver-session'
 
 export async function authenticated() {
   const client = await createClient()
@@ -31,32 +33,31 @@ export async function shopAccess(shopId?: unknown) {
   if (!shop.active) throw new ApiError(403, 'Shop is inactive')
   return { user, shop, db }
 }
+/** Returns the courier ID of a valid, unrevoked session cookie on this request. */
+export async function sessionDriverId(db = createServiceClient()) {
+  const token = (await cookies()).get(DRIVER_SESSION_COOKIE)?.value
+  if (!token) return null
+  const session = verifyDriverSession(token, driverSessionSecret())
+  if (!session) return null
+  const { data } = await db.from('driver_credentials').select('session_version').eq('driver_id', session.driverId).maybeSingle()
+  return data?.session_version === session.version ? session.driverId : null
+}
 export async function driverAccess(driverId: unknown) {
-  let user: User | null
-  try {
-    const supabase = await createClient()
-    const { data } = await supabase.auth.getUser()
-    user = data?.user || null
-  } catch {
-    user = null
-  }
-
   const db = createServiceClient()
   const driver = checked(await db.from('drivers').select('*').eq('id', uuid(driverId)).maybeSingle())
-  if (!driver) throw new ApiError(404, 'Driver not found')
   if (!driver.active) throw new ApiError(403, 'Driver is inactive')
 
-  if (user) {
-    if (driver.user_id && driver.user_id === user.id) {
-      return { user, driver, db }
-    }
-    // If user is logged in but not linked directly to this driver, check workspace manager/owner role
-    await workspaceAccess(driver.workspace_id, ['owner', 'manager'], user)
-    return { user, driver, db }
-  }
+  // Courier signed in on their phone with phone + PIN
+  if (await sessionDriverId(db) === driver.id) return { user: null as User | null, driver, db }
 
-  // Mobile run sheet direct access: active driver updating orders assigned to their fleet profile
-  return { user: null, driver, db }
+  // Staff account linked to this courier, or a manager/owner of the courier's workspace
+  const user = await createClient()
+    .then(client => client.auth.getUser())
+    .then(({ data }) => data?.user || null)
+    .catch(() => null)
+  if (!user) throw new ApiError(401, 'Your courier session has expired. Please sign in again.')
+  if (driver.user_id !== user.id) await workspaceAccess(driver.workspace_id, ['owner', 'manager'], user)
+  return { user: user as User | null, driver, db }
 }
 export async function validateReferences(db: ReturnType<typeof createServiceClient>, workspaceId: string, refs: Record<string, unknown>) {
   for (const [table, value] of Object.entries(refs)) {

@@ -154,6 +154,27 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_credentials: {
+        Row: {
+          driver_id: string
+          pin_hash: string
+          session_version: number
+          updated_at: string
+        }
+        Insert: {
+          driver_id: string
+          pin_hash: string
+          session_version?: number
+          updated_at?: string
+        }
+        Update: {
+          driver_id?: string
+          pin_hash?: string
+          session_version?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       driver_push_subscriptions: {
         Row: {
           auth: string
@@ -360,7 +381,6 @@ export type Database = {
           name: string
           pay_owed_usd: number
           phone: string | null
-          pin_code: string | null
           user_id: string | null
           workspace_id: string
         }
@@ -376,7 +396,6 @@ export type Database = {
           name: string
           pay_owed_usd?: number
           phone?: string | null
-          pin_code?: string | null
           user_id?: string | null
           workspace_id: string
         }
@@ -392,7 +411,6 @@ export type Database = {
           name?: string
           pay_owed_usd?: number
           phone?: string | null
-          pin_code?: string | null
           user_id?: string | null
           workspace_id?: string
         }
@@ -813,6 +831,17 @@ export type Database = {
     Functions: {
       accept_staff_invite: { Args: { p_token: string; p_user: string; p_email: string; p_name: string }; Returns: boolean }
       consume_limit: { Args: { p_key: string; p_max: number }; Returns: boolean }
+      mark_cashout_paid: { Args: { p_request: string; p_workspace: string; p_user: string }; Returns: string }
+      request_shop_cashout: {
+        Args: { p_shop: string; p_amount: number; p_method: string; p_details: string; p_notes: string }
+        Returns: Database["public"]["Tables"]["cashout_requests"]["Row"]
+      }
+      set_driver_pin: { Args: { p_driver: string; p_pin: string }; Returns: boolean }
+      track_orders_by_phone: { Args: { p_phone: string }; Returns: Json }
+      verify_driver_login: {
+        Args: { p_phone: string; p_pin: string }
+        Returns: { driver_id: string; name: string; session_version: number }[]
+      }
       is_member: { Args: { ws_id: string }; Returns: boolean }
       set_allow_owner_delete: { Args: { p_allow: boolean }; Returns: boolean }
       my_role: {

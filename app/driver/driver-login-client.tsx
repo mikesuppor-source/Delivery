@@ -207,7 +207,7 @@ export function DriverLoginClient() {
                 }}
               />
               <span style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'block' }}>
-                Default PIN is 1234 unless updated by your manager
+                Your PIN is given to you by dispatch
               </span>
             </div>
 

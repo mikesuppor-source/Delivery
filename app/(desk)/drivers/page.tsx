@@ -1,5 +1,5 @@
 import { allRows } from '@/lib/pagination'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { DriverListClient } from './driver-list-client'
 import type { UserRole } from '@/lib/auth'
 
@@ -20,7 +20,7 @@ export default async function DriversPage() {
     allRows(
       supabase
         .from('drivers')
-        .select('id, name, phone, pin_code, active, cash_held_usd, pay_owed_usd, current_lat, current_lng, last_location_at')
+        .select('id, name, phone, active, cash_held_usd, pay_owed_usd, current_lat, current_lng, last_location_at')
         .eq('workspace_id', member.workspace_id)
         .order('name')
     ),
@@ -48,8 +48,16 @@ export default async function DriversPage() {
     }
   }
 
+  // PIN hashes stay server-side; the list only learns whether a PIN is set
+  const driverIds = ((driversRes.data as any[]) || []).map(d => d.id)
+  const { data: credentials } = driverIds.length
+    ? await createServiceClient().from('driver_credentials').select('driver_id').in('driver_id', driverIds)
+    : { data: [] }
+  const withPin = new Set((credentials || []).map(c => c.driver_id))
+
   const drivers = ((driversRes.data as any[]) || []).map(d => ({
     ...d,
+    has_pin: withPin.has(d.id),
     active_orders_count: pendingCounts[d.id] || 0,
   }))
 

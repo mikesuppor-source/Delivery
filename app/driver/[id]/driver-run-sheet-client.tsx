@@ -579,10 +579,9 @@ export function DriverRunSheetClient({
     const queueKey = `cedar_driver_offline_queue_${driver.id}`
     const ordersKey = `cedar_driver_orders_${driver.id}`
 
-    // 0. Bind this device to this courier profile permanently
+    // 0. Remember this courier on the device (the signed session cookie is what grants access)
     try {
       localStorage.setItem('cedar_saved_driver_id', driver.id)
-      document.cookie = `cedar_saved_driver_id=${driver.id}; path=/; max-age=31536000; SameSite=Lax`
     } catch (_e) {
       void _e
     }
@@ -863,7 +862,6 @@ export function DriverRunSheetClient({
     try {
       await fetch('/api/driver/auth', { method: 'DELETE' }).catch(() => {})
       localStorage.removeItem('cedar_saved_driver_id')
-      document.cookie = 'cedar_saved_driver_id=; path=/; max-age=0'
     } catch (_e) {
       void _e
     }
