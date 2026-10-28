@@ -43,6 +43,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Local development: dev bundles keep the same URL between edits, so caching them serves stale code
+  if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
+    return;
+  }
+
   // Never cache API routes to avoid stale financial states
   if (url.pathname.startsWith('/api/')) {
     return;

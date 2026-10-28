@@ -7,6 +7,8 @@ export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: false,
   workers: 1,
+  // Local runs use `next dev`, which compiles each page on its first visit
+  timeout: process.env.CI ? 30_000 : 90_000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
