@@ -648,8 +648,8 @@ export function StatementClient({
                 <label>Amount (USD)</label>
                 <input
                   type="number"
-                  step="0.5"
-                  min="0.5"
+                  step="0.01"
+                  min="0.01"
                   placeholder="0.00"
                   value={amountUsd}
                   onChange={e => setAmountUsd(e.target.value)}
