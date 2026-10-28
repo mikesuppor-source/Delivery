@@ -1,3 +1,6 @@
+-- pgcrypto (gen_random_bytes, crypt) lives in "extensions" on Supabase; the CLI does not search it by default
+set search_path = public, extensions;
+
 -- ============================================================
 -- Cedar Delivery Desk — Merchant Portal & Unique Barcodes
 -- Migration 003: Unique order codes & shop owner account link

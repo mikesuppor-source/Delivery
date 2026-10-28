@@ -1,8 +1,14 @@
-// Seeds a LOCAL Supabase (supabase start) with test data for manual testing.
-// Refuses to run against anything but localhost.
+// Seeds a Supabase database with test data for manual testing.
 //
+// Local (supabase start), with the fixed logins below:
 //   npx supabase start
 //   node scripts/seed-local.mjs
+//
+// A remote STAGING project, only when you name its project ref explicitly. Logins
+// then come from env vars (never commit them; the repo is public):
+//   SEED_SUPABASE_URL=https://<ref>.supabase.co SEED_SERVICE_ROLE_KEY=... \
+//   SEED_OWNER_PASSWORD=... SEED_MERCHANT_PASSWORD=... SEED_COURIER_PIN=... \
+//   node scripts/seed-local.mjs --remote=<ref>
 //
 // Test logins (local only):
 //   Desk owner:     owner@cedar.test     / CedarLocalOwner-2026
@@ -12,16 +18,32 @@
 import { execFileSync } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
 
-const status = Object.fromEntries(
-  execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', shell: process.platform === 'win32' })
-    .split(/\r?\n/)
-    .map(line => line.match(/^([A-Z_]+)="?(.*?)"?$/))
-    .filter(Boolean)
-    .map(m => [m[1], m[2]])
-)
-const url = status.API_URL
-if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(url || '')) throw new Error('Refusing to seed a non-local database: ' + url)
-const db = createClient(url, status.SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+const remoteRef = process.argv.find(a => a.startsWith('--remote='))?.slice('--remote='.length)
+let url, serviceKey
+const logins = { owner: 'CedarLocalOwner-2026', merchant: 'CedarLocalMerchant-2026', pin: '482913' }
+
+if (remoteRef) {
+  url = process.env.SEED_SUPABASE_URL
+  serviceKey = process.env.SEED_SERVICE_ROLE_KEY
+  // The URL must be the project you named, so a stray env var cannot seed the wrong database
+  if (url !== `https://${remoteRef}.supabase.co`) throw new Error(`SEED_SUPABASE_URL must be https://${remoteRef}.supabase.co`)
+  for (const [key, name] of [['owner', 'SEED_OWNER_PASSWORD'], ['merchant', 'SEED_MERCHANT_PASSWORD'], ['pin', 'SEED_COURIER_PIN']]) {
+    if (!process.env[name]) throw new Error(name + ' is required for remote seeding (no default logins on reachable databases)')
+    logins[key] = process.env[name]
+  }
+} else {
+  const status = Object.fromEntries(
+    execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', shell: process.platform === 'win32' })
+      .split(/\r?\n/)
+      .map(line => line.match(/^([A-Z_]+)="?(.*?)"?$/))
+      .filter(Boolean)
+      .map(m => [m[1], m[2]])
+  )
+  url = status.API_URL
+  serviceKey = status.SERVICE_ROLE_KEY
+  if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(url || '')) throw new Error('Refusing to seed a non-local database: ' + url)
+}
+const db = createClient(url, serviceKey, { auth: { persistSession: false } })
 
 const must = async (promise, what) => {
   const { data, error } = await promise
@@ -35,8 +57,8 @@ async function user(email, password) {
   return (await must(db.auth.admin.createUser({ email, password, email_confirm: true }), 'create ' + email)).user.id
 }
 
-const owner = await user('owner@cedar.test', 'CedarLocalOwner-2026')
-const merchant = await user('merchant@cedar.test', 'CedarLocalMerchant-2026')
+const owner = await user('owner@cedar.test', logins.owner)
+const merchant = await user('merchant@cedar.test', logins.merchant)
 
 const ws = await must(db.from('workspaces').upsert({ name: 'Cedar Local', slug: 'cedar-local', usd_to_lbp: 89500 }, { onConflict: 'slug' }).select().single(), 'workspace')
 await must(db.from('workspace_members').upsert({ workspace_id: ws.id, user_id: owner, role: 'owner', display_name: 'Local Owner', joined_at: new Date().toISOString() }, { onConflict: 'workspace_id,user_id' }).select(), 'owner member')
@@ -50,7 +72,7 @@ async function driver(name, phone, pin) {
   if (pin) await must(db.rpc('set_driver_pin', { p_driver: row.id, p_pin: pin }), 'pin')
   return row
 }
-const rami = await driver('Rami Courier', '+961 71 123 456', '482913')
+const rami = await driver('Rami Courier', '+961 71 123 456', logins.pin)
 await driver('Second Courier', '+961 70 222 333', null)
 
 const area = (await must(db.from('delivery_areas').select().eq('workspace_id', ws.id).eq('name', 'Beirut Central').maybeSingle(), 'find area'))

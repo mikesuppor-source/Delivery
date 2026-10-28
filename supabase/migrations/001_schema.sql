@@ -1,3 +1,6 @@
+-- pgcrypto (gen_random_bytes, crypt) lives in "extensions" on Supabase; the CLI does not search it by default
+set search_path = public, extensions;
+
 -- ============================================================
 -- Cedar Delivery Desk — Database Schema
 -- Migration 001: Core tables
