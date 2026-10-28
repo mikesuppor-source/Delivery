@@ -7,6 +7,7 @@ import { GoogleMapsIcon } from '@/components/google-maps-icon'
 import { getGoogleMapsDirectionsUrl, getWazeDirectionsUrl, formatDisplayAddress } from '@/lib/maps'
 import { CourierTrackActions } from '@/components/courier-track-actions'
 import { formatOrderCode } from '@/lib/order-codes'
+import { SUPPORT_WHATSAPP } from '@/lib/support'
 import { CustomerGpsShare } from '@/components/customer-gps-share'
 import type { Metadata } from 'next'
 
@@ -153,17 +154,19 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
 
           <div className="track-support-bar">
             <span>Need help with your delivery?</span>
-            <a
-              href={`https://wa.me/${(process.env.NEXT_PUBLIC_SUPPORT_PHONE || '96170000000').replace(/\D/g, '')}?text=${encodeURIComponent(
-                `Hello Cedar Delivery, I need assistance tracking my order ${code}.`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="whatsapp-btn"
-            >
-              <WhatsAppIcon size={14} color="#fff" />
-              <span>Contact Dispatch</span>
-            </a>
+            {SUPPORT_WHATSAPP && (
+              <a
+                href={`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(
+                  `Hello Cedar Delivery, I need assistance tracking my order ${code}.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="whatsapp-btn"
+              >
+                <WhatsAppIcon size={14} color="#fff" />
+                <span>Contact Dispatch</span>
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -174,9 +177,10 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
   const colUSD = Number(order.collection_usd) || 0
   const colLBP = usdToLbp(colUSD, rate)
 
-  const supportPhone = (order.shop?.phone || process.env.NEXT_PUBLIC_SUPPORT_PHONE || '').replace(/\D/g, '')
+  const supportPhone = (order.shop?.phone || '').replace(/\D/g, '') || SUPPORT_WHATSAPP
   const courierPhone = order.driver?.phone ? order.driver.phone.replace(/\D/g, '') : supportPhone
-  const dispatchContactNumber = supportPhone || courierPhone || '96170000000'
+  // Empty when no shop, courier or dispatch number is known; the WhatsApp buttons are then hidden
+  const dispatchContactNumber = supportPhone || courierPhone
 
   // Status mapping
   const statusSteps = [
@@ -461,18 +465,20 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
             {/* Share Pin Location via WhatsApp */}
-            <a
-              href={`https://wa.me/${courierPhone || dispatchContactNumber}?text=${encodeURIComponent(
-                `Hello, I am tracking my delivery for order ${order.code} (Recipient: ${order.recipient_name || 'Customer'}). My delivery address is: ${order.recipient_address || ''}. Here is my live pin location:`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary btn-sm"
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
-            >
-              <WhatsAppIcon size={14} color="#25D366" />
-              <span>Send Pin Location on WhatsApp</span>
-            </a>
+            {(courierPhone || dispatchContactNumber) && (
+              <a
+                href={`https://wa.me/${courierPhone || dispatchContactNumber}?text=${encodeURIComponent(
+                  `Hello, I am tracking my delivery for order ${order.code} (Recipient: ${order.recipient_name || 'Customer'}). My delivery address is: ${order.recipient_address || ''}. Here is my live pin location:`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-sm"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, padding: '8px 12px' }}
+              >
+                <WhatsAppIcon size={14} color="#25D366" />
+                <span>Send Pin Location on WhatsApp</span>
+              </a>
+            )}
 
             {/* Call or WhatsApp Courier Driver */}
             {order.driver?.phone ? (
@@ -483,7 +489,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
               >
                 <span>Call Courier ({order.driver.name})</span>
               </a>
-            ) : (
+            ) : dispatchContactNumber ? (
               <a
                 href={`https://wa.me/${dispatchContactNumber}?text=${encodeURIComponent(
                   `Hello, I need assistance with delivery for order ${order.code}.`
@@ -495,7 +501,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
               >
                 <span>Contact Dispatch Office</span>
               </a>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -521,17 +527,19 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             <small>Questions about your shipment?</small>
             <p>Our dispatch team is available via WhatsApp.</p>
           </div>
-          <a
-            href={`https://wa.me/${dispatchContactNumber}?text=${encodeURIComponent(
-              `Hello Cedar Delivery, I am tracking order ${order.code} and have a question regarding my delivery.`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="whatsapp-btn"
-          >
-            <WhatsAppIcon size={15} color="#fff" />
-            <span>Chat with Dispatch</span>
-          </a>
+          {dispatchContactNumber && (
+            <a
+              href={`https://wa.me/${dispatchContactNumber}?text=${encodeURIComponent(
+                `Hello Cedar Delivery, I am tracking order ${order.code} and have a question regarding my delivery.`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whatsapp-btn"
+            >
+              <WhatsAppIcon size={15} color="#fff" />
+              <span>Chat with Dispatch</span>
+            </a>
+          )}
         </div>
       </div>
     </div>

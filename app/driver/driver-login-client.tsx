@@ -4,6 +4,9 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TruckIcon } from '@/components/icons'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
+import { supportWhatsAppUrl } from '@/lib/support'
+
+const PIN_HELP_URL = supportWhatsAppUrl('Hello Dispatch, I am a Cedar courier and need my driver login PIN.')
 
 export function DriverLoginClient() {
   const router = useRouter()
@@ -255,24 +258,26 @@ export function DriverLoginClient() {
             <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
               Forgot your PIN or need help?
             </p>
-            <a
-              href="https://wa.me/96170000000?text=Hello%20Dispatch,%20I%20am%20a%20Cedar%20courier%20and%20need%20my%20driver%20login%20PIN."
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: 12.5,
-                fontWeight: 700,
-                color: '#25D366',
-                textDecoration: 'none',
-                marginTop: 6,
-              }}
-            >
-              <WhatsAppIcon size={14} color="#25D366" />
-              <span>Contact Dispatch on WhatsApp</span>
-            </a>
+            {PIN_HELP_URL && (
+              <a
+                href={PIN_HELP_URL!}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: '#25D366',
+                  textDecoration: 'none',
+                  marginTop: 6,
+                }}
+              >
+                <WhatsAppIcon size={14} color="#25D366" />
+                <span>Contact Dispatch on WhatsApp</span>
+              </a>
+            )}
           </div>
         </div>
 
