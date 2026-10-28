@@ -1,3 +1,6 @@
+-- pgcrypto (gen_random_bytes, crypt) lives in "extensions" on Supabase; the CLI does not search it by default
+set search_path = public, extensions;
+
 -- Migration 007: Shopify Integration for Merchant Stores & Webhooks
 alter table public.shops 
 add column if not exists api_key text unique,

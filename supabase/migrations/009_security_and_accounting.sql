@@ -1,3 +1,6 @@
+-- pgcrypto (gen_random_bytes, crypt) lives in "extensions" on Supabase; the CLI does not search it by default
+set search_path = public, extensions;
+
 begin;
 
 -- Fail on conflicting integration identities; never silently delete historical orders.
