@@ -4,6 +4,8 @@
 -- Requires pgcrypto (enabled in 001). On Supabase it lives in the "extensions" schema.
 
 begin;
+-- crypt()/gen_salt() live in "extensions" on Supabase and in "public" elsewhere.
+set local search_path = public, extensions;
 
 -- ─── 1. Phone normalization shared by courier login and tracking lookup ───
 create or replace function public.phone_core(p_phone text) returns text
