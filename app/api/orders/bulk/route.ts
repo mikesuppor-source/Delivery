@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
-import { api, ApiError, checked, ids } from '@/lib/api'
+import { api, ApiError, checked } from '@/lib/api'
+import { id, idList, optionalId, parseBody, z } from '@/lib/validation'
 import { workspaceAccess, validateReferences } from '@/lib/access'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
+const BulkAction = z.looseObject({ workspaceId: id, orderIds: idList, action: z.enum(['delete', 'assign_driver', 'update_status']), driverId: optionalId })
 export const POST = api(async req => {
-  const body=await req.json()
+  const body=await parseBody(req,BulkAction)
   const {db,workspaceId}=await workspaceAccess(body.workspaceId)
-  const selected=ids(body.orderIds)
-  if(!['delete','assign_driver','update_status'].includes(body.action)) throw new ApiError(400,'Invalid bulk action')
+  const selected=body.orderIds
   await validateReferences(db,workspaceId,{drivers:body.driverId})
   const orders=checked(await db.from('orders').select('*').in('id',selected).eq('workspace_id',workspaceId))
   if(orders.length!==selected.length) throw new ApiError(403,'Some orders are not accessible')

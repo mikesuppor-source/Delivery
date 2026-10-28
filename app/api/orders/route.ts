@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { api, ApiError, checked, ids, money, textField, uuid } from '@/lib/api'
+import { api, ApiError, checked } from '@/lib/api'
+import { flag, id, idList, ilikeAny, money, optionalId, parseBody, searchTerm, serviceType, text, weightKg, z } from '@/lib/validation'
 import { authenticated, workspaceAccess, validateReferences } from '@/lib/access'
 import { generateUniqueOrderCode, formatOrderCode } from '@/lib/order-codes'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
@@ -7,10 +8,39 @@ import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 import { findBestDriverForArea } from '@/lib/auto-dispatch'
 import { sendPushToDriver } from '@/lib/push'
 
+const CreateOrder = z.object({
+  workspaceId: id,
+  shopId: optionalId,
+  areaId: optionalId,
+  driverId: z.union([id, z.literal('auto'), z.literal(''), z.null()]).optional(),
+  autoAssign: z.boolean().optional(),
+  code: text(60),
+  collectionUsd: money(),
+  deliveryFeeUsd: money(),
+  driverPayUsd: money(),
+  recipientName: text(200),
+  recipientPhone: text(40),
+  recipientAddress: text(1000),
+  serviceType,
+  weightKg,
+  isBreakable: flag,
+  paymentMethod: text(40),
+  carrierName: text(100),
+  carrierTrackingCode: text(100),
+  destinationGovernorate: text(100),
+  destinationCaza: text(100),
+  destinationTown: text(100),
+  notes: text(4000),
+})
+// Field-level rules for edits live in orderPatch (shared with the courier app)
+const UpdateOrder = z.looseObject({ workspaceId: id, orderId: id, code: z.string().max(60).optional() })
+const DeleteOrders = z.object({ workspaceId: id, orderIds: idList.optional(), orderId: id.optional() })
+  .refine(b => b.orderIds || b.orderId, { message: 'Select between 1 and 200 records' })
+
 export const GET = api(async req => {
   const { client } = await authenticated()
   const params = new URL(req.url).searchParams
-  const search = textField(params.get('search'), 'search', 100)
+  const search = searchTerm(params.get('search'))
   const page = Math.max(0, Math.floor(Number(params.get('page')) || 0))
   let query = client.from('orders').select(ORDER_SELECT, { count: 'exact' })
   if (search) {
@@ -18,7 +48,7 @@ export const GET = api(async req => {
       query = query.eq('tracking_token', search.toLowerCase())
     } else {
       const codeClean = formatOrderCode(search)
-      query = query.or(`code.ilike.%${codeClean || search}%,recipient_name.ilike.%${search}%,recipient_phone.ilike.%${search}%,recipient_address.ilike.%${search}%`)
+      query = query.or(ilikeAny(['code'], codeClean || search) + ',' + ilikeAny(['recipient_name', 'recipient_phone', 'recipient_address'], search))
     }
   }
   const result = await query.order('created_at',{ascending:false}).order('id').range(page*100,page*100+99)
@@ -26,7 +56,7 @@ export const GET = api(async req => {
   return NextResponse.json({ orders, count:result.count, page })
 })
 export const POST = api(async req => {
-  const body=await req.json()
+  const body=await parseBody(req, CreateOrder)
   const { db,user,workspaceId }=await workspaceAccess(body.workspaceId)
   let resolvedDriverId: string | null = (body.driverId && body.driverId !== 'auto') ? body.driverId : null
   if ((!resolvedDriverId && body.areaId && body.driverId === 'auto') || (body.autoAssign && body.areaId && !resolvedDriverId)) {
@@ -34,24 +64,24 @@ export const POST = api(async req => {
   }
   await validateReferences(db,workspaceId,{shops:body.shopId,drivers:resolvedDriverId,delivery_areas:body.areaId})
   const ws=checked(await db.from('workspaces').select('usd_to_lbp').eq('id',workspaceId).single())
-  const code=body.code ? formatOrderCode(textField(body.code,'code',60,true)) : await generateUniqueOrderCode(db,'CD')
+  const code=body.code ? formatOrderCode(body.code) : await generateUniqueOrderCode(db,'CD')
   if (!code) throw new ApiError(400,'Invalid tracking code')
   const order=checked(await db.from('orders').insert({
     workspace_id:workspaceId,code,shop_id:body.shopId||null,driver_id:resolvedDriverId||null,area_id:body.areaId||null,
     status:resolvedDriverId?'assigned':'pending',usd_to_lbp_rate:ws.usd_to_lbp,
-    collection_usd:money(body.collectionUsd,'collection'),delivery_fee_usd:money(body.deliveryFeeUsd,'delivery fee'),
-    driver_pay_usd:money(body.driverPayUsd,'driver pay'),recipient_name:textField(body.recipientName,'recipient',200),
-    recipient_phone:textField(body.recipientPhone,'phone',40),recipient_address:textField(body.recipientAddress,'address',1000),
-    service_type:(body.serviceType === 'replacement' || body.serviceType === 'pickup') ? body.serviceType : 'delivery',
-    weight_kg:(body.weightKg != null && body.weightKg !== '') ? Math.max(0, Number(body.weightKg)) : undefined,
-    is_breakable:Boolean(body.isBreakable),
-    payment_method:textField(body.paymentMethod, 'payment method', 40) || 'cash_usd',
-    carrier_name:textField(body.carrierName, 'carrier name', 100),
-    carrier_tracking_code:textField(body.carrierTrackingCode, 'carrier tracking code', 100),
-    destination_governorate:textField(body.destinationGovernorate, 'governorate', 100),
-    destination_caza:textField(body.destinationCaza, 'caza', 100),
-    destination_town:textField(body.destinationTown, 'town', 100),
-    notes:textField(body.notes,'notes',4000),created_by:user.id
+    collection_usd:body.collectionUsd,delivery_fee_usd:body.deliveryFeeUsd,
+    driver_pay_usd:body.driverPayUsd,recipient_name:body.recipientName,
+    recipient_phone:body.recipientPhone,recipient_address:body.recipientAddress,
+    service_type:body.serviceType,
+    weight_kg:body.weightKg,
+    is_breakable:body.isBreakable,
+    payment_method:body.paymentMethod || 'cash_usd',
+    carrier_name:body.carrierName,
+    carrier_tracking_code:body.carrierTrackingCode,
+    destination_governorate:body.destinationGovernorate,
+    destination_caza:body.destinationCaza,
+    destination_town:body.destinationTown,
+    notes:body.notes,created_by:user.id
   }).select(ORDER_SELECT).single())
 
   if (resolvedDriverId) {
@@ -66,9 +96,9 @@ export const POST = api(async req => {
   return NextResponse.json({success:true,order})
 })
 export const PATCH = api(async req => {
-  const body=await req.json()
+  const body=await parseBody(req, UpdateOrder)
   const {db,user,member,workspaceId}=await workspaceAccess(body.workspaceId,['owner','manager','driver'])
-  const order=checked(await db.from('orders').select('*').eq('id',uuid(body.orderId)).eq('workspace_id',workspaceId).single())
+  const order=checked(await db.from('orders').select('*').eq('id',body.orderId).eq('workspace_id',workspaceId).single())
   if (!order) throw new ApiError(404,'Order not found')
   const isDriver=member.role==='driver'
   if(isDriver) {
@@ -77,18 +107,12 @@ export const PATCH = api(async req => {
     if(!driver) throw new ApiError(403,'Order is not assigned to you')
   }
   const updates=orderPatch(body,order,isDriver)
-  if(!isDriver && body.code!==undefined) updates.code=formatOrderCode(textField(body.code,'code',60,true))
-  await validateReferences(db,workspaceId,{drivers:updates.driver_id,delivery_areas:updates.area_id})
-  let updateResult = await db.from('orders').update(updates).eq('id',order.id).eq('workspace_id',workspaceId).select(ORDER_SELECT).maybeSingle()
-  if (updateResult.error && (updateResult.error as any).code === '42703') {
-    const safeUpdates: any = { ...updates }
-    delete safeUpdates.pod_collected_usd
-    delete safeUpdates.cash_discrepancy_usd
-    delete safeUpdates.location_lat
-    delete safeUpdates.location_lng
-    updateResult = await db.from('orders').update(safeUpdates).eq('id',order.id).eq('workspace_id',workspaceId).select(ORDER_SELECT).maybeSingle()
+  if(!isDriver && body.code!==undefined) {
+    updates.code=formatOrderCode(body.code)
+    if(!updates.code) throw new ApiError(400,'Invalid code')
   }
-  const updated = checked(updateResult)
+  await validateReferences(db,workspaceId,{drivers:updates.driver_id,delivery_areas:updates.area_id})
+  const updated = checked(await db.from('orders').update(updates).eq('id',order.id).eq('workspace_id',workspaceId).select(ORDER_SELECT).maybeSingle())
   if(!updated) throw new ApiError(404,'Order not found or update could not be completed')
   if(updated.status === 'delivered') {
     fulfillShopifyOrder(db, order.id).catch(e => console.error('Shopify fulfillment sync failed:', e))
@@ -104,14 +128,14 @@ export const PATCH = api(async req => {
   return NextResponse.json({success:true,order:updated})
 })
 export const DELETE = api(async req => {
-  const body=await req.json()
+  const body=await parseBody(req, DeleteOrders)
   // STRICTLY REQUIRE 'owner' ROLE FOR PERMANENT RECORD DELETION!
   const {db,workspaceId,member}=await workspaceAccess(body.workspaceId,['owner'])
   if (member.role !== 'owner') {
     throw new ApiError(403, 'Forbidden: Only the workspace owner can delete records.')
   }
 
-  const selected=ids(body.orderIds || [body.orderId])
+  const selected=body.orderIds || [body.orderId as string]
   const orders=checked(await db.from('orders').select('id,status,code').in('id',selected).eq('workspace_id',workspaceId))
   if (orders.length !== selected.length) throw new ApiError(404, 'One or more orders not found')
 

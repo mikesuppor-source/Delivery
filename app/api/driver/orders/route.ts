@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
-import { api, ApiError, checked, uuid } from '@/lib/api'
+import { api, ApiError, checked } from '@/lib/api'
+import { id, parseBody, z } from '@/lib/validation'
 import { driverAccess } from '@/lib/access'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
 import { savePod } from '@/lib/pod'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 import { allRows } from '@/lib/pagination'
+
+const CourierUpdate = z.looseObject({ driverId: id, orderId: id })
 
 export const GET = api(async req => {
   const url = new URL(req.url)
@@ -39,9 +42,9 @@ export const GET = api(async req => {
   return NextResponse.json({ success: true, orders })
 })
 export const PATCH = api(async req => {
-  const body=await req.json()
+  const body=await parseBody(req,CourierUpdate)
   const {db,driver}=await driverAccess(body.driverId)
-  const order=checked(await db.from('orders').select('*').eq('id',uuid(body.orderId)).eq('driver_id',driver.id).eq('workspace_id',driver.workspace_id).single())
+  const order=checked(await db.from('orders').select('*').eq('id',body.orderId).eq('driver_id',driver.id).eq('workspace_id',driver.workspace_id).single())
   if(!order) throw new ApiError(404,'Order not found')
   const updates=orderPatch(body,order,true)
   if(body.podPhoto) updates.pod_photo=await savePod(db,order.id,body.podPhoto,'photo')

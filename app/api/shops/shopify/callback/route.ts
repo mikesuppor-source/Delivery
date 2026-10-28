@@ -11,24 +11,10 @@ export const GET=api(async req=>{
  if(!verifyOAuth(params,secret)) throw new ApiError(403,'Invalid Shopify callback signature')
  const state=params.get('state')||''
  if(!equalSignature(state,req.cookies.get('cedar_oauth_state')?.value||'')) throw new ApiError(403,'Invalid OAuth state')
+ // Deleting the state row is what consumes it, so each OAuth request can complete only once
  const db=createServiceClient()
- let pending: { shop_id: string; user_id: string; domain: string } | null = null
- try {
-  const {data}=await db.from('oauth_states').select('*').eq('nonce',state).eq('domain',domain).gt('expires_at',new Date().toISOString()).maybeSingle()
-  if(data) {
-   pending=data
-   await db.from('oauth_states').delete().eq('nonce',state)
-  }
- } catch (e) { void e }
- if(!pending) {
-  const metaCookie=req.cookies.get('cedar_oauth_meta')?.value
-  if(metaCookie) {
-   try {
-    const decoded=JSON.parse(Buffer.from(metaCookie,'base64url').toString('utf8'))
-    if(decoded.state===state && decoded.domain===domain) pending=decoded
-   } catch (e) { void e }
-  }
- }
+ const {data:pending,error}=await db.from('oauth_states').delete().eq('nonce',state).eq('domain',domain).gt('expires_at',new Date().toISOString()).select('shop_id,user_id').maybeSingle()
+ if(error) throw new ApiError(500,'Database operation failed')
  if(!pending) throw new ApiError(403,'OAuth request expired or already used')
  const {user}=await shopAccess(pending.shop_id)
  if(user.id!==pending.user_id) throw new ApiError(403,'OAuth session changed')
@@ -41,6 +27,5 @@ export const GET=api(async req=>{
  await installShopify(pending.shop_id,domain,JSON.stringify({access_token:token.access_token,refresh_token:token.refresh_token,expires_at:token.expires_in?Date.now()+token.expires_in*1000:undefined}))
  const response=NextResponse.redirect(siteUrl()+'/portal')
  response.cookies.delete('cedar_oauth_state')
- response.cookies.delete('cedar_oauth_meta')
  return response
 })
