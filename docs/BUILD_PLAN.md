@@ -154,6 +154,7 @@ Branch **`feature/zone-pricing`** contains the uncommitted file **`supabase/migr
 
 ### 3.3 Security
 - Never commit `.env*`, `.agents/`, `.claude/skills/`, `skills-lock.json` or any key.
+- Never write a key, token or password in the code, not even as a fallback (`process.env.X || 'key'`): this repository is public. Keys live in the hosting settings only, and `tests/no-built-in-secrets.test.ts` fails if one is written into the code.
 - Never expose courier pay or company profit to shops or customers.
 - Never expose customer addresses on public pages.
 - Couriers see only their own orders and money.

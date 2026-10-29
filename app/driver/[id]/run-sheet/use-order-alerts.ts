@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { DriverLang, useDriverTranslation } from '@/lib/driver-i18n'
-import { VAPID_PUBLIC_KEY, urlB64ToUint8Array, type DriverRunSheetOrder } from './shared'
+import { VAPID_PUBLIC_KEY, sameServerKey, urlB64ToUint8Array, type DriverRunSheetOrder } from './shared'
 
 interface AlertDeps {
   driver: { id: string }
@@ -91,6 +91,11 @@ export function useOrderAlerts({ driver, lang, t, isStandaloneApp, setShowIosIns
       navigator.serviceWorker.ready.then(async reg => {
         try {
           const sub = await reg.pushManager.getSubscription()
+          if (sub && VAPID_PUBLIC_KEY && !sameServerKey(sub.options?.applicationServerKey, urlB64ToUint8Array(VAPID_PUBLIC_KEY))) {
+            // Registered with an older signing key: it can no longer receive alerts, so the courier turns them on again
+            await sub.unsubscribe()
+            return
+          }
           if (sub) {
             setPushSubscribed(true)
             setAlertsEnabled(true)
@@ -110,6 +115,12 @@ export function useOrderAlerts({ driver, lang, t, isStandaloneApp, setShowIosIns
     try {
       if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
         showNotification('error', 'Push is not supported on this device/browser.')
+        setPushLoading(false)
+        return
+      }
+
+      if (!VAPID_PUBLIC_KEY) {
+        showNotification('error', 'Background alerts are not set up on this server yet.')
         setPushLoading(false)
         return
       }
@@ -149,11 +160,17 @@ export function useOrderAlerts({ driver, lang, t, isStandaloneApp, setShowIosIns
         return
       }
 
+      const serverKey = urlB64ToUint8Array(VAPID_PUBLIC_KEY)
       let sub = await reg.pushManager.getSubscription()
+      if (sub && !sameServerKey(sub.options?.applicationServerKey, serverKey)) {
+        // Made with an older signing key: it cannot receive alerts any more, so start a new one
+        await sub.unsubscribe()
+        sub = null
+      }
       if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+          applicationServerKey: serverKey,
         })
       }
 

@@ -124,6 +124,10 @@ A shop's page can email its account statement as a PDF, in English or Arabic. It
 
 Until both are set, the Email button answers that email is not set up. Only owners and managers can send, the address always comes from the shop's record, and one person can send at most ten emails a minute.
 
+### Courier push notifications
+
+Lock-screen alerts for couriers are signed with a key pair that lives in the hosting settings only. Make one with `npx web-push generate-vapid-keys`, then set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (the public one), `VAPID_PRIVATE_KEY` (the private one, keep it secret) and, if you like, `VAPID_SUBJECT` (a `mailto:` address) in Vercel, and redeploy because the public key is built into the courier page. Never write the private key in the code: this repository is public, and whoever holds it can send notifications to couriers' phones. Without both keys push is off and the courier page says alerts are not set up. After a new pair is set, each courier opens their run sheet and turns alerts on again once.
+
 ### Receipts and fonts
 
 Expense receipts (photos or PDFs, up to 2.5 MB) are kept in the private `expense-receipts` storage bucket, created by migration 029, and opened through links that stop working after a minute. Statement PDFs use the Cairo font in `assets/fonts` (SIL Open Font License, see `OFL.txt` there), which has Arabic and Latin letters in one file, and can be printed in English or Arabic (`lang=ar`, laid out right to left).

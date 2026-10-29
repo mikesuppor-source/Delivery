@@ -110,9 +110,8 @@ export const LEBANON_QUICK_CITIES = [
   { name: 'Chouf / Aley', lat: 33.8058, lng: 35.6025 },
 ]
 
-export const VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  'BNuDgLL_EdWvNDLSM2vA5ER-OAsBwoKaT9JadeksO4nD5IHeE4HXX8TOg_uez1wiJ-PSslp1dKHejy-DxKbXuHw'
+// Comes from the hosting settings only (see lib/push.ts); empty means background alerts are not set up
+export const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
 
 export function urlB64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -123,4 +122,11 @@ export function urlB64ToUint8Array(base64String: string) {
     outputArray[i] = rawData.charCodeAt(i)
   }
   return outputArray
+}
+
+// A phone that registered for alerts with an older signing key can no longer receive them; compare to know
+export function sameServerKey(current: ArrayBufferLike | null | undefined, wanted: Uint8Array) {
+  if (!current) return true // not reported by this browser: leave the registration alone
+  const have = new Uint8Array(current)
+  return have.length === wanted.length && have.every((byte, i) => byte === wanted[i])
 }

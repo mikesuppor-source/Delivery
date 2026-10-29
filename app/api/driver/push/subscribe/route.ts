@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { api, ApiError, checked, textField } from '@/lib/api'
 import { driverAccess } from '@/lib/access'
-import { sendPushToDriver } from '@/lib/push'
+import { isPushConfigured, sendPushToDriver } from '@/lib/push'
 
 export const POST = api(async req => {
   const body = await req.json()
@@ -9,6 +9,7 @@ export const POST = api(async req => {
   const { subscription, test } = body
 
   if (test) {
+    if (!isPushConfigured()) throw new ApiError(503, 'Background alerts are not set up on this server yet')
     const res = await sendPushToDriver(driver.id, {
       title: 'Cedar Delivery Alert',
       body: 'Background notifications active! You will be alerted when new orders are assigned.',

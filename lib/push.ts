@@ -1,20 +1,25 @@
 import webpush from 'web-push'
 import { createServiceClient } from '@/lib/supabase/server'
 
-export const VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  'BNuDgLL_EdWvNDLSM2vA5ER-OAsBwoKaT9JadeksO4nD5IHeE4HXX8TOg_uez1wiJ-PSslp1dKHejy-DxKbXuHw'
+const DEFAULT_SUBJECT = 'mailto:dispatch@cedardelivery.com'
 
-export const VAPID_PRIVATE_KEY =
-  process.env.VAPID_PRIVATE_KEY || 'nGaGfABppdxvBJTDl2UY2EhVNGAVC_6EwTBc7Lhjiwk'
-
-export const VAPID_SUBJECT =
-  process.env.VAPID_SUBJECT || 'mailto:dispatch@cedardelivery.com'
-
-try {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
-} catch (_e) {
-  void _e
+/**
+ * Push notifications are signed with a key pair that lives in the hosting settings only:
+ * NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY (make a pair with `npx web-push generate-vapid-keys`).
+ * Never write the private key in the code. This repository is public, and whoever holds the private key can
+ * send notifications to couriers' phones. Without both settings push is simply off.
+ */
+export function isPushConfigured(): boolean {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const privateKey = process.env.VAPID_PRIVATE_KEY
+  if (!publicKey || !privateKey) return false
+  try {
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT || DEFAULT_SUBJECT, publicKey, privateKey)
+    return true
+  } catch (_e) {
+    void _e
+    return false
+  }
 }
 
 export interface DriverPushPayload {
@@ -35,6 +40,7 @@ export async function sendPushToDriver(
   payload: DriverPushPayload
 ): Promise<{ sent: number; failed: number; errors?: string[] }> {
   if (!driverId) return { sent: 0, failed: 0, errors: ['No driverId provided'] }
+  if (!isPushConfigured()) return { sent: 0, failed: 0, errors: ['Push notifications are not set up on this server'] }
 
   const supabase = createServiceClient()
   const { data: subs, error } = await supabase
