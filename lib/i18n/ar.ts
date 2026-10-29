@@ -176,4 +176,21 @@ export const ar: Record<TranslationKey, string> = {
   scanOrPresent: 'يرجى تسليم كيس الكاش وإبراز هذا الملخص للمحاسب بالمكتب.',
   ordersCompletedToday: 'طلبات تم تسليمها اليوم',
   voucherScanHint: 'يمكن للمحاسب مسح الكود أو مطابقة المبالغ أعلاه لإغلاق الشيفت.',
+
+  // Phase 3 Warehouse Holding
+  inStorageTab: 'قيد التخزين بالمستودع',
+  readyToReleaseTab: 'جاهز للإفراج والتوصيل',
+  releasedHistoryTab: 'سجل الطرود المفرجة',
+  shelfCode: 'رقم الرف / الموقع',
+  deliverAfterDate: 'التوصيل بعد تاريخ',
+  storageFeeAccumulated: 'رسوم التخزين',
+  releaseAction: 'إفراج للمناديب',
+  holdAction: 'تخزين بالمستودع',
+  reasonWeather: 'طقس عاصف / أحوال جوية',
+  reasonFarZone: 'منطقة بعيدة / تجميع رحلات',
+  reasonCustomerRequest: 'طلب الزبون تأجيل الموعد',
+  reasonScheduled: 'توصيل مجدول مسبقاً',
+  reasonAddressProblem: 'العنوان غير مكتمل / تدقيق',
+  reasonShopRequest: 'طلب المتجر / التاجر',
+  reasonOther: 'أسباب تشغيلية أخرى',
 }

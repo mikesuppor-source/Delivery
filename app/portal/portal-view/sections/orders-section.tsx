@@ -325,6 +325,37 @@ export function OrdersSection() {
                       >
                         <span>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
                       </button>
+                      {order.is_held && (
+                        <div style={{ marginTop: 4 }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#92400e',
+                              background: '#fef3c7',
+                              padding: '2px 7px',
+                              borderRadius: 6,
+                              border: '1px solid #fde68a',
+                            }}
+                            title={`Held in warehouse${order.deliver_after ? ` until ${order.deliver_after}` : ''}`}
+                          >
+                            <span>📦 Held</span>
+                            {order.hold_reason && (
+                              <span style={{ fontWeight: 500, opacity: 0.9 }}>
+                                : {order.hold_reason.replace('_', ' ')}
+                              </span>
+                            )}
+                            {order.deliver_after && (
+                              <span style={{ fontWeight: 500, opacity: 0.85 }}>
+                                • from {new Date(order.deliver_after).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     <td style={{ padding: '12px' }}>

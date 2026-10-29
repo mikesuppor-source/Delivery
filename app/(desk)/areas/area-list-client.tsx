@@ -20,6 +20,8 @@ interface Area {
   driver_pay_usd: number | null
   return_fee_usd: number
   return_driver_pay_usd: number
+  storage_fee_per_day_usd?: number | null
+  free_storage_days?: number | null
   active: boolean
   default_driver_id: string | null
   assigned_driver_ids?: string[] | null
@@ -51,6 +53,8 @@ export function AreaListClient({
   const [driverPayUsd, setDriverPayUsd] = useState('')
   const [returnFeeUsd, setReturnFeeUsd] = useState('2.00')
   const [returnDriverPayUsd, setReturnDriverPayUsd] = useState('1.00')
+  const [storageFeePerDayUsd, setStorageFeePerDayUsd] = useState('0.00')
+  const [freeStorageDays, setFreeStorageDays] = useState('3')
   const [defaultDriverId, setDefaultDriverId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -77,6 +81,8 @@ export function AreaListClient({
     setDriverPayUsd('')
     setReturnFeeUsd('2.00')
     setReturnDriverPayUsd('1.00')
+    setStorageFeePerDayUsd('0.00')
+    setFreeStorageDays('3')
     setDefaultDriverId('')
     setError('')
     setIsModalOpen(true)
@@ -89,6 +95,8 @@ export function AreaListClient({
     setDriverPayUsd(area.driver_pay_usd !== null && area.driver_pay_usd !== undefined ? String(area.driver_pay_usd) : '')
     setReturnFeeUsd(String(area.return_fee_usd ?? 2.0))
     setReturnDriverPayUsd(String(area.return_driver_pay_usd ?? 1.0))
+    setStorageFeePerDayUsd(String(area.storage_fee_per_day_usd ?? 0))
+    setFreeStorageDays(String(area.free_storage_days ?? 3))
     setDefaultDriverId(area.default_driver_id || '')
     setError('')
     setIsModalOpen(true)
@@ -106,6 +114,8 @@ export function AreaListClient({
       feeUsd: Number(feeUsd),
       returnFeeUsd: Number(returnFeeUsd),
       returnDriverPayUsd: Number(returnDriverPayUsd),
+      storageFeePerDayUsd: Number(storageFeePerDayUsd) || 0,
+      freeStorageDays: parseInt(freeStorageDays, 10) || 0,
     }
 
     if (driverPayUsd.trim() !== '') {
@@ -449,6 +459,7 @@ export function AreaListClient({
                 <th>You Keep</th>
                 <th>Return Fee</th>
                 <th>Return Courier</th>
+                <th>Storage Fee</th>
                 <th>Fleet Pool</th>
                 <th>Status</th>
                 {canEdit && <th style={{ textAlign: 'right' }}>Actions</th>}
@@ -505,6 +516,12 @@ export function AreaListClient({
                       </td>
                       <td>
                         <span>{formatUSD(Number(area.return_driver_pay_usd ?? 1))}</span>
+                      </td>
+                      <td>
+                        <span>{formatUSD(Number(area.storage_fee_per_day_usd ?? 0))}/d</span>
+                        <small style={{ display: 'block', fontSize: 11, color: 'var(--muted)' }}>
+                          {area.free_storage_days ?? 3}d free
+                        </small>
                       </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -674,6 +691,30 @@ export function AreaListClient({
                 required
               />
               <small style={{ color: 'var(--muted)', fontSize: 11 }}>Paid to courier for return trip</small>
+            </div>
+
+            <div className="field">
+              <label>Storage Fee / Day ($ USD)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={storageFeePerDayUsd}
+                onChange={e => setStorageFeePerDayUsd(e.target.value)}
+              />
+              <small style={{ color: 'var(--muted)', fontSize: 11 }}>Charged to shop after free storage days</small>
+            </div>
+
+            <div className="field">
+              <label>Free Storage Days</label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                value={freeStorageDays}
+                onChange={e => setFreeStorageDays(e.target.value)}
+              />
+              <small style={{ color: 'var(--muted)', fontSize: 11 }}>Grace period before storage fee applies</small>
             </div>
 
             {!editingArea && (

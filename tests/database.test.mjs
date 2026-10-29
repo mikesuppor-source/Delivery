@@ -243,5 +243,106 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
    )
    await db.exec('reset role')
   })
+   await t.test('warehouse holding, RLS, release rules, and storage fee calculations', async () => {
+     await db.query("select set_config('test.user_id',$1,false)", [owner])
+     const hubA = id(40)
+     await db.query(
+       'insert into hubs(id, workspace_id, name, address, is_default, active) values($1, $2, $3, $4, true, true)',
+       [hubA, a, 'Main Test Hub', 'Beirut Port']
+     )
+     const shelfA = id(41)
+     await db.query(
+       'insert into hub_shelves(id, workspace_id, hub_id, code) values($1, $2, $3, $4)',
+       [shelfA, a, hubA, 'SHELF-X1']
+     )
+
+     // 1. Cannot hold delivered or cancelled order
+     const delivOrder = id(42)
+     await db.query(
+       "insert into orders(id, workspace_id, shop_id, code, status, usd_to_lbp_rate) values($1, $2, $3, 'CD-DELIV42', 'delivered', 89500)",
+       [delivOrder, a, shop]
+     )
+     await assert.rejects(
+       db.query("select hold_order($1, $2, 'SHELF-X1', 'weather'::hold_reason, 'storm', null, $3)", [delivOrder, hubA, owner]),
+       /Can only hold orders in pending, assigned, or failed status/i
+     )
+
+     // 2. Holding an assigned order clears courier and moves status to pending
+     const assignOrder = id(43)
+     await db.query(
+       "insert into orders(id, workspace_id, shop_id, driver_id, code, status, usd_to_lbp_rate, collection_usd, delivery_fee_usd) values($1, $2, $3, $4, 'CD-HOLD43', 'assigned', 89500, 50, 4)",
+       [assignOrder, a, shop, drv]
+     )
+     const holdRes = (await db.query(
+       "select hold_order($1, $2, 'SHELF-X1', 'customer_request'::hold_reason, 'traveling', '2026-11-05'::date, $3) as r",
+       [assignOrder, hubA, owner]
+     )).rows[0].r
+     assert.equal(holdRes.success, true)
+
+     const heldOrderRow = (await db.query('select status, driver_id, is_held, hub_id from orders where id=$1', [assignOrder])).rows[0]
+     assert.equal(heldOrderRow.status, 'pending')
+     assert.equal(heldOrderRow.driver_id, null)
+     assert.equal(heldOrderRow.is_held, true)
+     assert.equal(heldOrderRow.hub_id, hubA)
+
+     // 3. Held order cannot be assigned or dispatched until released
+     await assert.rejects(
+       db.query('update orders set driver_id=$1, status=$2 where id=$3', [drv, 'assigned', assignOrder]),
+       /Cannot assign or dispatch a held order until it is released/i
+     )
+
+     // 4. Cannot create duplicate open hold on same order
+     await assert.rejects(
+       db.query("select hold_order($1, $2, 'SHELF-X1', 'weather'::hold_reason, 'again', null, $3)", [assignOrder, hubA, owner]),
+       /Order is already on hold in warehouse/i
+     )
+
+     // 5. Configure storage fee on delivery area and backdate held_at by 5 days (free days = 2, fee = $1.50)
+     const areaWithStorage = id(44)
+     await db.query(
+       'insert into delivery_areas(id, workspace_id, name, fee_usd, storage_fee_per_day_usd, free_storage_days) values($1, $2, $3, 4, 1.50, 2)',
+       [areaWithStorage, a, 'Storage Test Zone']
+     )
+     await db.query('update orders set area_id=$1 where id=$2', [areaWithStorage, assignOrder])
+     await db.query("update order_holds set held_at = now() - interval '5 days' where order_id=$1 and released_at is null", [assignOrder])
+
+     // 6. Release order: calculates storage fee (5 - 2 = 3 days * $1.50 = $4.50)
+     const releaseRes = (await db.query(
+       "select release_order($1, $2, 'Customer returned from trip') as r",
+       [assignOrder, owner]
+     )).rows[0].r
+     assert.equal(releaseRes.success, true)
+     assert.equal(Number(releaseRes.storage_fee_usd), 4.5)
+
+     const releasedOrderRow = (await db.query('select is_held, storage_fee_usd, shop_balance_usd from orders where id=$1', [assignOrder])).rows[0]
+     assert.equal(releasedOrderRow.is_held, false)
+     assert.equal(Number(releasedOrderRow.storage_fee_usd), 4.5)
+     // 50 collection - 4 delivery fee - 4.50 storage fee = 41.50 shop balance
+     assert.equal(Number(releasedOrderRow.shop_balance_usd), 41.5)
+
+     // 7. Merchant RLS: merchant can read holds on their own orders
+     await db.query("select set_config('test.user_id',$1,false)", [merchant])
+     await db.exec('set role authenticated')
+     const merchantHolds = (await db.query('select count(*) from order_holds where order_id=$1', [assignOrder])).rows[0].count
+     assert.equal(Number(merchantHolds), 1)
+
+     // Direct write on order_holds is forbidden
+     await assert.rejects(
+       db.query("insert into order_holds(id, workspace_id, order_id, hub_id, reason) values($1, $2, $3, $4, 'other')", [id(45), a, assignOrder, hubA]),
+       /permission denied/i
+     )
+     await db.exec('reset role')
+
+     // 8. Cross-workspace isolation: workspace B cannot see or touch workspace A holds
+     const userB = id(49)
+     await db.query("insert into auth.users values($1, 'userb@test.invalid', now())", [userB])
+     await db.query("insert into workspace_members(workspace_id, user_id, role) values($1, $2, 'owner')", [b, userB])
+
+     await db.query("select set_config('test.user_id',$1,false)", [userB])
+     await db.exec('set role authenticated')
+     const bHolds = (await db.query('select count(*) from order_holds where workspace_id=$1', [a])).rows[0].count
+     assert.equal(Number(bHolds), 0)
+     await db.exec('reset role')
+   })
  }finally{await db.close()}
 })

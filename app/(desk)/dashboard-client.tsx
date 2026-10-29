@@ -30,6 +30,8 @@ export interface DashboardClientProps {
     stuckTransitCount: number
     failedAttemptsCount: number
     pendingCashoutsCount: number
+    overdueHoldsCount?: number
+    inStorageCount?: number
   }
   couriersNow: Array<{
     id: string
@@ -75,7 +77,8 @@ export function DashboardClient({
     attention.unassignedCount +
     attention.stuckTransitCount +
     attention.failedAttemptsCount +
-    attention.pendingCashoutsCount
+    attention.pendingCashoutsCount +
+    (attention.overdueHoldsCount || 0)
 
   const maxDayCount = Math.max(1, ...chartData.days.map(d => d.count))
 
@@ -312,6 +315,30 @@ export function DashboardClient({
                 <span>{attention.pendingCashoutsCount} {t('dashCashoutAlert')}</span>
                 <span className="ui-btn ui-btn--neutral ui-btn--sm" style={{ padding: '3px 8px', fontSize: 11 }}>
                   Payout
+                </span>
+              </Link>
+            )}
+
+            {(attention.overdueHoldsCount ?? 0) > 0 && (
+              <Link
+                href="/warehouse"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  background: 'var(--ui-surface-2)',
+                  border: '1px solid var(--ui-border)',
+                  borderRadius: 'var(--ui-radius-sm)',
+                  textDecoration: 'none',
+                  color: 'var(--ui-text)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                <span>{attention.overdueHoldsCount} parcels in warehouse ready or overdue</span>
+                <span className="ui-btn ui-btn--warning ui-btn--sm" style={{ padding: '3px 8px', fontSize: 11 }}>
+                  Release
                 </span>
               </Link>
             )}

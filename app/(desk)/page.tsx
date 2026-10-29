@@ -33,7 +33,7 @@ export default async function OverviewPage() {
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 3600 * 1000).toISOString()
 
   // Parallel data fetching for analytics and real-time operations
-  const [ordersRes, recentOrdersRes, driversRes, areasRes, cashoutsRes] = await Promise.all([
+  const [ordersRes, recentOrdersRes, driversRes, areasRes, cashoutsRes, holdsRes] = await Promise.all([
     allRows(
       supabase
         .from('orders')
@@ -76,6 +76,14 @@ export default async function OverviewPage() {
         .eq('workspace_id', workspace.id)
         .eq('status', 'pending'),
     ),
+
+    allRows(
+      supabase
+        .from('order_holds')
+        .select('id, deliver_after, held_at')
+        .eq('workspace_id', workspace.id)
+        .is('released_at', null),
+    ),
   ])
 
   const orders = (ordersRes.data as any[]) || []
@@ -108,6 +116,15 @@ export default async function OverviewPage() {
   ).length
   const failedAttemptsCount = orders.filter(o => o.status === 'failed').length
   const pendingCashoutsCount = (cashoutsRes.data || []).length
+
+  // Warehouse Holds Attention
+  const activeHolds = (holdsRes.data as any[]) || []
+  const todayDateStr = now.toISOString().slice(0, 10)
+  const overdueHoldsCount = activeHolds.filter(
+    h =>
+      (h.deliver_after && h.deliver_after <= todayDateStr) ||
+      now.getTime() - new Date(h.held_at).getTime() > 7 * 86400000,
+  ).length
 
   // 3. Couriers Now fleet status
   const couriersNow = drivers.map(d => {
@@ -194,6 +211,8 @@ export default async function OverviewPage() {
         stuckTransitCount,
         failedAttemptsCount,
         pendingCashoutsCount,
+        overdueHoldsCount,
+        inStorageCount: activeHolds.length,
       }}
       couriersNow={couriersNow}
       chartData={{ days, zones }}

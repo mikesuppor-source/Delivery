@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import type { Order } from '../types'
 import { Modal } from '@/components/modal'
 import { LocationHelper } from '@/components/location-helper'
@@ -112,6 +113,36 @@ export function EditOrderModal({ editingOrder, onClose }: { editingOrder: Order;
       >
         <form onSubmit={handleSaveEditOrder}>
           <div className="form-grid">
+            {editingOrder?.is_held && (
+              <div
+                className="field full"
+                style={{
+                  background: 'var(--ui-warning-soft, #fef3c7)',
+                  border: '1.5px solid var(--ui-warning, #f59e0b)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 800, color: 'var(--ui-warning-text, #92400e)', fontSize: 13 }}>
+                    📦 Currently Held in Warehouse Hub
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--ui-warning-text, #92400e)', marginTop: 2 }}>
+                    This parcel cannot be assigned to couriers until released.
+                  </div>
+                </div>
+                <Link
+                  href="/warehouse"
+                  className="btn btn-sm btn-primary"
+                  style={{ textDecoration: 'none' }}
+                >
+                  Manage in Warehouse
+                </Link>
+              </div>
+            )}
             {/* Custom Tracking Code / Waybill # */}
             <div className="field full" style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--line)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>

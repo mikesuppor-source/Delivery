@@ -10,6 +10,7 @@ const CreateCatalog=z.object({
  pinCode:z.string().optional(),userId:optionalId,feeUsd:money(),assignedDriverIds:z.array(z.unknown()).optional(),
  // Zone pricing (Phase 1): null means use the workspace default
  driverPayUsd:money().optional(),returnFeeUsd:money().optional(),returnDriverPayUsd:money().optional(),
+ storageFeePerDayUsd:money().optional(),freeStorageDays:z.number().int().min(0).max(365).optional(),
 })
 const ChangeCatalog=z.object({
  workspaceId:id,id:id.optional(),areaId:id.optional(),
@@ -18,6 +19,7 @@ const ChangeCatalog=z.object({
  feeUsd:money().optional(),defaultDriverId:optionalId.optional(),assignedDriverIds:z.array(z.unknown()).optional(),
  // Zone pricing (Phase 1)
  driverPayUsd:money().optional(),returnFeeUsd:money().optional(),returnDriverPayUsd:money().optional(),
+ storageFeePerDayUsd:money().optional(),freeStorageDays:z.number().int().min(0).max(365).optional(),
 })
 type Db=Awaited<ReturnType<typeof workspaceAccess>>['db']
 // Area driver pools may only contain this workspace's couriers.
@@ -46,6 +48,8 @@ export function createCatalog(table:Table) {
    if(body.driverPayUsd!==undefined)row.driver_pay_usd=body.driverPayUsd
    if(body.returnFeeUsd!==undefined)row.return_fee_usd=body.returnFeeUsd
    if(body.returnDriverPayUsd!==undefined)row.return_driver_pay_usd=body.returnDriverPayUsd
+   if(body.storageFeePerDayUsd!==undefined)row.storage_fee_per_day_usd=body.storageFeePerDayUsd
+   if(body.freeStorageDays!==undefined)row.free_storage_days=body.freeStorageDays
    if(body.assignedDriverIds){
     const cleanDriverIds = await workspaceDriverIds(db,workspaceId,body.assignedDriverIds)
     row.assigned_driver_ids = cleanDriverIds
@@ -89,6 +93,8 @@ export async function changeCatalog(req:NextRequest,table:Table,recordId?:string
    if(body.driverPayUsd!==undefined)updates.driver_pay_usd=body.driverPayUsd
    if(body.returnFeeUsd!==undefined)updates.return_fee_usd=body.returnFeeUsd
    if(body.returnDriverPayUsd!==undefined)updates.return_driver_pay_usd=body.returnDriverPayUsd
+   if(body.storageFeePerDayUsd!==undefined)updates.storage_fee_per_day_usd=body.storageFeePerDayUsd
+   if(body.freeStorageDays!==undefined)updates.free_storage_days=body.freeStorageDays
    if(body.defaultDriverId!==undefined){
     await validateReferences(db,workspaceId,{drivers:body.defaultDriverId})
     updates.default_driver_id=body.defaultDriverId

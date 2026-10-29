@@ -197,6 +197,31 @@ export function OrderModals() {
               </div>
             )}
 
+            {inspectingOrder.is_held && (
+              <div
+                style={{
+                  background: '#fef3c7',
+                  border: '1.5px solid #f59e0b',
+                  borderRadius: 10,
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <div style={{ fontSize: 24 }}>📦</div>
+                <div>
+                  <strong style={{ color: '#92400e', fontSize: 13, display: 'block' }}>
+                    Stored in Warehouse Hold
+                  </strong>
+                  <span style={{ fontSize: 12, color: '#b45309' }}>
+                    Reason: {inspectingOrder.hold_reason ? inspectingOrder.hold_reason.replace('_', ' ') : 'Warehouse storage'}
+                    {inspectingOrder.deliver_after && ` • Scheduled delivery from ${formatDate(inspectingOrder.deliver_after)}`}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Visual 4-Step Stepper Timeline */}
             <div
               style={{

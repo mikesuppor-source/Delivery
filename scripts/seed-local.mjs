@@ -78,6 +78,28 @@ await driver('Second Courier', '+961 70 222 333', null)
 const area = (await must(db.from('delivery_areas').select().eq('workspace_id', ws.id).eq('name', 'Beirut Central').maybeSingle(), 'find area'))
   || await must(db.from('delivery_areas').insert({ workspace_id: ws.id, name: 'Beirut Central', fee_usd: 3, default_driver_id: rami.id, assigned_driver_ids: [rami.id] }).select().single(), 'area')
 
+// Seed default warehouse hub and shelves
+const hub = (await must(db.from('hubs').select().eq('workspace_id', ws.id).eq('name', 'Beirut Central Hub').maybeSingle(), 'find hub'))
+  || await must(db.from('hubs').insert({
+    workspace_id: ws.id,
+    name: 'Beirut Central Hub',
+    address: 'Corniche El Mazraa, Beirut',
+    is_default: true,
+    active: true,
+  }).select().single(), 'create hub')
+
+for (const shelfCode of ['A-01', 'A-02', 'B-01', 'B-02']) {
+  const existingShelf = await db.from('hub_shelves').select().eq('hub_id', hub.id).eq('code', shelfCode).maybeSingle()
+  if (!existingShelf.data) {
+    await must(db.from('hub_shelves').insert({
+      workspace_id: ws.id,
+      hub_id: hub.id,
+      code: shelfCode,
+      zone_id: area.id,
+    }), 'create shelf ' + shelfCode)
+  }
+}
+
 async function order(code, fields) {
   const found = await must(db.from('orders').select('id,status').eq('code', code).maybeSingle(), 'find order')
   if (found) return found

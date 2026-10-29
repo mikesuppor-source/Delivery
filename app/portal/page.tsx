@@ -39,7 +39,8 @@ export default async function MerchantPortalPage() {
     .select(`
       *,
       area:area_id(id, name, fee_usd),
-      driver:driver_id(id, name, phone)
+      driver:driver_id(id, name, phone),
+      order_holds(reason, deliver_after, released_at)
     `)
     .eq('shop_id', effectiveShop.id)
     .order('created_at', { ascending: false }))
@@ -70,11 +71,16 @@ export default async function MerchantPortalPage() {
   const specialPrices = (pricesRes.data as any[]) || []
   const ws = wsRes.data
 
-  const mappedOrders = ((orders || []) as any[]).map(o => ({
-    ...o,
-    area: Array.isArray(o.area) ? o.area[0] || null : o.area,
-    driver: Array.isArray(o.driver) ? o.driver[0] || null : o.driver,
-  }))
+  const mappedOrders = ((orders || []) as any[]).map(o => {
+    const activeHold = (o.order_holds || []).find((h: any) => !h.released_at) || null
+    return {
+      ...o,
+      area: Array.isArray(o.area) ? o.area[0] || null : o.area,
+      driver: Array.isArray(o.driver) ? o.driver[0] || null : o.driver,
+      hold_reason: activeHold?.reason || null,
+      deliver_after: activeHold?.deliver_after || null,
+    }
+  })
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>

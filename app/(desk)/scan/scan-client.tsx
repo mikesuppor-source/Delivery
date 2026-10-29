@@ -6,7 +6,6 @@ import {
   formatUSD,
   formatLBP,
   usdToLbp,
-  formatDate,
   ORDER_STATUS_LABELS,
 } from '@/lib/utils'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
@@ -49,6 +48,9 @@ interface ScannedOrder {
   recipient_address: string | null
   notes: string | null
   driver_id: string | null
+  is_held?: boolean
+  hub_id?: string | null
+  storage_fee_usd?: number
   shop?: { id: string; name: string; phone: string | null } | null
   area?: { id: string; name: string } | null
   driver?: { id: string; name: string; phone: string | null } | null
@@ -110,10 +112,31 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [scanHistory, setScanHistory] = useState<Array<{ code: string; status: string; time: string }>>([])
   const [continuousMode, setContinuousMode] = useState(false)
-  const [targetAction, setTargetAction] = useState<'view' | 'pickup' | 'deliver'>('view')
+  const [targetAction, setTargetAction] = useState<'view' | 'pickup' | 'deliver' | 'warehouse'>('view')
   const [targetDriverId, setTargetDriverId] = useState<string>('')
   const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([])
   const [selectedCameraId, setSelectedCameraId] = useState<string>('')
+
+  // Warehouse Holding States
+  const [warehouseHubs, setWarehouseHubs] = useState<Array<{ id: string; name: string; is_default?: boolean }>>([])
+  const [warehouseHubId, setWarehouseHubId] = useState<string>('')
+  const [warehouseShelfCode, setWarehouseShelfCode] = useState<string>('')
+  const [warehouseReason, setWarehouseReason] = useState<string>('customer_request')
+  const [warehouseDeliverAfter, setWarehouseDeliverAfter] = useState<string>('')
+  const [warehouseNote, setWarehouseNote] = useState<string>('')
+
+  useEffect(() => {
+    fetch(`/api/hubs?workspaceId=${workspaceId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.hubs && data.hubs.length > 0) {
+          setWarehouseHubs(data.hubs)
+          const def = data.hubs.find((h: any) => h.is_default) || data.hubs[0]
+          setWarehouseHubId(def.id)
+        }
+      })
+      .catch(() => {})
+  }, [workspaceId])
 
   const scannerRef = useRef<unknown>(null)
   const stoppingPromiseRef = useRef<Promise<void> | null>(null)
@@ -175,6 +198,12 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
             await handleUpdateStatus(matchedOrder.id, 'picked_up', targetDriverId || undefined)
           } else if (targetAction === 'deliver' && matchedOrder.status !== 'delivered') {
             await handleUpdateStatus(matchedOrder.id, 'delivered')
+          } else if (targetAction === 'warehouse') {
+            if (matchedOrder.is_held) {
+              await handleWarehouseRelease(matchedOrder.id)
+            } else if (warehouseHubId) {
+              await handleWarehouseHold(matchedOrder.id)
+            }
           }
         }
       }
@@ -252,6 +281,64 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
       showMessage(`Assigned to ${foundDriver?.name || 'Unassigned'}`, 'success')
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Failed to assign driver', 'error')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleWarehouseHold(orderId: string) {
+    if (!warehouseHubId) {
+      showMessage('Please select a warehouse hub', 'error')
+      return
+    }
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/warehouse/hold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId,
+          orderIds: [orderId],
+          hubId: warehouseHubId,
+          shelfCode: warehouseShelfCode.trim() || null,
+          reason: warehouseReason,
+          deliverAfter: warehouseDeliverAfter || null,
+          note: warehouseNote.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to hold order')
+      setOrder(prev => prev ? { ...prev, is_held: true, hub_id: warehouseHubId, status: 'pending', driver_id: null, driver: null } : null)
+      playScannerBeep(true)
+      showMessage(`Parcel stored in warehouse (Shelf: ${warehouseShelfCode || 'Hub'})`, 'success')
+    } catch (err: unknown) {
+      playScannerBeep(false)
+      showMessage(err instanceof Error ? err.message : 'Failed to hold order', 'error')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleWarehouseRelease(orderId: string) {
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/warehouse/release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId,
+          orderIds: [orderId],
+          note: 'Warehouse scan release to dispatch',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to release order')
+      setOrder(prev => prev ? { ...prev, is_held: false, status: 'pending' } : null)
+      playScannerBeep(true)
+      showMessage('Parcel released from warehouse to dispatch', 'success')
+    } catch (err: unknown) {
+      playScannerBeep(false)
+      showMessage(err instanceof Error ? err.message : 'Failed to release order', 'error')
     } finally {
       setActionLoading(false)
     }
@@ -786,6 +873,146 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
                   />
                   <span>Mark Delivered & Record COD collection</span>
                 </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="action"
+                    checked={targetAction === 'warehouse'}
+                    onChange={() => setTargetAction('warehouse')}
+                  />
+                  <span>Warehouse Hub (Intake / Hold / Release)</span>
+                </label>
+
+                {targetAction === 'warehouse' && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                      marginTop: 4,
+                      marginLeft: 22,
+                      padding: 10,
+                      background: 'var(--ui-surface-2)',
+                      border: '1px solid var(--ui-border)',
+                      borderRadius: 6,
+                    }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                          Warehouse Hub
+                        </label>
+                        <select
+                          value={warehouseHubId}
+                          onChange={e => setWarehouseHubId(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            borderRadius: 6,
+                            border: '1px solid var(--line)',
+                            background: 'var(--surface)',
+                            fontSize: 12,
+                          }}
+                        >
+                          {warehouseHubs.map(h => (
+                            <option key={h.id} value={h.id}>
+                              {h.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                          Shelf Code
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. A-01"
+                          value={warehouseShelfCode}
+                          onChange={e => setWarehouseShelfCode(e.target.value.toUpperCase())}
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            borderRadius: 6,
+                            border: '1px solid var(--line)',
+                            background: 'var(--surface)',
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                          Reason
+                        </label>
+                        <select
+                          value={warehouseReason}
+                          onChange={e => setWarehouseReason(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            borderRadius: 6,
+                            border: '1px solid var(--line)',
+                            background: 'var(--surface)',
+                            fontSize: 12,
+                          }}
+                        >
+                          <option value="customer_request">Customer Rescheduled</option>
+                          <option value="weather">Severe Weather</option>
+                          <option value="far_zone">Far Zone Trip</option>
+                          <option value="scheduled">Scheduled Future Date</option>
+                          <option value="address_problem">Address Issue</option>
+                          <option value="shop_request">Merchant Request</option>
+                          <option value="other">Other Warehouse Reason</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                          Deliver After
+                        </label>
+                        <input
+                          type="date"
+                          value={warehouseDeliverAfter}
+                          onChange={e => setWarehouseDeliverAfter(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            borderRadius: 6,
+                            border: '1px solid var(--line)',
+                            background: 'var(--surface)',
+                            fontSize: 12,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                        Note (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Call customer before dispatch"
+                        value={warehouseNote}
+                        onChange={e => setWarehouseNote(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          borderRadius: 6,
+                          border: '1px solid var(--line)',
+                          background: 'var(--surface)',
+                          fontSize: 12,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -898,6 +1125,28 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
               </Link>
             </div>
           </div>
+
+          {/* Held Notification Banner */}
+          {order.is_held && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 14px',
+                background: 'var(--ui-warning-soft, #fef3c7)',
+                border: '1px solid var(--ui-warning, #f59e0b)',
+                borderRadius: 8,
+                color: 'var(--ui-warning-text, #92400e)',
+                fontWeight: 700,
+                fontSize: 13,
+                marginBottom: 20,
+              }}
+            >
+              <span>📦</span>
+              <span>This parcel is currently in storage at the warehouse. Couriers cannot be assigned until released.</span>
+            </div>
+          )}
 
           {/* Details Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
@@ -1018,6 +1267,36 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
           {/* Fast Status Action Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderTop: '1px solid var(--line)', paddingTop: 16 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>Quick Actions:</span>
+
+            {order.is_held ? (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => handleWarehouseRelease(order.id)}
+                className="btn btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'var(--ui-warning, #f59e0b)',
+                  borderColor: 'var(--ui-warning, #f59e0b)',
+                  color: '#000',
+                  fontWeight: 800,
+                }}
+              >
+                <span>📦 Release from Warehouse (Scan Out)</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => handleWarehouseHold(order.id)}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+              >
+                <span>📦 Hold in Warehouse (Scan In)</span>
+              </button>
+            )}
 
             {order.status !== 'picked_up' && (
               <button

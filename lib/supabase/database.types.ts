@@ -1,957 +1,712 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.18"
-  }
-  public: {
-    Tables: {
-      customers: {
-        Row: {
-          id: string
-          workspace_id: string
-          phone: string
-          name: string
-          governorate: string | null
-          caza: string | null
-          town: string | null
-          address: string | null
-          notes: string | null
-          orders_count: number
-          last_order_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          workspace_id: string
-          phone: string
-          name: string
-          governorate?: string | null
-          caza?: string | null
-          town?: string | null
-          address?: string | null
-          notes?: string | null
-          orders_count?: number
-          last_order_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          workspace_id?: string
-          phone?: string
-          name?: string
-          governorate?: string | null
-          caza?: string | null
-          town?: string | null
-          address?: string | null
-          notes?: string | null
-          orders_count?: number
-          last_order_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customers_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+  
+  "graphql_public": {
+          Tables: {
+            [_ in never]: never
           }
-        ]
-      }
-      cashout_requests: {
-        Row: {
-          id: string
-          workspace_id: string
-          shop_id: string
-          amount_usd: number
-          amount_lbp: number
-          method: string
-          account_details: string
-          notes: string | null
-          status: Database["public"]["Enums"]["cashout_status"]
-          processed_by: string | null
-          processed_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          workspace_id: string
-          shop_id: string
-          amount_usd?: number
-          amount_lbp?: number
-          method?: string
-          account_details: string
-          notes?: string | null
-          status?: Database["public"]["Enums"]["cashout_status"]
-          processed_by?: string | null
-          processed_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          workspace_id?: string
-          shop_id?: string
-          amount_usd?: number
-          amount_lbp?: number
-          method?: string
-          account_details?: string
-          notes?: string | null
-          status?: Database["public"]["Enums"]["cashout_status"]
-          processed_by?: string | null
-          processed_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cashout_requests_shop_id_fkey"
-            columns: ["shop_id"]
-            isOneToOne: false
-            referencedRelation: "shops"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cashout_requests_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+          Views: {
+            [_ in never]: never
           }
-        ]
-      }
-      shop_integrations: {
-        Row: {
-          shop_id: string
-          api_key: string
-          access_token: string | null
-          updated_at: string
-        }
-        Insert: {
-          shop_id?: string
-          api_key?: string
-          access_token?: string | null
-          updated_at?: string
-        }
-        Update: {
-          shop_id?: string
-          api_key?: string
-          access_token?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      driver_credentials: {
-        Row: {
-          driver_id: string
-          pin_hash: string
-          session_version: number
-          updated_at: string
-        }
-        Insert: {
-          driver_id: string
-          pin_hash: string
-          session_version?: number
-          updated_at?: string
-        }
-        Update: {
-          driver_id?: string
-          pin_hash?: string
-          session_version?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      driver_push_subscriptions: {
-        Row: {
-          auth: string
-          created_at: string
-          driver_id: string
-          endpoint: string
-          id: string
-          last_used_at: string
-          p256dh: string
-          user_agent: string | null
-        }
-        Insert: {
-          auth: string
-          created_at?: string
-          driver_id: string
-          endpoint: string
-          id?: string
-          last_used_at?: string
-          p256dh: string
-          user_agent?: string | null
-        }
-        Update: {
-          auth?: string
-          created_at?: string
-          driver_id?: string
-          endpoint?: string
-          id?: string
-          last_used_at?: string
-          p256dh?: string
-          user_agent?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "driver_push_subscriptions_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
+          Functions: {
+            "graphql":
+{ Args: { "extensions"?: Json,"operationName"?: string,"query"?: string,"variables"?: Json }; Returns: Json
+                           }
           }
-        ]
-      }
-      oauth_states: {
-        Row: {
-          nonce: string
-          user_id: string
-          shop_id: string
-          domain: string
-          expires_at: string
-        }
-        Insert: {
-          nonce?: string
-          user_id?: string
-          shop_id?: string
-          domain?: string
-          expires_at?: string
-        }
-        Update: {
-          nonce?: string
-          user_id?: string
-          shop_id?: string
-          domain?: string
-          expires_at?: string
-        }
-        Relationships: []
-      }
-      order_events: {
-        Row: {
-          id: string
-          workspace_id: string
-          order_id: string
-          old_status: string | null
-          new_status: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          workspace_id?: string
-          order_id?: string
-          old_status?: string | null
-          new_status?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          workspace_id?: string
-          order_id?: string
-          old_status?: string | null
-          new_status?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
-      audit_log: {
-        Row: {
-          action: string
-          actor_email: string | null
-          actor_id: string | null
-          created_at: string
-          diff: Json | null
-          entity_id: string | null
-          entity_type: string | null
-          id: string
-          workspace_id: string
-          service_type: Database["public"]["Enums"]["order_service_type"]
-          weight_kg: number
-          is_breakable: boolean
-          payment_method: string
-          carrier_name: string | null
-          carrier_tracking_code: string | null
-          destination_governorate: string | null
-          destination_caza: string | null
-          destination_town: string | null
-        }
-        Insert: {
-          action: string
-          actor_email?: string | null
-          actor_id?: string | null
-          created_at?: string
-          diff?: Json | null
-          entity_id?: string | null
-          entity_type?: string | null
-          id?: string
-          workspace_id: string
-        }
-        Update: {
-          action?: string
-          actor_email?: string | null
-          actor_id?: string | null
-          created_at?: string
-          diff?: Json | null
-          entity_id?: string | null
-          entity_type?: string | null
-          id?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_log_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      delivery_areas: {
-        Row: {
-          active: boolean
-          created_at: string
-          default_driver_id: string | null
-          assigned_driver_ids: string[]
-          fee_usd: number
-          driver_pay_usd: number | null
-          return_fee_usd: number
-          return_driver_pay_usd: number
-          id: string
-          name: string
-          workspace_id: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          default_driver_id?: string | null
-          assigned_driver_ids?: string[]
-          fee_usd?: number
-          driver_pay_usd?: number | null
-          return_fee_usd?: number
-          return_driver_pay_usd?: number
-          id?: string
-          name: string
-          workspace_id: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          default_driver_id?: string | null
-          assigned_driver_ids?: string[]
-          fee_usd?: number
-          driver_pay_usd?: number | null
-          return_fee_usd?: number
-          return_driver_pay_usd?: number
-          id?: string
-          name?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "delivery_areas_default_driver_id_fkey"
-            columns: ["default_driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "delivery_areas_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      drivers: {
-        Row: {
-          cash_held_lbp: number
-          active: boolean
-          cash_held_usd: number
-          created_at: string
-          current_lat: number | null
-          current_lng: number | null
-          last_location_at: string | null
-          id: string
-          name: string
-          pay_owed_usd: number
-          phone: string | null
-          user_id: string | null
-          workspace_id: string
-        }
-        Insert: {
-          cash_held_lbp?: number
-          active?: boolean
-          cash_held_usd?: number
-          created_at?: string
-          current_lat?: number | null
-          current_lng?: number | null
-          last_location_at?: string | null
-          id?: string
-          name: string
-          pay_owed_usd?: number
-          phone?: string | null
-          user_id?: string | null
-          workspace_id: string
-        }
-        Update: {
-          cash_held_lbp?: number
-          active?: boolean
-          cash_held_usd?: number
-          created_at?: string
-          current_lat?: number | null
-          current_lng?: number | null
-          last_location_at?: string | null
-          id?: string
-          name?: string
-          pay_owed_usd?: number
-          phone?: string | null
-          user_id?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "drivers_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      invitations: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          invited_by: string
-          role: Database["public"]["Enums"]["user_role"]
-          token: string
-          workspace_id: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          email: string
-          expires_at?: string
-          id?: string
-          invited_by: string
-          role?: Database["public"]["Enums"]["user_role"]
-          token?: string
-          workspace_id: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          invited_by?: string
-          role?: Database["public"]["Enums"]["user_role"]
-          token?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invitations_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      orders: {
-        Row: {
-          tracking_token: string
-          pod_collected_usd: number | null
-          cash_discrepancy_usd: number | null
-          location_lat: number | null
-          location_lng: number | null
-          area_id: string | null
-          code: string
-          collection_usd: number
-          created_at: string
-          created_by: string | null
-          delivered_at: string | null
-          delivery_fee_usd: number
-          driver_id: string | null
-          driver_pay_usd: number
-          id: string
-          notes: string | null
-          pod_collected_lbp: number | null
-          pod_photo: string | null
-          pod_signature: string | null
-          recipient_address: string | null
-          recipient_name: string | null
-          recipient_phone: string | null
-          shop_balance_usd: number
-          shop_id: string | null
-          shopify_order_id: string | null
-          shopify_order_number: string | null
-          status: Database["public"]["Enums"]["order_status"]
-          updated_at: string
-          usd_to_lbp_rate: number
-          workspace_id: string
-          service_type?: Database["public"]["Enums"]["order_service_type"]
-          weight_kg?: number
-          is_breakable?: boolean
-          payment_method?: string
-          carrier_name?: string | null
-          carrier_tracking_code?: string | null
-          destination_governorate?: string | null
-          destination_caza?: string | null
-          destination_town?: string | null
-        }
-        Insert: {
-          tracking_token?: string
-          pod_collected_usd?: number | null
-          cash_discrepancy_usd?: number | null
-          location_lat?: number | null
-          location_lng?: number | null
-          area_id?: string | null
-          code?: string
-          collection_usd?: number
-          created_at?: string
-          created_by?: string | null
-          delivered_at?: string | null
-          delivery_fee_usd?: number
-          driver_id?: string | null
-          driver_pay_usd?: number
-          id?: string
-          notes?: string | null
-          pod_collected_lbp?: number | null
-          pod_photo?: string | null
-          pod_signature?: string | null
-          recipient_address?: string | null
-          recipient_name?: string | null
-          recipient_phone?: string | null
-          shop_balance_usd?: number
-          shop_id?: string | null
-          shopify_order_id?: string | null
-          shopify_order_number?: string | null
-          status?: Database["public"]["Enums"]["order_status"]
-          updated_at?: string
-          usd_to_lbp_rate: number
-          workspace_id: string
-          service_type?: Database["public"]["Enums"]["order_service_type"]
-          weight_kg?: number
-          is_breakable?: boolean
-          payment_method?: string
-          carrier_name?: string | null
-          carrier_tracking_code?: string | null
-          destination_governorate?: string | null
-          destination_caza?: string | null
-          destination_town?: string | null
-        }
-        Update: {
-          tracking_token?: string
-          pod_collected_usd?: number | null
-          cash_discrepancy_usd?: number | null
-          location_lat?: number | null
-          location_lng?: number | null
-          area_id?: string | null
-          code?: string
-          collection_usd?: number
-          created_at?: string
-          created_by?: string | null
-          delivered_at?: string | null
-          delivery_fee_usd?: number
-          driver_id?: string | null
-          driver_pay_usd?: number
-          id?: string
-          notes?: string | null
-          pod_collected_lbp?: number | null
-          pod_photo?: string | null
-          pod_signature?: string | null
-          recipient_address?: string | null
-          recipient_name?: string | null
-          recipient_phone?: string | null
-          shop_balance_usd?: number
-          shop_id?: string | null
-          shopify_order_id?: string | null
-          shopify_order_number?: string | null
-          status?: Database["public"]["Enums"]["order_status"]
-          updated_at?: string
-          usd_to_lbp_rate?: number
-          workspace_id?: string
-          service_type?: Database["public"]["Enums"]["order_service_type"]
-          weight_kg?: number
-          is_breakable?: boolean
-          payment_method?: string
-          carrier_name?: string | null
-          carrier_tracking_code?: string | null
-          destination_governorate?: string | null
-          destination_caza?: string | null
-          destination_town?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_area_id_fkey"
-            columns: ["area_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_areas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_shop_id_fkey"
-            columns: ["shop_id"]
-            isOneToOne: false
-            referencedRelation: "shops"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      settlements: {
-        Row: {
-          idempotency_key: string | null
-          amount_lbp: number
-          amount_usd: number
-          created_at: string
-          created_by: string | null
-          driver_id: string | null
-          id: string
-          note: string | null
-          order_id: string | null
-          shop_id: string | null
-          type: Database["public"]["Enums"]["settlement_type"]
-          usd_to_lbp: number
-          workspace_id: string
-        }
-        Insert: {
-          idempotency_key?: string | null
-          amount_lbp?: number
-          amount_usd: number
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          note?: string | null
-          order_id?: string | null
-          shop_id?: string | null
-          type: Database["public"]["Enums"]["settlement_type"]
-          usd_to_lbp: number
-          workspace_id: string
-        }
-        Update: {
-          idempotency_key?: string | null
-          amount_lbp?: number
-          amount_usd?: number
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          note?: string | null
-          order_id?: string | null
-          shop_id?: string | null
-          type?: Database["public"]["Enums"]["settlement_type"]
-          usd_to_lbp?: number
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "settlements_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "settlements_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "settlements_shop_id_fkey"
-            columns: ["shop_id"]
-            isOneToOne: false
-            referencedRelation: "shops"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "settlements_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      shops: {
-        Row: {
-          active: boolean
-          address: string | null
-          balance_usd: number
-          created_at: string
-          id: string
-          name: string
-          phone: string | null
-          prefix: string | null
-          shopify_domain: string | null
-          user_id: string | null
-          workspace_id: string
-        }
-        Insert: {
-          active?: boolean
-          address?: string | null
-          balance_usd?: number
-          created_at?: string
-          id?: string
-          name: string
-          phone?: string | null
-          prefix?: string | null
-          shopify_domain?: string | null
-          user_id?: string | null
-          workspace_id: string
-        }
-        Update: {
-          active?: boolean
-          address?: string | null
-          balance_usd?: number
-          created_at?: string
-          id?: string
-          name?: string
-          phone?: string | null
-          prefix?: string | null
-          shopify_domain?: string | null
-          user_id?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shops_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      shop_area_prices: {
-        Row: {
-          workspace_id: string
-          shop_id: string
-          area_id: string
-          fee_usd: number
-          updated_at: string
-        }
-        Insert: {
-          workspace_id: string
-          shop_id: string
-          area_id: string
-          fee_usd: number
-          updated_at?: string
-        }
-        Update: {
-          workspace_id?: string
-          shop_id?: string
-          area_id?: string
-          fee_usd?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shop_area_prices_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      saved_views: {
-        Row: {
-          id: string
-          workspace_id: string
-          user_id: string
-          page: string
-          name: string
-          filters: Json
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          workspace_id: string
-          user_id: string
-          page: string
-          name: string
-          filters?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          workspace_id?: string
-          user_id?: string
-          page?: string
-          name?: string
-          filters?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "saved_views_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workspace_members: {
-        Row: {
-          created_at: string
-          display_name: string | null
-          id: string
-          invited_by: string | null
-          joined_at: string | null
-          role: Database["public"]["Enums"]["user_role"]
-          user_id: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          display_name?: string | null
-          id?: string
-          invited_by?: string | null
-          joined_at?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
-          user_id: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          display_name?: string | null
-          id?: string
-          invited_by?: string | null
-          joined_at?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
-          user_id?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_members_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workspaces: {
-        Row: {
-          created_at: string
-          currency: string
-          default_delivery_fee_usd: number | null
-          default_driver_pay_usd: number | null
-          id: string
-          name: string
-          slug: string
-          usd_to_lbp: number
-        }
-        Insert: {
-          created_at?: string
-          currency?: string
-          default_delivery_fee_usd?: number | null
-          default_driver_pay_usd?: number | null
-          id?: string
-          name: string
-          slug: string
-          usd_to_lbp?: number
-        }
-        Update: {
-          created_at?: string
-          currency?: string
-          default_delivery_fee_usd?: number | null
-          default_driver_pay_usd?: number | null
-          id?: string
-          name?: string
-          slug?: string
-          usd_to_lbp?: number
-        }
-        Relationships: []
-      }
+          Enums: {
+            [_ in never]: never
+          }
+          CompositeTypes: {
+            [_ in never]: never
+          }
+        },"public": {
+          Tables: {
+            "audit_log": {
+                  Row: {
+                    "action": string,"actor_email": string | null,"actor_id": string | null,"created_at": string,"diff": Json | null,"entity_id": string | null,"entity_type": string | null,"id": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": string,"actor_email"?: string | null,"actor_id"?: string | null,"created_at"?: string,"diff"?: Json | null,"entity_id"?: string | null,"entity_type"?: string | null,"id"?: string,"workspace_id": string
+                  }
+                  Update: {
+                    "action"?: string,"actor_email"?: string | null,"actor_id"?: string | null,"created_at"?: string,"diff"?: Json | null,"entity_id"?: string | null,"entity_type"?: string | null,"id"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "audit_log_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
     }
-    Views: {
-      [_ in never]: never
+                  ]
+                },"cashout_requests": {
+                  Row: {
+                    "account_details": string,"amount_lbp": number,"amount_usd": number,"created_at": string,"id": string,"method": string,"notes": string | null,"processed_at": string | null,"processed_by": string | null,"shop_id": string,"status": Database["public"]['Enums']["cashout_status"],"updated_at": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_details": string,"amount_lbp"?: number,"amount_usd"?: number,"created_at"?: string,"id"?: string,"method"?: string,"notes"?: string | null,"processed_at"?: string | null,"processed_by"?: string | null,"shop_id": string,"status"?: Database["public"]['Enums']["cashout_status"],"updated_at"?: string,"workspace_id": string
+                  }
+                  Update: {
+                    "account_details"?: string,"amount_lbp"?: number,"amount_usd"?: number,"created_at"?: string,"id"?: string,"method"?: string,"notes"?: string | null,"processed_at"?: string | null,"processed_by"?: string | null,"shop_id"?: string,"status"?: Database["public"]['Enums']["cashout_status"],"updated_at"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "cashout_requests_shop_id_fkey"
+      columns: ["shop_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "cashout_requests_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
     }
-    Functions: {
-      accept_staff_invite: { Args: { p_token: string; p_user: string; p_email: string; p_name: string }; Returns: boolean }
-      consume_limit: { Args: { p_key: string; p_max: number }; Returns: boolean }
-      mark_cashout_paid: { Args: { p_request: string; p_workspace: string; p_user: string }; Returns: string }
-      request_shop_cashout: {
-        Args: { p_shop: string; p_amount: number; p_method: string; p_details: string; p_notes: string }
-        Returns: Database["public"]["Tables"]["cashout_requests"]["Row"]
-      }
-      set_driver_pin: { Args: { p_driver: string; p_pin: string }; Returns: boolean }
-      profit_report: { Args: { p_workspace: string; p_from: string; p_to: string }; Returns: Json }
-      track_orders_by_phone: { Args: { p_phone: string }; Returns: Json }
-      verify_driver_login: {
-        Args: { p_phone: string; p_pin: string }
-        Returns: { driver_id: string; name: string; session_version: number }[]
-      }
-      is_member: { Args: { ws_id: string }; Returns: boolean }
-      set_allow_owner_delete: { Args: { p_allow: boolean }; Returns: boolean }
-      my_role: {
-        Args: { ws_id: string }
-        Returns: Database["public"]["Enums"]["user_role"]
-      }
+                  ]
+                },"customers": {
+                  Row: {
+                    "address": string | null,"caza": string | null,"created_at": string,"governorate": string | null,"id": string,"last_order_at": string | null,"name": string,"notes": string | null,"orders_count": number,"phone": string,"town": string | null,"updated_at": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "address"?: string | null,"caza"?: string | null,"created_at"?: string,"governorate"?: string | null,"id"?: string,"last_order_at"?: string | null,"name": string,"notes"?: string | null,"orders_count"?: number,"phone": string,"town"?: string | null,"updated_at"?: string,"workspace_id": string
+                  }
+                  Update: {
+                    "address"?: string | null,"caza"?: string | null,"created_at"?: string,"governorate"?: string | null,"id"?: string,"last_order_at"?: string | null,"name"?: string,"notes"?: string | null,"orders_count"?: number,"phone"?: string,"town"?: string | null,"updated_at"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "customers_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
     }
-    Enums: {
-      cashout_status: "pending" | "approved" | "rejected" | "paid"
-      order_service_type: "delivery" | "replacement" | "pickup"
-      order_status:
-        | "pending"
-        | "assigned"
-        | "picked_up"
-        | "delivered"
-        | "failed"
-        | "returned" | "cancelled"
-      settlement_type: "shop_payment" | "driver_cash_remittance" | "driver_pay"
-      user_role: "owner" | "manager" | "driver" | "readonly"
+                  ]
+                },"delivery_areas": {
+                  Row: {
+                    "active": boolean,"assigned_driver_ids": (string)[],"created_at": string,"default_driver_id": string | null,"driver_pay_usd": number | null,"fee_usd": number,"free_storage_days": number,"id": string,"name": string,"return_driver_pay_usd": number,"return_fee_usd": number,"storage_fee_per_day_usd": number,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"assigned_driver_ids"?: (string)[],"created_at"?: string,"default_driver_id"?: string | null,"driver_pay_usd"?: number | null,"fee_usd"?: number,"free_storage_days"?: number,"id"?: string,"name": string,"return_driver_pay_usd"?: number,"return_fee_usd"?: number,"storage_fee_per_day_usd"?: number,"workspace_id": string
+                  }
+                  Update: {
+                    "active"?: boolean,"assigned_driver_ids"?: (string)[],"created_at"?: string,"default_driver_id"?: string | null,"driver_pay_usd"?: number | null,"fee_usd"?: number,"free_storage_days"?: number,"id"?: string,"name"?: string,"return_driver_pay_usd"?: number,"return_fee_usd"?: number,"storage_fee_per_day_usd"?: number,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "area_driver_tenant"
+      columns: ["default_driver_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "delivery_areas_default_driver_id_fkey"
+      columns: ["default_driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "delivery_areas_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
     }
-    CompositeTypes: {
-      [_ in never]: never
+                  ]
+                },"driver_credentials": {
+                  Row: {
+                    "driver_id": string,"pin_hash": string,"session_version": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "driver_id": string,"pin_hash": string,"session_version"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "driver_id"?: string,"pin_hash"?: string,"session_version"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "driver_credentials_driver_id_fkey"
+      columns: ["driver_id"]
+isOneToOne: true
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
     }
-  }
+                  ]
+                },"driver_push_subscriptions": {
+                  Row: {
+                    "auth": string,"created_at": string,"driver_id": string,"endpoint": string,"id": string,"last_used_at": string,"p256dh": string,"user_agent": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "auth": string,"created_at"?: string,"driver_id": string,"endpoint": string,"id"?: string,"last_used_at"?: string,"p256dh": string,"user_agent"?: string | null
+                  }
+                  Update: {
+                    "auth"?: string,"created_at"?: string,"driver_id"?: string,"endpoint"?: string,"id"?: string,"last_used_at"?: string,"p256dh"?: string,"user_agent"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "driver_push_subscriptions_driver_id_fkey"
+      columns: ["driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"drivers": {
+                  Row: {
+                    "active": boolean,"cash_held_lbp": number,"cash_held_usd": number,"created_at": string,"current_lat": number | null,"current_lng": number | null,"id": string,"last_location_at": string | null,"name": string,"pay_owed_usd": number,"phone": string | null,"user_id": string | null,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"cash_held_lbp"?: number,"cash_held_usd"?: number,"created_at"?: string,"current_lat"?: number | null,"current_lng"?: number | null,"id"?: string,"last_location_at"?: string | null,"name": string,"pay_owed_usd"?: number,"phone"?: string | null,"user_id"?: string | null,"workspace_id": string
+                  }
+                  Update: {
+                    "active"?: boolean,"cash_held_lbp"?: number,"cash_held_usd"?: number,"created_at"?: string,"current_lat"?: number | null,"current_lng"?: number | null,"id"?: string,"last_location_at"?: string | null,"name"?: string,"pay_owed_usd"?: number,"phone"?: string | null,"user_id"?: string | null,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "drivers_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"hub_shelves": {
+                  Row: {
+                    "code": string,"created_at": string,"hub_id": string,"id": string,"workspace_id": string,"zone_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "code": string,"created_at"?: string,"hub_id": string,"id"?: string,"workspace_id": string,"zone_id"?: string | null
+                  }
+                  Update: {
+                    "code"?: string,"created_at"?: string,"hub_id"?: string,"id"?: string,"workspace_id"?: string,"zone_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "hub_shelves_hub_id_workspace_id_fkey"
+      columns: ["hub_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "hubs"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "hub_shelves_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "hub_shelves_zone_id_fkey"
+      columns: ["zone_id"]
+isOneToOne: false
+      referencedRelation: "delivery_areas"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"hubs": {
+                  Row: {
+                    "active": boolean,"address": string | null,"created_at": string,"id": string,"is_default": boolean,"lat": number | null,"lng": number | null,"name": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"address"?: string | null,"created_at"?: string,"id"?: string,"is_default"?: boolean,"lat"?: number | null,"lng"?: number | null,"name": string,"workspace_id": string
+                  }
+                  Update: {
+                    "active"?: boolean,"address"?: string | null,"created_at"?: string,"id"?: string,"is_default"?: boolean,"lat"?: number | null,"lng"?: number | null,"name"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "hubs_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"invitations": {
+                  Row: {
+                    "accepted_at": string | null,"created_at": string,"email": string,"expires_at": string,"id": string,"invited_by": string,"role": Database["public"]['Enums']["user_role"],"token": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "accepted_at"?: string | null,"created_at"?: string,"email": string,"expires_at"?: string,"id"?: string,"invited_by": string,"role"?: Database["public"]['Enums']["user_role"],"token"?: string,"workspace_id": string
+                  }
+                  Update: {
+                    "accepted_at"?: string | null,"created_at"?: string,"email"?: string,"expires_at"?: string,"id"?: string,"invited_by"?: string,"role"?: Database["public"]['Enums']["user_role"],"token"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invitations_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"money_ledger": {
+                  Row: {
+                    "cash_delta": number,"created_at": string,"driver_id": string | null,"id": string,"lbp_delta": number,"order_id": string | null,"pay_delta": number,"reason": string,"settlement_id": string | null,"shop_delta": number,"shop_id": string | null,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cash_delta"?: number,"created_at"?: string,"driver_id"?: string | null,"id"?: string,"lbp_delta"?: number,"order_id"?: string | null,"pay_delta"?: number,"reason": string,"settlement_id"?: string | null,"shop_delta"?: number,"shop_id"?: string | null,"workspace_id": string
+                  }
+                  Update: {
+                    "cash_delta"?: number,"created_at"?: string,"driver_id"?: string | null,"id"?: string,"lbp_delta"?: number,"order_id"?: string | null,"pay_delta"?: number,"reason"?: string,"settlement_id"?: string | null,"shop_delta"?: number,"shop_id"?: string | null,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "money_ledger_driver_id_fkey"
+      columns: ["driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "money_ledger_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "money_ledger_settlement_id_fkey"
+      columns: ["settlement_id"]
+isOneToOne: false
+      referencedRelation: "settlements"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "money_ledger_shop_id_fkey"
+      columns: ["shop_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "money_ledger_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"oauth_states": {
+                  Row: {
+                    "domain": string,"expires_at": string,"nonce": string,"shop_id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "domain": string,"expires_at"?: string,"nonce": string,"shop_id": string,"user_id": string
+                  }
+                  Update: {
+                    "domain"?: string,"expires_at"?: string,"nonce"?: string,"shop_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "oauth_states_shop_id_fkey"
+      columns: ["shop_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"order_events": {
+                  Row: {
+                    "created_at": string,"id": string,"new_status": Database["public"]['Enums']["order_status"],"old_status": Database["public"]['Enums']["order_status"] | null,"order_id": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"new_status": Database["public"]['Enums']["order_status"],"old_status"?: Database["public"]['Enums']["order_status"] | null,"order_id": string,"workspace_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"new_status"?: Database["public"]['Enums']["order_status"],"old_status"?: Database["public"]['Enums']["order_status"] | null,"order_id"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "order_events_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_events_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"order_holds": {
+                  Row: {
+                    "deliver_after": string | null,"held_at": string,"held_by": string | null,"hub_id": string,"id": string,"note": string | null,"order_id": string,"reason": Database["public"]['Enums']["hold_reason"],"release_note": string | null,"released_at": string | null,"released_by": string | null,"shelf_code": string | null,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "deliver_after"?: string | null,"held_at"?: string,"held_by"?: string | null,"hub_id": string,"id"?: string,"note"?: string | null,"order_id": string,"reason": Database["public"]['Enums']["hold_reason"],"release_note"?: string | null,"released_at"?: string | null,"released_by"?: string | null,"shelf_code"?: string | null,"workspace_id": string
+                  }
+                  Update: {
+                    "deliver_after"?: string | null,"held_at"?: string,"held_by"?: string | null,"hub_id"?: string,"id"?: string,"note"?: string | null,"order_id"?: string,"reason"?: Database["public"]['Enums']["hold_reason"],"release_note"?: string | null,"released_at"?: string | null,"released_by"?: string | null,"shelf_code"?: string | null,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "order_holds_hub_id_workspace_id_fkey"
+      columns: ["hub_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "hubs"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "order_holds_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_holds_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"orders": {
+                  Row: {
+                    "accounting_version": number,"area_id": string | null,"carrier_name": string | null,"carrier_tracking_code": string | null,"cash_discrepancy_usd": number | null,"code": string,"collection_usd": number,"created_at": string,"created_by": string | null,"delivered_at": string | null,"delivery_fee_usd": number,"destination_caza": string | null,"destination_governorate": string | null,"destination_town": string | null,"driver_id": string | null,"driver_pay_usd": number,"hub_id": string | null,"id": string,"is_breakable": boolean,"is_held": boolean,"location_lat": number | null,"location_lng": number | null,"notes": string | null,"payment_method": string,"pod_collected_lbp": number | null,"pod_collected_usd": number | null,"pod_photo": string | null,"pod_signature": string | null,"recipient_address": string | null,"recipient_name": string | null,"recipient_phone": string | null,"service_type": Database["public"]['Enums']["order_service_type"],"shop_balance_usd": number,"shop_id": string | null,"shopify_order_id": string | null,"shopify_order_number": string | null,"status": Database["public"]['Enums']["order_status"],"storage_fee_usd": number,"tracking_token": string,"updated_at": string,"usd_to_lbp_rate": number,"weight_kg": number,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate": number,"weight_kg"?: number,"workspace_id": string
+                  }
+                  Update: {
+                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate"?: number,"weight_kg"?: number,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "order_area_tenant"
+      columns: ["area_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "delivery_areas"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "order_driver_tenant"
+      columns: ["driver_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "order_shop_tenant"
+      columns: ["shop_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "orders_area_id_fkey"
+      columns: ["area_id"]
+isOneToOne: false
+      referencedRelation: "delivery_areas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orders_driver_id_fkey"
+      columns: ["driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orders_hub_id_fkey"
+      columns: ["hub_id"]
+isOneToOne: false
+      referencedRelation: "hubs"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orders_shop_id_fkey"
+      columns: ["shop_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orders_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"request_limits": {
+                  Row: {
+                    "bucket": string,"hits": number,"key": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bucket": string,"hits": number,"key": string
+                  }
+                  Update: {
+                    "bucket"?: string,"hits"?: number,"key"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"saved_views": {
+                  Row: {
+                    "created_at": string,"filters": NonNullable<Json>,"id": string,"name": string,"page": string,"updated_at": string,"user_id": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"filters"?: NonNullable<Json>,"id"?: string,"name": string,"page": string,"updated_at"?: string,"user_id": string,"workspace_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"filters"?: NonNullable<Json>,"id"?: string,"name"?: string,"page"?: string,"updated_at"?: string,"user_id"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "saved_views_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"settlements": {
+                  Row: {
+                    "amount_lbp": number,"amount_usd": number,"created_at": string,"created_by": string | null,"driver_id": string | null,"id": string,"idempotency_key": string | null,"note": string | null,"order_id": string | null,"shop_id": string | null,"type": Database["public"]['Enums']["settlement_type"],"usd_to_lbp": number,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_lbp"?: number,"amount_usd": number,"created_at"?: string,"created_by"?: string | null,"driver_id"?: string | null,"id"?: string,"idempotency_key"?: string | null,"note"?: string | null,"order_id"?: string | null,"shop_id"?: string | null,"type": Database["public"]['Enums']["settlement_type"],"usd_to_lbp": number,"workspace_id": string
+                  }
+                  Update: {
+                    "amount_lbp"?: number,"amount_usd"?: number,"created_at"?: string,"created_by"?: string | null,"driver_id"?: string | null,"id"?: string,"idempotency_key"?: string | null,"note"?: string | null,"order_id"?: string | null,"shop_id"?: string | null,"type"?: Database["public"]['Enums']["settlement_type"],"usd_to_lbp"?: number,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "settlement_driver_tenant"
+      columns: ["driver_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "settlement_shop_tenant"
+      columns: ["shop_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "settlements_driver_id_fkey"
+      columns: ["driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "settlements_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "settlements_shop_id_fkey"
+      columns: ["shop_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "settlements_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"shop_area_prices": {
+                  Row: {
+                    "area_id": string,"fee_usd": number,"shop_id": string,"updated_at": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "area_id": string,"fee_usd": number,"shop_id": string,"updated_at"?: string,"workspace_id": string
+                  }
+                  Update: {
+                    "area_id"?: string,"fee_usd"?: number,"shop_id"?: string,"updated_at"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "shop_area_prices_area_id_workspace_id_fkey"
+      columns: ["area_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "delivery_areas"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "shop_area_prices_shop_id_workspace_id_fkey"
+      columns: ["shop_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "shop_area_prices_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"shop_integrations": {
+                  Row: {
+                    "access_token": string | null,"api_key": string,"shop_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "access_token"?: string | null,"api_key"?: string,"shop_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "access_token"?: string | null,"api_key"?: string,"shop_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "shop_integrations_shop_id_fkey"
+      columns: ["shop_id"]
+isOneToOne: true
+      referencedRelation: "shops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"shops": {
+                  Row: {
+                    "active": boolean,"address": string | null,"balance_usd": number,"created_at": string,"id": string,"name": string,"phone": string | null,"prefix": string | null,"shopify_domain": string | null,"user_id": string | null,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"name": string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id": string
+                  }
+                  Update: {
+                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"name"?: string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "shops_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"workspace_members": {
+                  Row: {
+                    "created_at": string,"display_name": string | null,"id": string,"invited_by": string | null,"joined_at": string | null,"role": Database["public"]['Enums']["user_role"],"user_id": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"display_name"?: string | null,"id"?: string,"invited_by"?: string | null,"joined_at"?: string | null,"role"?: Database["public"]['Enums']["user_role"],"user_id": string,"workspace_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"display_name"?: string | null,"id"?: string,"invited_by"?: string | null,"joined_at"?: string | null,"role"?: Database["public"]['Enums']["user_role"],"user_id"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "workspace_members_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"workspaces": {
+                  Row: {
+                    "created_at": string,"currency": string,"default_delivery_fee_usd": number | null,"default_driver_pay_usd": number | null,"id": string,"name": string,"slug": string,"usd_to_lbp": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"name": string,"slug": string,"usd_to_lbp"?: number
+                  }
+                  Update: {
+                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"name"?: string,"slug"?: string,"usd_to_lbp"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                }
+          }
+          Views: {
+            [_ in never]: never
+          }
+          Functions: {
+            "accept_staff_invite":
+{ Args: { "p_email": string,"p_name": string,"p_token": string,"p_user": string }; Returns: boolean
+                           },
+"consume_limit":
+{ Args: { "p_key": string,"p_max": number }; Returns: boolean
+                           },
+"hold_order":
+{ Args: { "p_deliver_after"?: string,"p_hub": string,"p_note"?: string,"p_order": string,"p_reason": Database["public"]['Enums']["hold_reason"],"p_shelf": string,"p_user"?: string }; Returns: Json
+                           },
+"is_member":
+{ Args: { "ws_id": string }; Returns: boolean
+                           },
+"mark_cashout_paid":
+{ Args: { "p_request": string,"p_user": string,"p_workspace": string }; Returns: string
+                           },
+"my_role":
+{ Args: { "ws_id": string }; Returns: Database["public"]['Enums']["user_role"]
+                           },
+"phone_core":
+{ Args: { "p_phone": string }; Returns: string
+                           },
+"profit_report":
+{ Args: { "p_from": string,"p_to": string,"p_workspace": string }; Returns: Json
+                           },
+"release_order":
+{ Args: { "p_note"?: string,"p_order": string,"p_user"?: string }; Returns: Json
+                           },
+"request_shop_cashout":
+{ Args: { "p_amount": number,"p_details": string,"p_method": string,"p_notes": string,"p_shop": string }; Returns: {
+              "account_details": string,
+"amount_lbp": number,
+"amount_usd": number,
+"created_at": string,
+"id": string,
+"method": string,
+"notes": string | null,
+"processed_at": string | null,
+"processed_by": string | null,
+"shop_id": string,
+"status": Database["public"]['Enums']["cashout_status"],
+"updated_at": string,
+"workspace_id": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "cashout_requests"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"set_allow_owner_delete":
+{ Args: { "p_allow": boolean }; Returns: boolean
+                           },
+"set_driver_pin":
+{ Args: { "p_driver": string,"p_pin": string }; Returns: boolean
+                           },
+"track_orders_by_phone":
+{ Args: { "p_phone": string }; Returns: Json
+                           },
+"verify_driver_login":
+{ Args: { "p_phone": string,"p_pin": string }; Returns: {
+              "driver_id": string,"name": string,"session_version": number
+            }[]
+                           }
+          }
+          Enums: {
+            "cashout_status": "pending"|"approved"|"rejected"|"paid","hold_reason": "weather"|"far_zone"|"customer_request"|"scheduled"|"address_problem"|"shop_request"|"other","order_service_type": "delivery"|"replacement"|"pickup","order_status": "pending"|"assigned"|"picked_up"|"delivered"|"failed"|"returned"|"cancelled","settlement_type": "shop_payment"|"driver_cash_remittance"|"driver_pay","user_role": "owner"|"manager"|"driver"|"readonly"
+          }
+          CompositeTypes: {
+            [_ in never]: never
+          }
+        }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
 
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
@@ -959,129 +714,111 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never = never
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+    ? R
     : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never = never
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+      Insert: infer I
+    }
+    ? I
     : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never = never
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+      Update: infer U
+    }
+    ? U
     : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never = never
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never = never
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
-  public: {
-    Enums: {
-      order_status: [
-        "pending",
-        "assigned",
-        "picked_up",
-        "delivered",
-        "failed",
-        "returned",
-        "cancelled",
-      ],
-      settlement_type: ["shop_payment", "driver_cash_remittance", "driver_pay"],
-      user_role: ["owner", "manager", "driver", "readonly"],
-    },
-  },
+  "graphql_public": {
+          Enums: {
+            
+          }
+        },"public": {
+          Enums: {
+            "cashout_status": ["pending", "approved", "rejected", "paid"],"hold_reason": ["weather", "far_zone", "customer_request", "scheduled", "address_problem", "shop_request", "other"],"order_service_type": ["delivery", "replacement", "pickup"],"order_status": ["pending", "assigned", "picked_up", "delivered", "failed", "returned", "cancelled"],"settlement_type": ["shop_payment", "driver_cash_remittance", "driver_pay"],"user_role": ["owner", "manager", "driver", "readonly"]
+          }
+        }
 } as const

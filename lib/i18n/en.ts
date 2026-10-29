@@ -174,6 +174,23 @@ export const en = {
   scanOrPresent: 'Present this summary and cash pouch to cashier at depot.',
   ordersCompletedToday: 'Orders Completed Today',
   voucherScanHint: 'Cashier can scan code or verify amounts above to close shift.',
+
+  // Phase 3 Warehouse Holding
+  inStorageTab: 'In Storage',
+  readyToReleaseTab: 'Ready to Release',
+  releasedHistoryTab: 'Released History',
+  shelfCode: 'Shelf Code',
+  deliverAfterDate: 'Deliver After',
+  storageFeeAccumulated: 'Storage Fee',
+  releaseAction: 'Release to Dispatch',
+  holdAction: 'Hold in Warehouse',
+  reasonWeather: 'Severe Weather / Storm',
+  reasonFarZone: 'Remote / Consolidated Zone',
+  reasonCustomerRequest: 'Customer Rescheduled',
+  reasonScheduled: 'Scheduled Future Date',
+  reasonAddressProblem: 'Address Incomplete / Issue',
+  reasonShopRequest: 'Merchant / Shop Request',
+  reasonOther: 'Other Warehouse Reason',
 } as const
 
 export type TranslationKey = keyof typeof en

@@ -24,6 +24,9 @@ export interface Order {
   notes?: string | null
   shopify_order_id?: string | null
   shopify_order_number?: string | null
+  is_held?: boolean
+  hub_id?: string | null
+  storage_fee_usd?: number
   created_at: string
   shop: { id: string; name: string; phone?: string | null } | null
   driver: { id: string; name: string; phone?: string | null } | null

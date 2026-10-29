@@ -97,6 +97,11 @@ export function OrderRow({ order }: { order: Order }) {
               {order.carrier_tracking_code}
             </Tag>
           )}
+          {order.is_held && (
+            <Tag tone="warning" title="Parcel is currently held in warehouse">
+              📦 Held
+            </Tag>
+          )}
           {order.shopify_order_number && (
             <Tag tone="success" title={`Shopify Order #${order.shopify_order_number}`}>
               <ShopifyIcon size={10} />

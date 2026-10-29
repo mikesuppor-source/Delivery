@@ -7,6 +7,9 @@ const statuses = ['pending','assigned','picked_up','delivered','failed','returne
 export interface ReturnPricing { returnFeeUsd: number; returnDriverPayUsd: number }
 
 export function orderPatch(body: Record<string, unknown>, order: Record<string, unknown>, driver = false, returnPricing?: ReturnPricing) {
+  if (order.is_held && (body.driverId || ['assigned', 'picked_up', 'delivered'].includes(String(body.status)))) {
+    throw new ApiError(400, 'Cannot assign or dispatch a held order until released from warehouse')
+  }
   const updates: Record<string, unknown> = {}
   if (body.status !== undefined) {
     if (typeof body.status !== 'string' || !statuses.includes(body.status)) throw new ApiError(400, 'Invalid order status')

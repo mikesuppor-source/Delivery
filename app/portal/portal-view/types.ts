@@ -27,6 +27,11 @@ export interface PortalOrder {
   weight_kg?: number
   is_breakable?: boolean
   carrier_tracking_code?: string | null
+  is_held?: boolean
+  hub_id?: string | null
+  storage_fee_usd?: number
+  hold_reason?: string | null
+  deliver_after?: string | null
   collection_usd: number
   delivery_fee_usd: number
   shop_balance_usd: number

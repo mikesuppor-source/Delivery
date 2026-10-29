@@ -39,10 +39,14 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
         .select(`
           id, workspace_id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
           recipient_name, recipient_phone, recipient_address, service_type, is_breakable, weight_kg, carrier_tracking_code,
-          driver_id,
+          is_held,
+          is_held,
+        driver_id,
           shop:shop_id(name, phone),
           area:area_id(name),
-          driver:driver_id(id, name, phone)
+          driver:driver_id(id, name, phone),
+        order_holds(reason, deliver_after, released_at),
+          order_holds(reason, deliver_after, released_at)
         `)
         .eq('tracking_token', trimmed.toLowerCase())
         .maybeSingle()
@@ -56,10 +60,12 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
       .select(`
         id, workspace_id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
         recipient_name, recipient_phone, recipient_address, service_type, is_breakable, weight_kg, carrier_tracking_code,
+        is_held,
         driver_id,
         shop:shop_id(name, phone),
         area:area_id(name),
-        driver:driver_id(id, name, phone)
+        driver:driver_id(id, name, phone),
+        order_holds(reason, deliver_after, released_at)
       `)
       .eq('code', formatOrderCode(trimmed))
       .maybeSingle()
@@ -103,6 +109,12 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     recipient_address: string | null
     service_type?: 'delivery' | 'replacement' | 'pickup' | null
     is_breakable?: boolean | null
+    is_held?: boolean
+    order_holds?: Array<{
+      reason: string
+      deliver_after?: string | null
+      released_at?: string | null
+    }>
     weight_kg?: number | null
     carrier_tracking_code?: string | null
     driver_id: string | null
@@ -201,6 +213,10 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
 
   const currentStep = statusIndexMap[order.status] ?? 0
   const isFailed = order.status === 'failed' || order.status === 'returned'
+  const activeHold = (order.order_holds || []).find(h => !h.released_at) || null
+  const deliverAfterFormatted = activeHold?.deliver_after
+    ? new Date(activeHold.deliver_after).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    : null
 
   return (
     <div className="track-container">
@@ -283,6 +299,33 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             </span>
           </div>
         </div>
+
+        {order.is_held && (
+          <div
+            style={{
+              background: '#fef3c7',
+              border: '1.5px solid #f59e0b',
+              borderRadius: 12,
+              padding: '16px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ fontSize: 28, flexShrink: 0 }}>📦</div>
+            <div>
+              <strong style={{ color: '#92400e', fontSize: 14, display: 'block', marginBottom: 2 }}>
+                Safely Stored in Our Warehouse
+              </strong>
+              <p style={{ color: '#b45309', fontSize: 13, margin: 0 }}>
+                {deliverAfterFormatted
+                  ? `Your parcel is safe in our warehouse and will be delivered from ${deliverAfterFormatted}.`
+                  : 'Your parcel is safe in our warehouse and will be dispatched for delivery shortly.'}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Status Callout */}
         <div className={`track-callout track-callout-${order.status}`}>
