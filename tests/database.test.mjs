@@ -505,5 +505,305 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     assert.equal(Number(summary.average), 5.0)
     assert.equal(summary.total_ratings, 1)
   })
+
+  // ─── Phase 6: finance pro ────────────────────────────────────────────────────
+  // Own workspace, shops, couriers and users so balances here never depend on the tests above.
+  const fin = Object.fromEntries(Object.entries({
+    ws: 700, owner: 701, manager: 702, readonly: 703, shopUser: 704, ownerB: 705,
+    shopA: 710, shopB: 711, c1: 720, c2: 721, c3: 722, area: 730,
+  }).map(([k, n]) => [k, id(n)]))
+  await db.query("insert into auth.users values($1,'fin-owner@test.invalid',now()),($2,'fin-manager@test.invalid',now()),($3,'fin-readonly@test.invalid',now()),($4,'fin-shop@test.invalid',now()),($5,'fin-ownerb@test.invalid',now())",
+    [fin.owner, fin.manager, fin.readonly, fin.shopUser, fin.ownerB])
+  await db.query("insert into workspaces(id,name,slug,usd_to_lbp) values($1,'Finance F','finance-f',90000)", [fin.ws])
+  await db.query("insert into workspace_members(workspace_id,user_id,role) values($1,$2,'owner'),($1,$3,'manager'),($1,$4,'readonly'),($5,$6,'owner')",
+    [fin.ws, fin.owner, fin.manager, fin.readonly, b, fin.ownerB])
+  await db.query("insert into shops(id,workspace_id,name,user_id) values($1,$3,'Shop A',$4),($2,$3,'Shop B',null)", [fin.shopA, fin.shopB, fin.ws, fin.shopUser])
+  await db.query("insert into drivers(id,workspace_id,name) values($1,$4,'Courier 1'),($2,$4,'Courier 2'),($3,$4,'Courier 3')", [fin.c1, fin.c2, fin.c3, fin.ws])
+  await db.query("update drivers set pay_mode='percent',pay_percent=20 where id=$1", [fin.c3])
+  await db.query("insert into delivery_areas(id,workspace_id,name,fee_usd,driver_pay_usd) values($1,$2,'Zone F',8,3)", [fin.area, fin.ws])
+
+  let orderSeq = 7000
+  const makeOrder = async ({ ws = fin.ws, shop = fin.shopA, driver = null, area = null, cod = 0, fee = 3, pay = 2, status = 'pending' } = {}) => {
+    const oid = id(orderSeq++)
+    await db.query("insert into orders(id,workspace_id,shop_id,driver_id,area_id,usd_to_lbp_rate,collection_usd,delivery_fee_usd,driver_pay_usd) values($1,$2,$3,$4,$5,90000,$6,$7,$8)",
+      [oid, ws, shop, driver, area, cod, fee, pay])
+    if (status === 'delivered') await db.query("update orders set status='delivered' where id=$1", [oid])
+    return oid
+  }
+  const num = async (sql, params) => Number(Object.values((await db.query(sql, params)).rows[0] ?? {})[0] ?? 0)
+  const shopBalance = shop => num('select balance_usd from shops where id=$1', [shop])
+  const driverOwed = driver => num('select pay_owed_usd from drivers where id=$1', [driver])
+  const iso = d => d.toISOString().slice(0, 10)
+  const addDays = (d, days, hours = 10) => new Date(d.getTime() + days * 86400000 + hours * 3600000)
+  const backdate = (oid, when) => db.query('update orders set delivered_at=$2 where id=$1', [oid, when.toISOString()])
+  const asUser = async (user, fn) => {
+    await db.query("select set_config('test.user_id',$1,false)", [user])
+    await db.exec('set role authenticated')
+    try { return await fn() } finally {
+      await db.exec('reset role')
+      await db.query("select set_config('test.user_id','',false)")
+    }
+  }
+
+  await t.test('finance pro: shop payout runs pay once, keep cash-out reserves and never overdraw', async () => {
+    const { ws, owner, shopA, shopB, c1 } = fin
+    const run = async (items, key) => (await db.query('select run_shop_payouts($1,$2::jsonb,$3,$4) as r', [ws, JSON.stringify(items), key, owner])).rows[0].r
+    await makeOrder({ shop: shopA, driver: c1, cod: 50, fee: 3, status: 'delivered' }) // +47
+    await makeOrder({ shop: shopA, driver: c1, cod: 30, fee: 3, status: 'delivered' }) // +27
+    await makeOrder({ shop: shopB, driver: c1, cod: 10, fee: 3, status: 'delivered' }) // +7
+    assert.equal(await shopBalance(shopA), 74)
+
+    // $20 is reserved by a pending cash-out request, so a run can pay at most $54
+    await db.query("select request_shop_cashout($1,20,'whish','71 000 111','')", [shopA])
+    const first = await run([{ shop_id: shopA, amount_usd: 54 }], id(8001))
+    assert.equal(first.replayed, false)
+    assert.equal(first.count, 1)
+    assert.equal(Number(first.total_usd), 54)
+    assert.equal(await shopBalance(shopA), 20)
+    await assert.rejects(run([{ shop_id: shopA, amount_usd: 0.01 }], id(8002)), /exceeds the available balance/)
+
+    // The same request again changes nothing; a different request under the same key is refused
+    const again = await run([{ shop_id: shopA, amount_usd: 54 }], id(8001))
+    assert.equal(again.replayed, true)
+    assert.equal(again.run_id, first.run_id)
+    assert.equal(await shopBalance(shopA), 20)
+    await assert.rejects(run([{ shop_id: shopA, amount_usd: 10 }], id(8001)), /already used for different details/)
+    assert.equal((await db.query('select count(*) from payout_runs where idempotency_key=$1', [id(8001)])).rows[0].count, 1)
+    const settlements = (await db.query('select type, shop_id, amount_usd from settlements where payout_run_id=$1', [first.run_id])).rows
+    assert.equal(settlements.length, 1)
+    assert.equal(settlements[0].type, 'shop_payment')
+    assert.equal(Number(settlements[0].amount_usd), 54)
+
+    // One bad line cancels the whole run: nothing is paid and the key is not used up
+    await assert.rejects(run([{ shop_id: shopB, amount_usd: 7 }, { shop_id: shopA, amount_usd: 5 }], id(8003)), /exceeds the available balance/)
+    assert.equal(await shopBalance(shopB), 7)
+    assert.equal((await db.query('select count(*) from payout_runs where idempotency_key=$1', [id(8003)])).rows[0].count, 0)
+
+    // Input rules
+    await assert.rejects(run([{ shop_id: shopB, amount_usd: 1 }, { shop_id: shopB, amount_usd: 1 }], id(8004)), /appear once/)
+    await assert.rejects(run([{ shop_id: otherShop, amount_usd: 1 }], id(8005)), /not found in this workspace/)
+    await assert.rejects(run([{ shop_id: shopB, amount_usd: 0 }], id(8006)), /positive amount/)
+    await assert.rejects(run([{ shop_id: shopB, amount_usd: 0.001 }], id(8007)), /positive amount/)
+    await assert.rejects(run([], id(8008)), /at least one payout/)
+
+    // Paying the rest of shop B, then settling the reserved cash-out request, leaves both at zero
+    await run([{ shop_id: shopB, amount_usd: 7, note: 'Whish transfer' }], id(8009))
+    assert.equal(await shopBalance(shopB), 0)
+    const request = (await db.query("select id from cashout_requests where shop_id=$1 and status='pending'", [shopA])).rows[0].id
+    await db.query('select mark_cashout_paid($1,$2,$3)', [request, ws, owner])
+    assert.equal(await shopBalance(shopA), 0)
+    assert.equal((await db.query('select note from settlements where payout_run_id=(select id from payout_runs where idempotency_key=$1)', [id(8009)])).rows[0].note, 'Whish transfer')
+  })
+
+  await t.test('finance pro: courier pay runs pay what is owed, once', async () => {
+    const { ws, owner, c1 } = fin
+    const run = async (items, key) => (await db.query('select run_driver_payouts($1,$2::jsonb,$3,$4) as r', [ws, JSON.stringify(items), key, owner])).rows[0].r
+    const owed = await driverOwed(c1)
+    assert.ok(owed >= 6, 'courier 1 delivered three orders at $2')
+    const paid = await run([{ driver_id: c1, amount_usd: owed }], id(8101))
+    assert.equal(Number(paid.total_usd), owed)
+    assert.equal(await driverOwed(c1), 0)
+    await assert.rejects(run([{ driver_id: c1, amount_usd: 0.01 }], id(8102)), /exceeds the/)
+    assert.equal((await run([{ driver_id: c1, amount_usd: owed }], id(8101))).replayed, true)
+    assert.equal(await driverOwed(c1), 0)
+    await assert.rejects(run([{ driver_id: drv, amount_usd: 1 }], id(8103)), /not found in this workspace/)
+    assert.equal((await db.query("select count(*) from settlements where payout_run_id=$1 and type='driver_pay'", [paid.run_id])).rows[0].count, 1)
+  })
+
+  await t.test('finance pro: percent couriers are paid a share of the fee, fixed couriers keep the zone rate', async () => {
+    const { area, c1, c3, shopB } = fin
+    const pay = oid => num('select driver_pay_usd from orders where id=$1', [oid])
+    const o = await makeOrder({ shop: shopB, area, driver: c3, cod: 20, fee: 8, pay: 3 })
+    assert.equal(await pay(o), 1.6) // 20% of $8, not the zone's $3
+    await db.query('update orders set driver_id=$2 where id=$1', [o, c1])
+    assert.equal(await pay(o), 3) // fixed courier: back to the zone rate
+    await db.query('update orders set driver_id=$2 where id=$1', [o, c3])
+    assert.equal(await pay(o), 1.6)
+    await db.query('update orders set delivery_fee_usd=10 where id=$1', [o])
+    assert.equal(await pay(o), 2) // follows a fee change
+    await db.query('update orders set delivery_fee_usd=9, driver_pay_usd=4 where id=$1', [o])
+    assert.equal(await pay(o), 4) // a manager override in the same edit wins
+    await db.query('update orders set driver_id=null where id=$1', [o])
+    assert.equal(await pay(o), 3) // unassigned: zone rate again
+
+    // Money already booked is never repriced
+    const done = await makeOrder({ shop: shopB, area, driver: c3, cod: 20, fee: 8, pay: 3, status: 'delivered' })
+    assert.equal(await pay(done), 1.6)
+    const owed = await driverOwed(c3)
+    await db.query('update orders set driver_id=$2 where id=$1', [done, c1])
+    assert.equal(await pay(done), 1.6)
+    await db.query('update orders set driver_id=$2 where id=$1', [done, c3])
+    assert.equal(await driverOwed(c3), owed)
+
+    await assert.rejects(db.query("update drivers set pay_mode='percent',pay_percent=null where id=$1", [c1]), /driver_pay_mode_valid/)
+    await assert.rejects(db.query("update drivers set pay_mode='percent',pay_percent=101 where id=$1", [c1]), /driver_pay_mode_valid/)
+    await assert.rejects(db.query("update drivers set pay_mode='salary' where id=$1", [c1]), /driver_pay_mode_valid/)
+  })
+
+  await t.test('finance pro: weekly bonuses go to the highest rule reached, once per courier per week', async () => {
+    const { ws, shopB } = fin
+    const [c4, c5] = [id(723), id(724)]
+    await db.query("insert into drivers(id,workspace_id,name) values($1,$3,'Courier 4'),($2,$3,'Courier 5')", [c4, c5, ws])
+    await db.query("insert into driver_bonus_rules(workspace_id,name,min_deliveries,bonus_usd,active) values($1,'Bronze',2,5,true),($1,'Silver',3,12,true),($1,'Disabled',1,100,false)", [ws])
+    const now = new Date()
+    const thisMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7)))
+    const weekStart = addDays(thisMonday, -7, 0)
+    const deliver = async (driver, when) => backdate(await makeOrder({ shop: shopB, driver, cod: 10, fee: 3, status: 'delivered' }), when)
+    for (const day of [1, 2, 3]) await deliver(c4, addDays(weekStart, day))
+    await deliver(c5, addDays(weekStart, 1))
+    await deliver(c5, addDays(weekStart, -1)) // the Sunday before: outside the week
+
+    const before = await driverOwed(c4)
+    const result = (await db.query('select apply_weekly_driver_bonuses($1,$2::date) as r', [ws, iso(weekStart)])).rows[0].r
+    assert.equal(result.bonuses_created, 1)
+    assert.equal(Number(result.total_bonus_usd), 12) // Silver only: tiers do not stack
+    assert.equal(await driverOwed(c4) - before, 12)
+    assert.equal(await num("select sum(pay_delta) from money_ledger where driver_id=$1 and reason like 'driver bonus%'", [c4]), 12)
+    const bonus = (await db.query('select deliveries_count, bonus_usd, note from driver_bonuses where driver_id=$1', [c4])).rows[0]
+    assert.equal(bonus.deliveries_count, 3)
+    assert.equal(bonus.note, 'Weekly bonus: Silver')
+    assert.equal((await db.query('select count(*) from driver_bonuses where driver_id=$1', [c5])).rows[0].count, 0)
+
+    // Running it again, or after more deliveries, pays nobody twice
+    assert.equal((await db.query('select apply_weekly_driver_bonuses($1,$2::date) as r', [ws, iso(weekStart)])).rows[0].r.bonuses_created, 0)
+    assert.equal(await driverOwed(c4) - before, 12)
+
+    await assert.rejects(db.query('select apply_weekly_driver_bonuses($1,$2::date)', [ws, iso(thisMonday)]), /once the week has finished/)
+    await assert.rejects(db.query('select apply_weekly_driver_bonuses($1,$2::date)', [ws, iso(addDays(weekStart, 1))]), /Monday/)
+    // A bonus cannot point at another company's courier
+    await assert.rejects(db.query("insert into driver_bonuses(workspace_id,driver_id,week_start,deliveries_count,bonus_usd) values($1,$2,$3,1,1)", [ws, drv, iso(addDays(weekStart, -7, 0))]), /foreign key/)
+  })
+
+  await t.test('finance pro: the P&L adds up to the orders, bonuses, expenses and the ledger', async () => {
+    const [wsP, shopP, c6] = [id(740), id(741), id(742)]
+    await db.query("insert into workspaces(id,name,slug,usd_to_lbp) values($1,'P&L Co','pnl-co',90000)", [wsP])
+    await db.query("insert into shops(id,workspace_id,name) values($1,$2,'P&L Shop')", [shopP, wsP])
+    await db.query("insert into drivers(id,workspace_id,name) values($1,$2,'P&L Courier')", [c6, wsP])
+    await db.query("insert into driver_bonus_rules(workspace_id,name,min_deliveries,bonus_usd) values($1,'Two a week',2,10)", [wsP])
+    const now = new Date()
+    const thisMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7)))
+    const weekStart = addDays(thisMonday, -7, 0)
+    const make = o => makeOrder({ ws: wsP, shop: shopP, driver: c6, cod: 20, ...o })
+
+    await backdate(await make({ fee: 4, pay: 2, status: 'delivered' }), addDays(weekStart, 1)) // the two bonus-week deliveries
+    await backdate(await make({ fee: 4, pay: 2, status: 'delivered' }), addDays(weekStart, 2))
+    await backdate(await make({ fee: 6, pay: 2, status: 'delivered' }), addDays(weekStart, -35)) // an earlier month
+    const stored = await make({ fee: 5, pay: 2, status: 'delivered' })
+    await db.query('update orders set storage_fee_usd=1.5 where id=$1', [stored])
+    const returned = await make({ fee: 3, pay: 2 })
+    await db.query("update orders set status='returned', collection_usd=0, delivery_fee_usd=2, driver_pay_usd=1 where id=$1", [returned])
+    await db.query('select apply_weekly_driver_bonuses($1,$2::date)', [wsP, iso(weekStart)])
+    await db.query("insert into expenses(workspace_id,date,category,amount_usd,amount_lbp,note) values($1,$2,'fuel',15,0,'Fuel'),($1,$2,'other',5,450000,'Packaging and phone')", [wsP, iso(now)])
+
+    const report = async () => (await db.query('select pnl_report($1,$2::date,$3::date) as r', [wsP, iso(addDays(weekStart, -40)), iso(now)])).rows[0].r
+    const pnl = await report()
+    const totals = Object.fromEntries(Object.entries(pnl.totals).map(([k, v]) => [k, Number(v)]))
+    assert.deepEqual(totals, {
+      delivered_orders: 4, returned_orders: 1,
+      delivery_fees_usd: 21, storage_fees_usd: 1.5, revenue_usd: 22.5,
+      courier_pay_usd: 9, bonuses_usd: 10, expenses_usd: 25, // $15 + $5 + 450,000 LBP at 90,000
+      total_cost_usd: 44, net_profit_usd: -21.5,
+    })
+    assert.ok(pnl.months.length >= 2, 'the earlier month is listed')
+    const sum = key => pnl.months.reduce((total, m) => total + Number(m[key]), 0)
+    assert.equal(sum('net_profit_usd'), -21.5)
+    assert.equal(sum('revenue_usd'), 22.5)
+    assert.deepEqual(pnl.expenses_by_category.map(c => [c.category, Number(c.amount_usd)]), [['fuel', 15], ['other', 10]])
+
+    // Everything the P&L pays out was credited to a courier in the ledger
+    assert.equal(await num('select sum(pay_delta) from money_ledger where workspace_id=$1 and settlement_id is null', [wsP]), 19)
+    // Orders outside the range are left out
+    const narrow = (await db.query('select pnl_report($1,$2::date,$3::date) as r', [wsP, iso(addDays(weekStart, -40)), iso(addDays(weekStart, -20))])).rows[0].r
+    assert.equal(Number(narrow.totals.delivery_fees_usd), 6)
+    await assert.rejects(db.query('select pnl_report($1,$2::date,$3::date)', [wsP, iso(now), iso(addDays(now, -2))]), /Invalid date range/)
+
+    // Changing the rate later does not move past expenses, and every change is logged with who made it.
+    // The server has no signed-in user of its own, so clear the one an earlier test left behind.
+    await db.query("select set_config('test.user_id','',false)")
+    await assert.rejects(db.query('select set_workspace_rate($1,0,$2)', [wsP, fin.owner]), /positive/)
+    await db.query('select set_workspace_rate($1,100000,$2)', [wsP, fin.owner])
+    assert.equal(Number((await report()).totals.expenses_usd), 25)
+    const rates = (await db.query('select rate, set_by from exchange_rates where workspace_id=$1 order by set_at, id', [wsP])).rows
+    assert.deepEqual(rates.map(r => Number(r.rate)), [90000, 100000])
+    assert.equal(rates[1].set_by, fin.owner)
+  })
+
+  await t.test('finance pro: a shop statement runs from the opening balance to the closing balance', async () => {
+    const { ws, shopA } = fin
+    const today = new Date()
+    const statement = async (from, to) => (await db.query('select shop_statement($1,$2,$3::date,$4::date) as r', [ws, shopA, iso(from), iso(to)])).rows[0].r
+    const reconcile = s => Number(s.opening_usd) + s.lines.reduce((total, l) => total + Number(l.amount_usd), 0)
+
+    const full = await statement(addDays(today, -60), today)
+    assert.equal(Number(full.opening_usd), 0)
+    assert.equal(full.lines.filter(l => l.kind === 'order').length, 2)
+    assert.equal(full.lines.filter(l => l.kind === 'payout').length, 2)
+    assert.equal(Number(full.closing_usd), 0)
+    assert.equal(reconcile(full), Number(full.closing_usd))
+    assert.equal(Number(full.closing_usd), await shopBalance(shopA))
+    const line = full.lines.find(l => l.kind === 'order' && Number(l.cod_usd) === 50)
+    assert.equal(Number(line.fee_usd), 3)
+    assert.equal(Number(line.amount_usd), 47)
+
+    // Move the two deliveries 40 days back: an earlier statement shows them, a later one starts with them
+    await db.query("update orders set delivered_at=now()-interval '40 days' where shop_id=$1 and status='delivered'", [shopA])
+    await db.query("update money_ledger set created_at=now()-interval '40 days' where shop_id=$1 and order_id is not null", [shopA])
+    const earlier = await statement(addDays(today, -45), addDays(today, -35))
+    assert.equal(Number(earlier.opening_usd), 0)
+    assert.deepEqual(earlier.lines.map(l => [l.kind, Number(l.amount_usd)]).sort(), [['order', 27], ['order', 47]])
+    assert.equal(Number(earlier.closing_usd), 74)
+    const later = await statement(addDays(today, -30), today)
+    assert.equal(Number(later.opening_usd), 74)
+    assert.deepEqual(later.lines.map(l => [l.kind, Number(l.amount_usd)]), [['payout', -54], ['payout', -20]])
+    assert.equal(Number(later.closing_usd), 0)
+    assert.equal(reconcile(later), 0)
+    const future = await statement(addDays(today, 5), addDays(today, 9))
+    assert.equal(future.lines.length, 0)
+    assert.equal(Number(future.opening_usd), Number(future.closing_usd))
+
+    await assert.rejects(db.query('select shop_statement($1,$2,current_date,current_date)', [ws, otherShop]), /Shop not found/)
+    await assert.rejects(db.query('select shop_statement($1,$2,current_date,current_date - 1)', [ws, shopA]), /Invalid date range/)
+  })
+
+  await t.test('finance pro: finance data is read by owners and managers only, and written by the server only', async () => {
+    const { ws, owner, manager, readonly, shopUser, ownerB } = fin
+    await db.query("insert into expenses(workspace_id,date,category,amount_usd,note) values($1,current_date,'rent',100,'Office')", [ws])
+    const tables = ['expenses', 'payout_runs', 'driver_bonuses', 'driver_bonus_rules', 'exchange_rates']
+    for (const [user, canRead] of [[owner, true], [manager, true], [readonly, false], [shopUser, false], [ownerB, false]]) {
+      await asUser(user, async () => {
+        for (const table of tables) {
+          const seen = Number((await db.query(`select count(*) from ${table} where workspace_id=$1`, [ws])).rows[0].count)
+          assert.equal(seen > 0, canRead, `${user} reading ${table}`)
+        }
+      })
+    }
+    await asUser(owner, async () => {
+      for (const sql of [
+        `insert into expenses(workspace_id,category,amount_usd,usd_to_lbp) values('${ws}','fuel',1,90000)`,
+        'update expenses set amount_usd=1', 'delete from expenses',
+        `insert into driver_bonus_rules(workspace_id,name,min_deliveries,bonus_usd) values('${ws}','x',1,1)`,
+        `insert into payout_runs(workspace_id,idempotency_key,payload_hash,type) values('${ws}','${id(1)}','x','shop_payout')`,
+        `insert into driver_bonuses(workspace_id,driver_id,week_start,deliveries_count,bonus_usd) values('${ws}','${fin.c1}','2026-01-05',1,1)`,
+        'update exchange_rates set rate=1', 'delete from payout_runs',
+      ]) await assert.rejects(db.query(sql), /permission denied/, sql)
+      for (const sql of [
+        `select run_shop_payouts('${ws}','[]'::jsonb,'${id(1)}',null)`,
+        `select run_driver_payouts('${ws}','[]'::jsonb,'${id(1)}',null)`,
+        `select apply_weekly_driver_bonuses('${ws}',date '2026-01-05')`,
+        `select pnl_report('${ws}',current_date,current_date)`,
+        `select shop_statement('${ws}','${fin.shopA}',current_date,current_date)`,
+        `select set_workspace_rate('${ws}',1,null)`,
+      ]) await assert.rejects(db.query(sql), /permission denied/, sql)
+    })
+  })
+
+  await t.test('profit report refuses anyone who is not an owner or manager of that workspace', async () => {
+    const { ws, manager, shopUser, ownerB } = fin
+    const ask = () => db.query("select profit_report($1, now() - interval '1 day', now() + interval '1 day') as r", [ws])
+    await asUser(manager, async () => assert.ok((await ask()).rows[0].r.totals))
+    await asUser(ownerB, async () => assert.rejects(ask(), /Forbidden/)) // owner of a different company
+    await asUser(shopUser, async () => assert.rejects(ask(), /Forbidden/)) // a merchant
+  })
+
   }finally{await db.close()}
 })

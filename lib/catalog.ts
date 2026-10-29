@@ -3,6 +3,7 @@ import { NextResponse, NextRequest } from 'next/server'
 import { api,ApiError,checked,uuid } from './api'
 import { authenticated,workspaceAccess,validateReferences } from './access'
 import { driverPin,generateDriverPin } from './driver-session'
+import { PAYOUT_METHODS } from './finance'
 import { id,money,optionalId,parseBody,requiredText,text,z } from './validation'
 // One schema covers shops, drivers and areas; each table only reads its own fields.
 const CreateCatalog=z.object({
@@ -20,6 +21,9 @@ const ChangeCatalog=z.object({
  // Zone pricing (Phase 1)
  driverPayUsd:money().optional(),returnFeeUsd:money().optional(),returnDriverPayUsd:money().optional(),
  storageFeePerDayUsd:money().optional(),freeStorageDays:z.number().int().min(0).max(365).optional(),
+ // Payouts and courier pay (Phase 6)
+ payoutMethod:z.enum(PAYOUT_METHODS).optional(),payoutAccount:text(200).optional(),
+ payMode:z.enum(['fixed','percent']).optional(),payPercent:z.number().min(0).max(100).nullable().optional(),
 })
 type Db=Awaited<ReturnType<typeof workspaceAccess>>['db']
 // Area driver pools may only contain this workspace's couriers.
@@ -88,6 +92,16 @@ export async function changeCatalog(req:NextRequest,table:Table,recordId?:string
   if(body.address!==undefined)updates.address=body.address
   if(table==='drivers'&&body.pinCode)driverPin(body.pinCode)
   if(body.active!==undefined)updates.active=body.active
+  if(table==='shops'){
+   if(body.payoutMethod!==undefined)updates.payout_method=body.payoutMethod
+   if(body.payoutAccount!==undefined)updates.payout_account=body.payoutAccount||null
+  }
+  if(table==='drivers'&&body.payMode){
+   // A percent courier is paid a share of each order's fee; a fixed one keeps the zone rate
+   if(body.payMode==='percent'&&body.payPercent==null)throw new ApiError(400,'Enter the percentage of the fee')
+   updates.pay_mode=body.payMode
+   updates.pay_percent=body.payMode==='percent'?body.payPercent:null
+  }
   if(table==='delivery_areas'){
    if(body.feeUsd!==undefined)updates.fee_usd=body.feeUsd
    if(body.driverPayUsd!==undefined)updates.driver_pay_usd=body.driverPayUsd

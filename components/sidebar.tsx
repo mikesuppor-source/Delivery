@@ -130,6 +130,31 @@ export function Sidebar({ userRole, displayName }: SidebarProps) {
           </Link>
         )}
 
+        {/* Finance — owner/manager: shop payouts, courier pay and bonuses, expenses */}
+        {hasMinRole(userRole, 'manager') && (
+          <>
+            <Link href="/finance/payouts" className={isActive('/finance/payouts')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" />
+                <path d="M6 10v.01M18 14v.01" />
+              </svg>
+              <b>{t('navPayouts')}</b>
+            </Link>
+            <Link href="/finance/courier-pay" className={isActive('/finance/courier-pay')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
+              </svg>
+              <b>{t('navCourierPay')}</b>
+            </Link>
+            <Link href="/finance/expenses" className={isActive('/finance/expenses')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="9" y1="12" x2="15" y2="12" />
+              </svg>
+              <b>{t('navExpenses')}</b>
+            </Link>
+          </>
+        )}
+
         {/* Reports & Profit — owner/manager */}
         {hasMinRole(userRole, 'manager') && (
           <Link href="/reports" className={isActive('/reports')}>

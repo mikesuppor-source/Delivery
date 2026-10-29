@@ -6,6 +6,7 @@ import { HeaderSection } from './sections/header-section'
 import { KpiSection } from './sections/kpi-section'
 import { OrdersSection } from './sections/orders-section'
 import { SettlementsSection } from './sections/settlements-section'
+import { PayModeSection } from './sections/pay-mode-section'
 import { ModalsSection } from './sections/modals-section'
 
 export function DriverProfileView() {
@@ -27,6 +28,7 @@ export function DriverProfileView() {
     <div>
       <HeaderSection />
       <KpiSection />
+      <PayModeSection />
 
       {/* ─── Main Content Tabs: Which Orders & Settlement History ─── */}
       <div className="panel">

@@ -23,7 +23,114 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "audit_log": {
+            "driver_bonus_rules": {
+                  Row: {
+                    "active": boolean,"bonus_usd": number,"created_at": string,"id": string,"min_deliveries": number,"name": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"bonus_usd": number,"created_at"?: string,"id"?: string,"min_deliveries": number,"name": string,"workspace_id": string
+                  }
+                  Update: {
+                    "active"?: boolean,"bonus_usd"?: number,"created_at"?: string,"id"?: string,"min_deliveries"?: number,"name"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "driver_bonus_rules_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"driver_bonuses": {
+                  Row: {
+                    "bonus_usd": number,"created_at": string,"deliveries_count": number,"driver_id": string,"id": string,"note": string | null,"rule_id": string | null,"week_start": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bonus_usd": number,"created_at"?: string,"deliveries_count": number,"driver_id": string,"id"?: string,"note"?: string | null,"rule_id"?: string | null,"week_start": string,"workspace_id": string
+                  }
+                  Update: {
+                    "bonus_usd"?: number,"created_at"?: string,"deliveries_count"?: number,"driver_id"?: string,"id"?: string,"note"?: string | null,"rule_id"?: string | null,"week_start"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "driver_bonus_driver_tenant"
+      columns: ["driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    },
+                    {
+      foreignKeyName: "driver_bonuses_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"exchange_rates": {
+                  Row: {
+                    "id": string,"rate": number,"set_at": string,"set_by": string | null,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "id"?: string,"rate": number,"set_at"?: string,"set_by"?: string | null,"workspace_id": string
+                  }
+                  Update: {
+                    "id"?: string,"rate"?: number,"set_at"?: string,"set_by"?: string | null,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "exchange_rates_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"expenses": {
+                  Row: {
+                    "amount_lbp": number,"amount_usd": number,"category": string,"created_at": string,"created_by": string | null,"date": string,"id": string,"note": string | null,"receipt_path": string | null,"usd_to_lbp": number,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_lbp"?: number,"amount_usd"?: number,"category": string,"created_at"?: string,"created_by"?: string | null,"date"?: string,"id"?: string,"note"?: string | null,"receipt_path"?: string | null,"usd_to_lbp"?: number,"workspace_id": string
+                  }
+                  Update: {
+                    "amount_lbp"?: number,"amount_usd"?: number,"category"?: string,"created_at"?: string,"created_by"?: string | null,"date"?: string,"id"?: string,"note"?: string | null,"receipt_path"?: string | null,"usd_to_lbp"?: number,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "expenses_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"payout_runs": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"id": string,"idempotency_key": string,"item_count": number,"payload_hash": string,"total_amount_usd": number,"type": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"idempotency_key": string,"item_count"?: number,"payload_hash": string,"total_amount_usd"?: number,"type": string,"workspace_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"idempotency_key"?: string,"item_count"?: number,"payload_hash"?: string,"total_amount_usd"?: number,"type"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "payout_runs_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },            "audit_log": {
                   Row: {
                     "action": string,"actor_email": string | null,"actor_id": string | null,"created_at": string,"diff": Json | null,"entity_id": string | null,"entity_type": string | null,"id": string,"workspace_id": string
                   }
@@ -195,14 +302,14 @@ isOneToOne: false
                   ]
                 },"drivers": {
                   Row: {
-                    "active": boolean,"cash_held_lbp": number,"cash_held_usd": number,"created_at": string,"current_lat": number | null,"current_lng": number | null,"id": string,"last_location_at": string | null,"name": string,"pay_owed_usd": number,"phone": string | null,"user_id": string | null,"workspace_id": string
+                    "active": boolean,"cash_held_lbp": number,"cash_held_usd": number,"created_at": string,"current_lat": number | null,"current_lng": number | null,"id": string,"last_location_at": string | null,"name": string,"pay_owed_usd": number,"phone": string | null,"user_id": string | null,"workspace_id": string,"pay_mode": string,"pay_percent": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"cash_held_lbp"?: number,"cash_held_usd"?: number,"created_at"?: string,"current_lat"?: number | null,"current_lng"?: number | null,"id"?: string,"last_location_at"?: string | null,"name": string,"pay_owed_usd"?: number,"phone"?: string | null,"user_id"?: string | null,"workspace_id": string
+                    "active"?: boolean,"cash_held_lbp"?: number,"cash_held_usd"?: number,"created_at"?: string,"current_lat"?: number | null,"current_lng"?: number | null,"id"?: string,"last_location_at"?: string | null,"name": string,"pay_owed_usd"?: number,"phone"?: string | null,"user_id"?: string | null,"workspace_id": string,"pay_mode"?: string,"pay_percent"?: number | null
                   }
                   Update: {
-                    "active"?: boolean,"cash_held_lbp"?: number,"cash_held_usd"?: number,"created_at"?: string,"current_lat"?: number | null,"current_lng"?: number | null,"id"?: string,"last_location_at"?: string | null,"name"?: string,"pay_owed_usd"?: number,"phone"?: string | null,"user_id"?: string | null,"workspace_id"?: string
+                    "active"?: boolean,"cash_held_lbp"?: number,"cash_held_usd"?: number,"created_at"?: string,"current_lat"?: number | null,"current_lng"?: number | null,"id"?: string,"last_location_at"?: string | null,"name"?: string,"pay_owed_usd"?: number,"phone"?: string | null,"user_id"?: string | null,"workspace_id"?: string,"pay_mode"?: string,"pay_percent"?: number | null
                   }
                   Relationships: [
                     {
@@ -633,14 +740,14 @@ isOneToOne: false
                   ]
                 },"settlements": {
                   Row: {
-                    "amount_lbp": number,"amount_usd": number,"created_at": string,"created_by": string | null,"driver_id": string | null,"id": string,"idempotency_key": string | null,"note": string | null,"order_id": string | null,"shop_id": string | null,"type": Database["public"]['Enums']["settlement_type"],"usd_to_lbp": number,"workspace_id": string
+                    "amount_lbp": number,"amount_usd": number,"created_at": string,"created_by": string | null,"driver_id": string | null,"id": string,"idempotency_key": string | null,"note": string | null,"order_id": string | null,"shop_id": string | null,"type": Database["public"]['Enums']["settlement_type"],"usd_to_lbp": number,"workspace_id": string,"payout_run_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount_lbp"?: number,"amount_usd": number,"created_at"?: string,"created_by"?: string | null,"driver_id"?: string | null,"id"?: string,"idempotency_key"?: string | null,"note"?: string | null,"order_id"?: string | null,"shop_id"?: string | null,"type": Database["public"]['Enums']["settlement_type"],"usd_to_lbp": number,"workspace_id": string
+                    "amount_lbp"?: number,"amount_usd": number,"created_at"?: string,"created_by"?: string | null,"driver_id"?: string | null,"id"?: string,"idempotency_key"?: string | null,"note"?: string | null,"order_id"?: string | null,"shop_id"?: string | null,"type": Database["public"]['Enums']["settlement_type"],"usd_to_lbp": number,"workspace_id": string,"payout_run_id"?: string | null
                   }
                   Update: {
-                    "amount_lbp"?: number,"amount_usd"?: number,"created_at"?: string,"created_by"?: string | null,"driver_id"?: string | null,"id"?: string,"idempotency_key"?: string | null,"note"?: string | null,"order_id"?: string | null,"shop_id"?: string | null,"type"?: Database["public"]['Enums']["settlement_type"],"usd_to_lbp"?: number,"workspace_id"?: string
+                    "amount_lbp"?: number,"amount_usd"?: number,"created_at"?: string,"created_by"?: string | null,"driver_id"?: string | null,"id"?: string,"idempotency_key"?: string | null,"note"?: string | null,"order_id"?: string | null,"shop_id"?: string | null,"type"?: Database["public"]['Enums']["settlement_type"],"usd_to_lbp"?: number,"workspace_id"?: string,"payout_run_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -735,14 +842,14 @@ isOneToOne: true
                   ]
                 },"shops": {
                   Row: {
-                    "active": boolean,"address": string | null,"balance_usd": number,"created_at": string,"id": string,"is_walkin": boolean,"name": string,"phone": string | null,"prefix": string | null,"shopify_domain": string | null,"user_id": string | null,"workspace_id": string
+                    "active": boolean,"address": string | null,"balance_usd": number,"created_at": string,"id": string,"is_walkin": boolean,"name": string,"phone": string | null,"prefix": string | null,"shopify_domain": string | null,"user_id": string | null,"workspace_id": string,"payout_account": string | null,"payout_method": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name": string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id": string
+                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name": string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id": string,"payout_account"?: string | null,"payout_method"?: string
                   }
                   Update: {
-                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name"?: string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id"?: string
+                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name"?: string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id"?: string,"payout_account"?: string | null,"payout_method"?: string
                   }
                   Relationships: [
                     {
@@ -775,14 +882,14 @@ isOneToOne: false
                   ]
                 },"workspaces": {
                   Row: {
-                    "created_at": string,"currency": string,"default_delivery_fee_usd": number | null,"default_driver_pay_usd": number | null,"id": string,"max_delivery_attempts": number,"max_driver_load": number,"name": string,"notify_delivered": boolean,"notify_failed_attempt": boolean,"notify_held": boolean,"notify_order_created": boolean,"notify_out_for_delivery": boolean,"slug": string,"usd_to_lbp": number,"whatsapp_business_account_id": string | null,"whatsapp_cloud_token": string | null,"whatsapp_phone_number_id": string | null
+                    "created_at": string,"currency": string,"default_delivery_fee_usd": number | null,"default_driver_pay_usd": number | null,"id": string,"max_delivery_attempts": number,"max_driver_load": number,"name": string,"notify_delivered": boolean,"notify_failed_attempt": boolean,"notify_held": boolean,"notify_order_created": boolean,"notify_out_for_delivery": boolean,"slug": string,"usd_to_lbp": number,"whatsapp_business_account_id": string | null,"whatsapp_cloud_token": string | null,"whatsapp_phone_number_id": string | null,"logo_url": string | null,"payout_days": string[],"payout_min_usd": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name": string,"notify_delivered"?: boolean,"notify_failed_attempt"?: boolean,"notify_held"?: boolean,"notify_order_created"?: boolean,"notify_out_for_delivery"?: boolean,"slug": string,"usd_to_lbp"?: number,"whatsapp_business_account_id"?: string | null,"whatsapp_cloud_token"?: string | null,"whatsapp_phone_number_id"?: string | null
+                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name": string,"notify_delivered"?: boolean,"notify_failed_attempt"?: boolean,"notify_held"?: boolean,"notify_order_created"?: boolean,"notify_out_for_delivery"?: boolean,"slug": string,"usd_to_lbp"?: number,"whatsapp_business_account_id"?: string | null,"whatsapp_cloud_token"?: string | null,"whatsapp_phone_number_id"?: string | null,"logo_url"?: string | null,"payout_days"?: string[],"payout_min_usd"?: number
                   }
                   Update: {
-                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name"?: string,"notify_delivered"?: boolean,"notify_failed_attempt"?: boolean,"notify_held"?: boolean,"notify_order_created"?: boolean,"notify_out_for_delivery"?: boolean,"slug"?: string,"usd_to_lbp"?: number,"whatsapp_business_account_id"?: string | null,"whatsapp_cloud_token"?: string | null,"whatsapp_phone_number_id"?: string | null
+                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name"?: string,"notify_delivered"?: boolean,"notify_failed_attempt"?: boolean,"notify_held"?: boolean,"notify_order_created"?: boolean,"notify_out_for_delivery"?: boolean,"slug"?: string,"usd_to_lbp"?: number,"whatsapp_business_account_id"?: string | null,"whatsapp_cloud_token"?: string | null,"whatsapp_phone_number_id"?: string | null,"logo_url"?: string | null,"payout_days"?: string[],"payout_min_usd"?: number
                   }
                   Relationships: [
                     
@@ -793,6 +900,24 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
+"apply_weekly_driver_bonuses":
+{ Args: { "p_week_start": string,"p_workspace": string }; Returns: Json
+                           },
+"pnl_report":
+{ Args: { "p_from": string,"p_to": string,"p_workspace": string }; Returns: Json
+                           },
+"run_driver_payouts":
+{ Args: { "p_key": string,"p_payouts": Json,"p_user"?: string,"p_workspace": string }; Returns: Json
+                           },
+"run_shop_payouts":
+{ Args: { "p_key": string,"p_payouts": Json,"p_user"?: string,"p_workspace": string }; Returns: Json
+                           },
+"set_workspace_rate":
+{ Args: { "p_rate": number,"p_user": string,"p_workspace": string }; Returns: undefined
+                           },
+"shop_statement":
+{ Args: { "p_from": string,"p_shop": string,"p_to": string,"p_workspace": string }; Returns: Json
+                           },
             "accept_staff_invite":
 { Args: { "p_email": string,"p_name": string,"p_token": string,"p_user": string }; Returns: boolean
                            },

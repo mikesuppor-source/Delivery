@@ -52,6 +52,8 @@ export async function middleware(request: NextRequest) {
     ].includes(path) ||
     path.startsWith('/track/') ||
     path.startsWith('/invite/') ||
+    // Scheduled jobs have no user session: each one checks the CRON_SECRET itself (lib/cron.ts)
+    path.startsWith('/api/cron/') ||
     path === '/driver' ||
     path.startsWith('/driver/') ||
     path.startsWith('/api/driver/') ||

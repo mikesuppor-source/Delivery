@@ -11,6 +11,9 @@ export interface Shop {
   created_at?: string
   api_key?: string | null
   shopify_domain?: string | null
+  /** How the shop is paid: cash, whish, omt or bank (Phase 6). */
+  payout_method?: string
+  payout_account?: string | null
 }
 
 export interface OrderItem {

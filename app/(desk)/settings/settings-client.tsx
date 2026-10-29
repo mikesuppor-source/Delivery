@@ -1,14 +1,27 @@
 'use client'
 
 import { useState } from 'react'
+import { WEEKDAYS, WEEKDAY_LABELS } from '@/lib/finance'
+import { formatDate } from '@/lib/utils'
+
+export interface RateHistoryItem {
+  id: string
+  rate: number
+  set_at: string
+  set_by_name: string | null
+}
 
 interface SettingsClientProps {
+  rateHistory?: RateHistoryItem[]
   workspace: {
     id: string
     name: string
     slug: string
     usd_to_lbp: number
     currency: string
+    payout_days?: string[]
+    payout_min_usd?: number | null
+    logo_url?: string | null
     default_driver_pay_usd?: number | null
     default_delivery_fee_usd?: number | null
     notify_order_created?: boolean
@@ -22,12 +35,17 @@ interface SettingsClientProps {
   isOwner: boolean
 }
 
-export function SettingsClient({ workspace, isOwner }: SettingsClientProps) {
+export function SettingsClient({ workspace, isOwner, rateHistory = [] }: SettingsClientProps) {
   const [name, setName] = useState(workspace.name)
   const [currency, setCurrency] = useState(workspace.currency)
   const [usdToLbp, setUsdToLbp] = useState(String(workspace.usd_to_lbp))
   const [defaultDriverPayUsd, setDefaultDriverPayUsd] = useState(String(workspace.default_driver_pay_usd ?? '2.00'))
   const [defaultDeliveryFeeUsd, setDefaultDeliveryFeeUsd] = useState(String(workspace.default_delivery_fee_usd ?? '3.50'))
+
+  // Finance: when shops are paid, the smallest payout, and the logo printed on statements
+  const [payoutDays, setPayoutDays] = useState<string[]>(workspace.payout_days ?? ['monday', 'thursday'])
+  const [payoutMinUsd, setPayoutMinUsd] = useState(String(workspace.payout_min_usd ?? '20'))
+  const [logoUrl, setLogoUrl] = useState(workspace.logo_url ?? '')
 
   // Notification flags
   const [notifyOrderCreated, setNotifyOrderCreated] = useState(workspace.notify_order_created ?? true)
@@ -60,6 +78,9 @@ export function SettingsClient({ workspace, isOwner }: SettingsClientProps) {
           usdToLbp: Number(usdToLbp),
           defaultDriverPayUsd: Number(defaultDriverPayUsd),
           defaultDeliveryFeeUsd: Number(defaultDeliveryFeeUsd),
+          payoutDays,
+          payoutMinUsd: Number(payoutMinUsd),
+          logoUrl: logoUrl.trim() || null,
           notifyOrderCreated,
           notifyOutForDelivery,
           notifyDelivered,
@@ -164,6 +185,64 @@ export function SettingsClient({ workspace, isOwner }: SettingsClientProps) {
                   required
                 />
                 <small style={{ color: 'var(--muted)', fontSize: 11 }}>Standard delivery charge for orders without an area fee</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PANEL: PAYOUT SCHEDULE AND STATEMENTS (Finance pro) */}
+        <div className="panel" style={{ marginBottom: 24 }}>
+          <div className="panel-title">
+            <h2>Payouts & Statements</h2>
+            <small>When shops are paid and what their statements show</small>
+          </div>
+          <div style={{ padding: '24px' }}>
+            <fieldset style={{ border: 'none', padding: 0, margin: '0 0 18px' }}>
+              <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Payout days</legend>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 18px' }}>
+                {WEEKDAYS.map(day => (
+                  <label key={day} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: isOwner ? 'pointer' : 'default', fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={payoutDays.includes(day)}
+                      disabled={!isOwner}
+                      onChange={e => setPayoutDays(prev => (e.target.checked ? [...prev, day] : prev.filter(d => d !== day)))}
+                      style={{ width: 16, height: 16, accentColor: 'var(--brand)' }}
+                    />
+                    {WEEKDAY_LABELS[day]}
+                  </label>
+                ))}
+              </div>
+              <small style={{ color: 'var(--muted)', fontSize: 11, display: 'block', marginTop: 6 }}>
+                The Shop Payouts screen shows whether today is a payout day. Payouts can still be made on any day.
+              </small>
+            </fieldset>
+
+            <div className="form-grid">
+              <div className="field">
+                <label>Smallest payout (USD $)</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={payoutMinUsd}
+                  onChange={e => setPayoutMinUsd(e.target.value)}
+                  disabled={!isOwner}
+                  required
+                />
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>Shops owed less than this wait for the next run</small>
+              </div>
+
+              <div className="field full">
+                <label>Company logo address (https, PNG or JPEG)</label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/logo.png"
+                  value={logoUrl}
+                  onChange={e => setLogoUrl(e.target.value)}
+                  disabled={!isOwner}
+                />
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>Printed on shop statements next to the company name. Leave empty for none.</small>
               </div>
             </div>
           </div>
@@ -304,6 +383,38 @@ export function SettingsClient({ workspace, isOwner }: SettingsClientProps) {
           </p>
         )}
       </form>
+
+      {/* Every change of the exchange rate is kept, with who made it */}
+      <div className="panel" style={{ maxWidth: 640, marginTop: 24 }}>
+        <div className="panel-title">
+          <h2>Exchange Rate History</h2>
+          <small>Orders and expenses keep the rate they were saved at</small>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Changed</th>
+                <th style={{ textAlign: 'right' }}>1 USD in LBP</th>
+                <th>By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rateHistory.length === 0 ? (
+                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>No changes recorded yet.</td></tr>
+              ) : (
+                rateHistory.map(item => (
+                  <tr key={item.id}>
+                    <td>{formatDate(item.set_at)}</td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} dir="ltr">{item.rate.toLocaleString('en-US')}</td>
+                    <td>{item.set_by_name ?? 'System'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {toast && (
         <div className="toast">

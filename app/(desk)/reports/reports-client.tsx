@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
 import { RefreshIcon } from '@/components/icons'
+import { PnlSection } from './pnl-section'
 
 interface ProfitTotals {
   orders_delivered: number
@@ -65,6 +66,7 @@ export function ReportsClient({
   initialFrom,
   initialTo,
 }: ReportsClientProps) {
+  const [view, setView] = useState<'profit' | 'pnl'>('profit')
   const [report, setReport] = useState<ProfitReportData | null>(initialReport)
   const [datePreset, setDatePreset] = useState<DatePreset>('this_month')
   const [fromDate, setFromDate] = useState(initialFrom.slice(0, 10))
@@ -232,6 +234,38 @@ export function ReportsClient({
     cod_collected_usd: 0,
   }
 
+  const viewSwitch = (
+    <div role="group" aria-label="Report" style={{ display: 'inline-flex', gap: 4, padding: 3, border: '1px solid var(--line)', borderRadius: 8 }}>
+      {([['profit', 'Profit'], ['pnl', 'Profit & loss']] as const).map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={view === key}
+          className={`btn btn-sm ${view === key ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setView(key)}
+          style={{ fontSize: 12, padding: '4px 12px' }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (view === 'pnl') {
+    return (
+      <>
+        <div className="page-heading">
+          <div>
+            <h1>Profit & Loss</h1>
+            <p>What the company earned each month after courier pay, bonuses and expenses</p>
+          </div>
+          {viewSwitch}
+        </div>
+        <PnlSection workspaceId={workspaceId} />
+      </>
+    )
+  }
+
   return (
     <>
       <div className="page-heading">
@@ -241,6 +275,7 @@ export function ReportsClient({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {viewSwitch}
           <button
             type="button"
             className="btn btn-secondary"

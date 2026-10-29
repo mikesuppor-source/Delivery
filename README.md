@@ -111,6 +111,8 @@ npx vercel env add NEXT_PUBLIC_SITE_URL
 
 Or connect your GitHub repo to Vercel for automatic deployments.
 
+Scheduled jobs (`/api/cron/bonuses` for weekly courier bonuses, `/api/cron/holds` for warehouse hold checks) only run for a caller that sends `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET` in Vercel before scheduling them; without it they refuse every request. Nothing is scheduled by default, and courier bonuses can also be calculated by hand on the Courier Pay screen.
+
 ## Project Structure
 
 ```

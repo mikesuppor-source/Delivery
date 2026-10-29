@@ -7,6 +7,8 @@ import { KpiSection } from './sections/kpi-section'
 import { OrdersSection } from './sections/orders-section'
 import { SettlementsSection } from './sections/settlements-section'
 import { SpecialPricesSection } from './sections/special-prices-section'
+import { PayoutDetailsSection } from './sections/payout-details-section'
+import { StatementDownloadSection } from './sections/statement-download-section'
 import { ModalsSection } from './sections/modals-section'
 
 export function ShopProfileView() {
@@ -212,6 +214,8 @@ export function ShopProfileView() {
         </div>
 
         {activeTab === 'orders' && <OrdersSection />}
+        {activeTab === 'payouts' && <PayoutDetailsSection />}
+        {activeTab === 'statement' && <StatementDownloadSection />}
         {(activeTab === 'payouts' || activeTab === 'statement') && <SettlementsSection />}
         {activeTab === 'prices' && <SpecialPricesSection />}
       </div>

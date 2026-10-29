@@ -4,6 +4,7 @@ import React from 'react'
 import { HeaderSection } from './sections/header-section'
 import { KpiSection } from './sections/kpi-section'
 import { OrdersSection } from './sections/orders-section'
+import { StatementSection } from './sections/statement-section'
 import { CreateOrderModal } from './sections/create-order-modal'
 import { OrderModals } from './sections/order-modals'
 import { CashoutModal } from './sections/cashout-modal'
@@ -15,6 +16,7 @@ export function PortalView() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <HeaderSection />
       <KpiSection />
+      <StatementSection />
       <OrdersSection />
       <CreateOrderModal />
       <OrderModals />

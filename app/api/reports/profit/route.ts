@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { api, ApiError } from '@/lib/api'
 import { id, z } from '@/lib/validation'
-import { workspaceAccess } from '@/lib/access'
+import { authenticated, workspaceAccess } from '@/lib/access'
 
 const ProfitQuery = z.object({
   workspaceId: id,
@@ -25,9 +25,11 @@ export const GET = api(async req => {
     throw new ApiError(400, body.error.issues[0]?.message ?? 'Invalid query parameters')
   }
 
-  const { db } = await workspaceAccess(body.data.workspaceId, ['owner', 'manager'])
+  await workspaceAccess(body.data.workspaceId, ['owner', 'manager'])
 
-  const { data, error } = await (db as any).rpc('profit_report', {
+  // The function checks the caller's own role, so it runs as the signed-in user, not the service role
+  const { client } = await authenticated()
+  const { data, error } = await (client as any).rpc('profit_report', {
     p_workspace: body.data.workspaceId,
     p_from: body.data.from,
     p_to: body.data.to,

@@ -11,6 +11,9 @@ export interface Driver {
   pay_owed_usd: number
   user_id: string | null
   created_at?: string
+  /** 'fixed' keeps the zone rate on each order; 'percent' pays a share of the fee (Phase 6). */
+  pay_mode?: string
+  pay_percent?: number | null
 }
 
 export interface OrderItem {

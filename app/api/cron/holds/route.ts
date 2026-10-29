@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { api, checked } from '@/lib/api'
+import { requireCron } from '@/lib/cron'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -11,11 +12,8 @@ export const dynamic = 'force-dynamic'
  * - Flags holds stored longer than 7 days without release
  */
 export const GET = api(async req => {
-  const authHeader = req.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    // Authorized cron or local execution
-  }
+  // This reads every company's holds with the service role, so only the scheduler may call it
+  requireCron(req)
 
   const db = createServiceClient()
   const todayStr = new Date().toISOString().slice(0, 10)

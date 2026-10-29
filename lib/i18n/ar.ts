@@ -14,6 +14,9 @@ export const ar: Record<TranslationKey, string> = {
   navAdmin: 'فريق العمل والأعضاء',
   navWarehouse: 'المستودع الرئيسي',
   navPortalPrices: 'أسعار التوصيل',
+  navPayouts: 'دفعات المتاجر',
+  navCourierPay: 'أجور السائقين',
+  navExpenses: 'المصروفات',
 
   // Actions
   actionNewOrder: 'طلب جديد',

@@ -12,6 +12,9 @@ export const en = {
   navAdmin: 'Team & Members',
   navWarehouse: 'Warehouse Hub',
   navPortalPrices: 'My Prices',
+  navPayouts: 'Shop Payouts',
+  navCourierPay: 'Courier Pay',
+  navExpenses: 'Expenses',
 
   // Actions
   actionNewOrder: 'New Order',
