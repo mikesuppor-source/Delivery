@@ -450,5 +450,60 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     assert.ok(o1AfterHandover.returns_handed_at)
     assert.equal(o1AfterHandover.returns_signature_path, 'signatures/shopA_return.png')
   })
+
+  await t.test('customer experience: walk-in shop, message log, and ratings submission', async () => {
+    // 1. Walk-in Shop: get_or_create_walkin_shop creates once and is idempotent
+    const walkinShop1 = (await db.query("select get_or_create_walkin_shop($1) as id", [a])).rows[0].id
+    assert.ok(walkinShop1)
+    const walkinShop2 = (await db.query("select get_or_create_walkin_shop($1) as id", [a])).rows[0].id
+    assert.equal(walkinShop1, walkinShop2)
+
+    const walkinShopRow = (await db.query("select is_walkin, name from shops where id=$1", [walkinShop1])).rows[0]
+    assert.equal(walkinShopRow.is_walkin, true)
+
+    // 2. Message Logging
+    const testOrder = id(60)
+    await db.query(
+      "insert into orders(id, workspace_id, shop_id, code, tracking_token, status, usd_to_lbp_rate) values($1, $2, $3, 'MSG-ORD-60', 'tok-msg-60', 'pending', 89500)",
+      [testOrder, a, walkinShop1]
+    )
+    const logId = (await db.query(
+      "select log_customer_message($1, $2, 'whatsapp', 'order_created', '+961 70 111 222', 'Your order is confirmed', 'sent') as id",
+      [a, testOrder]
+    )).rows[0].id
+    assert.ok(logId)
+    const msgRow = (await db.query("select channel, template, status, sent_at from message_log where id=$1", [logId])).rows[0]
+    assert.equal(msgRow.channel, 'whatsapp')
+    assert.equal(msgRow.template, 'order_created')
+    assert.equal(msgRow.status, 'sent')
+    assert.ok(msgRow.sent_at)
+
+    // 3. Ratings: cannot rate an undelivered order
+    await assert.rejects(
+      db.query("select submit_order_rating('tok-msg-60', 5, 'Great!')"),
+      /Ratings can only be submitted for delivered orders/i
+    )
+
+    // Transition to delivered
+    const driverX = id(61)
+    await db.query("insert into drivers(id, workspace_id, name) values($1, $2, 'Rated Courier')", [driverX, a])
+    await db.query("update orders set status='delivered', driver_id=$1 where id=$2", [driverX, testOrder])
+
+    // Rate 5 stars
+    const ratingRes = (await db.query("select submit_order_rating('tok-msg-60', 5, 'Quick delivery!') as r")).rows[0].r
+    assert.equal(ratingRes.rating, 5)
+    assert.equal(ratingRes.driver_id, driverX)
+
+    // Cannot rate twice
+    await assert.rejects(
+      db.query("select submit_order_rating('tok-msg-60', 4, 'Duplicate')"),
+      /This order has already been rated/i
+    )
+
+    // Driver rating summary calculates correctly
+    const summary = (await db.query("select get_driver_rating_summary($1) as r", [driverX])).rows[0].r
+    assert.equal(Number(summary.average), 5.0)
+    assert.equal(summary.total_ratings, 1)
+  })
   }finally{await db.close()}
 })

@@ -1,4 +1,4 @@
-
+﻿
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
@@ -91,14 +91,14 @@ isOneToOne: false
                   ]
                 },"delivery_areas": {
                   Row: {
-                    "active": boolean,"assigned_driver_ids": (string)[],"created_at": string,"default_driver_id": string | null,"driver_pay_usd": number | null,"fee_usd": number,"free_storage_days": number,"id": string,"name": string,"return_driver_pay_usd": number,"return_fee_usd": number,"storage_fee_per_day_usd": number,"workspace_id": string
+                    "active": boolean,"assigned_driver_ids": (string)[],"created_at": string,"default_driver_id": string | null,"driver_pay_usd": number | null,"fee_usd": number,"free_storage_days": number,"id": string,"name": string,"return_driver_pay_usd": number,"return_fee_usd": number,"storage_fee_per_day_usd": number,"time_slots": (string)[] | null,"workspace_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"assigned_driver_ids"?: (string)[],"created_at"?: string,"default_driver_id"?: string | null,"driver_pay_usd"?: number | null,"fee_usd"?: number,"free_storage_days"?: number,"id"?: string,"name": string,"return_driver_pay_usd"?: number,"return_fee_usd"?: number,"storage_fee_per_day_usd"?: number,"workspace_id": string
+                    "active"?: boolean,"assigned_driver_ids"?: (string)[],"created_at"?: string,"default_driver_id"?: string | null,"driver_pay_usd"?: number | null,"fee_usd"?: number,"free_storage_days"?: number,"id"?: string,"name": string,"return_driver_pay_usd"?: number,"return_fee_usd"?: number,"storage_fee_per_day_usd"?: number,"time_slots"?: (string)[] | null,"workspace_id": string
                   }
                   Update: {
-                    "active"?: boolean,"assigned_driver_ids"?: (string)[],"created_at"?: string,"default_driver_id"?: string | null,"driver_pay_usd"?: number | null,"fee_usd"?: number,"free_storage_days"?: number,"id"?: string,"name"?: string,"return_driver_pay_usd"?: number,"return_fee_usd"?: number,"storage_fee_per_day_usd"?: number,"workspace_id"?: string
+                    "active"?: boolean,"assigned_driver_ids"?: (string)[],"created_at"?: string,"default_driver_id"?: string | null,"driver_pay_usd"?: number | null,"fee_usd"?: number,"free_storage_days"?: number,"id"?: string,"name"?: string,"return_driver_pay_usd"?: number,"return_fee_usd"?: number,"storage_fee_per_day_usd"?: number,"time_slots"?: (string)[] | null,"workspace_id"?: string
                   }
                   Relationships: [
                     {
@@ -285,6 +285,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"message_log": {
+                  Row: {
+                    "body": string | null,"channel": string,"created_at": string,"error": string | null,"id": string,"order_id": string | null,"sent_at": string | null,"status": string,"template": string,"to_phone": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body"?: string | null,"channel": string,"created_at"?: string,"error"?: string | null,"id"?: string,"order_id"?: string | null,"sent_at"?: string | null,"status"?: string,"template": string,"to_phone": string,"workspace_id": string
+                  }
+                  Update: {
+                    "body"?: string | null,"channel"?: string,"created_at"?: string,"error"?: string | null,"id"?: string,"order_id"?: string | null,"sent_at"?: string | null,"status"?: string,"template"?: string,"to_phone"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "message_log_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "message_log_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"money_ledger": {
                   Row: {
                     "cash_delta": number,"created_at": string,"driver_id": string | null,"id": string,"lbp_delta": number,"order_id": string | null,"pay_delta": number,"reason": string,"settlement_id": string | null,"shop_delta": number,"shop_id": string | null,"workspace_id": string
@@ -413,16 +439,48 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"orders": {
+                },"order_ratings": {
                   Row: {
-                    "accounting_version": number,"area_id": string | null,"carrier_name": string | null,"carrier_tracking_code": string | null,"cash_discrepancy_usd": number | null,"code": string,"collection_usd": number,"created_at": string,"created_by": string | null,"delivered_at": string | null,"delivery_fee_usd": number,"destination_caza": string | null,"destination_governorate": string | null,"destination_town": string | null,"driver_id": string | null,"driver_pay_usd": number,"hub_id": string | null,"id": string,"is_breakable": boolean,"is_held": boolean,"location_lat": number | null,"location_lng": number | null,"notes": string | null,"payment_method": string,"pod_collected_lbp": number | null,"pod_collected_usd": number | null,"pod_photo": string | null,"pod_signature": string | null,"received_at_hub": string | null,"recipient_address": string | null,"recipient_name": string | null,"recipient_phone": string | null,"returns_handed_at": string | null,"returns_signature_path": string | null,"route_position": number | null,"service_type": Database["public"]['Enums']["order_service_type"],"shop_balance_usd": number,"shop_id": string | null,"shopify_order_id": string | null,"shopify_order_number": string | null,"status": Database["public"]['Enums']["order_status"],"storage_fee_usd": number,"tracking_token": string,"updated_at": string,"usd_to_lbp_rate": number,"weight_kg": number,"workspace_id": string
+                    "comment": string | null,"created_at": string,"driver_id": string | null,"id": string,"order_id": string,"rating": number,"workspace_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"received_at_hub"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"returns_handed_at"?: string | null,"returns_signature_path"?: string | null,"route_position"?: number | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate": number,"weight_kg"?: number,"workspace_id": string
+                    "comment"?: string | null,"created_at"?: string,"driver_id"?: string | null,"id"?: string,"order_id": string,"rating": number,"workspace_id": string
                   }
                   Update: {
-                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"received_at_hub"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"returns_handed_at"?: string | null,"returns_signature_path"?: string | null,"route_position"?: number | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate"?: number,"weight_kg"?: number,"workspace_id"?: string
+                    "comment"?: string | null,"created_at"?: string,"driver_id"?: string | null,"id"?: string,"order_id"?: string,"rating"?: number,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "order_ratings_driver_id_fkey"
+      columns: ["driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_ratings_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: true
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_ratings_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"orders": {
+                  Row: {
+                    "accounting_version": number,"area_id": string | null,"carrier_name": string | null,"carrier_tracking_code": string | null,"cash_discrepancy_usd": number | null,"code": string,"collection_usd": number,"created_at": string,"created_by": string | null,"declared_value_usd": number | null,"delivered_at": string | null,"delivery_fee_usd": number,"destination_caza": string | null,"destination_governorate": string | null,"destination_town": string | null,"driver_id": string | null,"driver_pay_usd": number,"hub_id": string | null,"id": string,"is_breakable": boolean,"is_held": boolean,"location_lat": number | null,"location_lng": number | null,"notes": string | null,"payment_method": string,"pod_collected_lbp": number | null,"pod_collected_usd": number | null,"pod_photo": string | null,"pod_signature": string | null,"received_at_hub": string | null,"recipient_address": string | null,"recipient_name": string | null,"recipient_phone": string | null,"returns_handed_at": string | null,"returns_signature_path": string | null,"route_position": number | null,"sender_address": string | null,"sender_name": string | null,"sender_phone": string | null,"service_type": Database["public"]['Enums']["order_service_type"],"shop_balance_usd": number,"shop_id": string | null,"shopify_order_id": string | null,"shopify_order_number": string | null,"status": Database["public"]['Enums']["order_status"],"storage_fee_usd": number,"time_slot": string | null,"tracking_token": string,"updated_at": string,"usd_to_lbp_rate": number,"weight_kg": number,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"declared_value_usd"?: number | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"received_at_hub"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"returns_handed_at"?: string | null,"returns_signature_path"?: string | null,"route_position"?: number | null,"sender_address"?: string | null,"sender_name"?: string | null,"sender_phone"?: string | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"time_slot"?: string | null,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate": number,"weight_kg"?: number,"workspace_id": string
+                  }
+                  Update: {
+                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"declared_value_usd"?: number | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"received_at_hub"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"returns_handed_at"?: string | null,"returns_signature_path"?: string | null,"route_position"?: number | null,"sender_address"?: string | null,"sender_name"?: string | null,"sender_phone"?: string | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"time_slot"?: string | null,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate"?: number,"weight_kg"?: number,"workspace_id"?: string
                   }
                   Relationships: [
                     {
@@ -677,14 +735,14 @@ isOneToOne: true
                   ]
                 },"shops": {
                   Row: {
-                    "active": boolean,"address": string | null,"balance_usd": number,"created_at": string,"id": string,"name": string,"phone": string | null,"prefix": string | null,"shopify_domain": string | null,"user_id": string | null,"workspace_id": string
+                    "active": boolean,"address": string | null,"balance_usd": number,"created_at": string,"id": string,"is_walkin": boolean,"name": string,"phone": string | null,"prefix": string | null,"shopify_domain": string | null,"user_id": string | null,"workspace_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"name": string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id": string
+                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name": string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id": string
                   }
                   Update: {
-                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"name"?: string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id"?: string
+                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name"?: string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id"?: string
                   }
                   Relationships: [
                     {
@@ -717,14 +775,14 @@ isOneToOne: false
                   ]
                 },"workspaces": {
                   Row: {
-                    "created_at": string,"currency": string,"default_delivery_fee_usd": number | null,"default_driver_pay_usd": number | null,"id": string,"max_delivery_attempts": number,"max_driver_load": number,"name": string,"slug": string,"usd_to_lbp": number
+                    "created_at": string,"currency": string,"default_delivery_fee_usd": number | null,"default_driver_pay_usd": number | null,"id": string,"max_delivery_attempts": number,"max_driver_load": number,"name": string,"notify_delivered": boolean,"notify_failed_attempt": boolean,"notify_held": boolean,"notify_order_created": boolean,"notify_out_for_delivery": boolean,"slug": string,"usd_to_lbp": number,"whatsapp_business_account_id": string | null,"whatsapp_cloud_token": string | null,"whatsapp_phone_number_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name": string,"slug": string,"usd_to_lbp"?: number
+                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name": string,"notify_delivered"?: boolean,"notify_failed_attempt"?: boolean,"notify_held"?: boolean,"notify_order_created"?: boolean,"notify_out_for_delivery"?: boolean,"slug": string,"usd_to_lbp"?: number,"whatsapp_business_account_id"?: string | null,"whatsapp_cloud_token"?: string | null,"whatsapp_phone_number_id"?: string | null
                   }
                   Update: {
-                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name"?: string,"slug"?: string,"usd_to_lbp"?: number
+                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name"?: string,"notify_delivered"?: boolean,"notify_failed_attempt"?: boolean,"notify_held"?: boolean,"notify_order_created"?: boolean,"notify_out_for_delivery"?: boolean,"slug"?: string,"usd_to_lbp"?: number,"whatsapp_business_account_id"?: string | null,"whatsapp_cloud_token"?: string | null,"whatsapp_phone_number_id"?: string | null
                   }
                   Relationships: [
                     
@@ -744,6 +802,12 @@ isOneToOne: false
 "consume_limit":
 { Args: { "p_key": string,"p_max": number }; Returns: boolean
                            },
+"get_driver_rating_summary":
+{ Args: { "p_driver_id": string }; Returns: Json
+                           },
+"get_or_create_walkin_shop":
+{ Args: { "p_workspace_id": string }; Returns: string
+                           },
 "handover_returns":
 { Args: { "p_order_ids": (string)[],"p_shop_id": string,"p_signature_path"?: string }; Returns: Json
                            },
@@ -752,6 +816,9 @@ isOneToOne: false
                            },
 "is_member":
 { Args: { "ws_id": string }; Returns: boolean
+                           },
+"log_customer_message":
+{ Args: { "p_body": string,"p_channel": string,"p_error"?: string,"p_order_id": string,"p_status"?: string,"p_template": string,"p_to_phone": string,"p_workspace_id": string }; Returns: string
                            },
 "mark_cashout_paid":
 { Args: { "p_request": string,"p_user": string,"p_workspace": string }; Returns: string
@@ -804,6 +871,9 @@ isOneToOne: false
                            },
 "set_route_positions":
 { Args: { "p_driver_id": string,"p_positions": Json }; Returns: Json
+                           },
+"submit_order_rating":
+{ Args: { "p_comment"?: string,"p_rating": number,"p_tracking_token": string }; Returns: Json
                            },
 "track_orders_by_phone":
 { Args: { "p_phone": string }; Returns: Json

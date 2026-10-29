@@ -9,6 +9,7 @@ import { CourierTrackActions } from '@/components/courier-track-actions'
 import { formatOrderCode } from '@/lib/order-codes'
 import { SUPPORT_WHATSAPP } from '@/lib/support'
 import { CustomerGpsShare } from '@/components/customer-gps-share'
+import { CustomerOrderRating } from '@/components/customer-order-rating'
 import type { Metadata } from 'next'
 
 interface TrackPageProps {
@@ -40,13 +41,12 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           id, workspace_id, code, tracking_token, status, collection_usd, usd_to_lbp_rate, created_at, delivered_at,
           recipient_name, recipient_phone, recipient_address, service_type, is_breakable, weight_kg, carrier_tracking_code,
           is_held,
-          is_held,
         driver_id,
           shop:shop_id(name, phone),
           area:area_id(name),
-          driver:driver_id(id, name, phone),
+          driver:driver_id(id, name, phone, current_lat, current_lng, last_location_at),
         order_holds(reason, deliver_after, released_at),
-          order_holds(reason, deliver_after, released_at)
+        order_ratings(rating, comment, created_at)
         `)
         .eq('tracking_token', trimmed.toLowerCase())
         .maybeSingle()
@@ -64,8 +64,9 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
         driver_id,
         shop:shop_id(name, phone),
         area:area_id(name),
-        driver:driver_id(id, name, phone),
-        order_holds(reason, deliver_after, released_at)
+        driver:driver_id(id, name, phone, current_lat, current_lng, last_location_at),
+        order_holds(reason, deliver_after, released_at),
+        order_ratings(rating, comment, created_at)
       `)
       .eq('code', formatOrderCode(trimmed))
       .maybeSingle()
@@ -120,7 +121,8 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     driver_id: string | null
     shop: { name: string; phone?: string | null } | null
     area: { name: string } | null
-    driver: { id: string; name: string; phone?: string | null } | null
+    driver: { id: string; name: string; phone?: string | null; current_lat?: number | null; current_lng?: number | null; last_location_at?: string | null } | null;
+    order_ratings?: { rating: number; comment?: string | null; created_at: string } | Array<{ rating: number; comment?: string | null; created_at: string }> | null
   } | null
 
   if (!order) {
@@ -195,6 +197,8 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
   const dispatchContactNumber = supportPhone || courierPhone
 
   // Status mapping
+  const isGpsRecent = Boolean(order.driver?.last_location_at && (Date.now() - new Date(order.driver.last_location_at).getTime()) < 30 * 60 * 1000)
+
   const statusSteps = [
     { key: 'pending', label: 'Order Registered', desc: 'Received from merchant' },
     { key: 'assigned', label: 'Courier Assigned', desc: 'Driver preparing pickup' },
@@ -482,6 +486,62 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
             orderCode={order.code}
             trackingToken={order.tracking_token}
             currentAddress={order.recipient_address}
+          />
+        )}
+
+        {/* Approximate Live Courier Location when out for delivery */}
+        {order.status === 'picked_up' && order.driver?.current_lat && order.driver?.current_lng && isGpsRecent && (
+          <div
+            style={{
+              marginTop: 16,
+              background: '#ecfdf5',
+              border: '1.5px solid #a7f3d0',
+              borderRadius: 12,
+              padding: '16px 18px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🛵</span>
+                <strong style={{ color: '#065f46', fontSize: 14 }}>
+                  Courier is On The Way!
+                </strong>
+              </div>
+              <span style={{ fontSize: 11, background: '#d1fae5', color: '#047857', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
+                Live GPS Active
+              </span>
+            </div>
+            <p style={{ fontSize: 12, color: '#065f46', margin: '4px 0 10px' }}>
+              Your courier <strong>{order.driver.name}</strong> is in transit in your neighborhood.
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <a
+                href={'https://www.google.com/maps?q=' + (Math.round((order.driver.current_lat || 0) * 500) / 500) + ',' + (Math.round((order.driver.current_lng || 0) * 500) / 500)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>📍 View Courier Area (~200m)</span>
+              </a>
+              {order.driver.phone && (
+                <a
+                  href={'tel:' + order.driver.phone}
+                  className="btn btn-primary btn-sm"
+                  style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <span>📞 Call Courier</span>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Customer Rating Component (After Delivery) */}
+        {order.status === 'delivered' && (order.tracking_token || order.code) && (
+          <CustomerOrderRating
+            trackingToken={order.tracking_token || order.code}
+            existingRating={Array.isArray(order.order_ratings) ? (order.order_ratings[0] || null) : (order.order_ratings || null)}
           />
         )}
 

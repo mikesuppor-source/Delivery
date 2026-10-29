@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { LocationHelper } from '@/components/location-helper'
 import { searchLebaneseTowns, type TownSearchResult } from '@/lib/lebanon-geo'
+import { parseOrderText } from '@/lib/parse-order-text'
 import { formatUSD } from '@/lib/utils'
 import { breakdown, priceOrder } from '@/lib/pricing'
 import type { UserRole } from '@/lib/auth'
@@ -96,6 +97,8 @@ export function NewOrderClient({
   const [isBreakable, setIsBreakable] = useState(false)
   const [carrierTrackingCode, setCarrierTrackingCode] = useState('')
   const [notes, setNotes] = useState('')
+  const [pastedMessage, setPastedMessage] = useState('')
+  const [timeSlot, setTimeSlot] = useState('')
 
   // CRM Match
   const [phoneMatchedCustomer, setPhoneMatchedCustomer] = useState<{
@@ -189,12 +192,41 @@ export function NewOrderClient({
     }
   }
 
+  
+  function handleParseWhatsApp() {
+    if (!pastedMessage.trim()) return
+    const parsed = parseOrderText(pastedMessage, rate)
+    if (parsed.recipientName) setRecipientName(parsed.recipientName)
+    if (parsed.recipientPhone) setRecipientPhone(parsed.recipientPhone)
+    if (parsed.recipientAddress) setRecipientAddress(parsed.recipientAddress)
+    if (parsed.collectionUsd !== null && !isNaN(parsed.collectionUsd)) {
+      setNetItemUsd(String(parsed.collectionUsd))
+      setPricingMode('free_delivery')
+    }
+    if (parsed.notes) setNotes(parsed.notes)
+    if (parsed.town) {
+      setDestinationTown(parsed.town)
+      setTownSearchQuery(parsed.town)
+      const match = areas.find(a =>
+        a.name.toLowerCase().includes(parsed.town!.toLowerCase()) ||
+        (parsed.caza && a.name.toLowerCase().includes(parsed.caza.toLowerCase())) ||
+        (parsed.governorate && a.name.toLowerCase().includes(parsed.governorate.toLowerCase()))
+      )
+      if (match) {
+        setAreaId(match.id)
+        updatePricingFor(shopId, match.id)
+      }
+    }
+  }
+
   function resetForm() {
     setCustomCode('')
     setRecipientName('')
     setRecipientPhone('')
     setRecipientAddress('')
     setDestinationTown('')
+    setPastedMessage('')
+    setTimeSlot('')
     setTownSearchQuery('')
     setNotes('')
     setServiceType('delivery')
@@ -253,6 +285,7 @@ export function NewOrderClient({
           isBreakable,
           carrierTrackingCode: carrierTrackingCode.trim() || undefined,
           destinationTown: destinationTown.trim() || undefined,
+          timeSlot: timeSlot || undefined,
           notes,
         }),
       })
@@ -384,6 +417,58 @@ export function NewOrderClient({
           <form onSubmit={e => { e.preventDefault(); submitOrder(false) }}>
             <div className="form-grid">
               
+              
+              {/* ⚡ Quick WhatsApp / Phone Order Intake & Paste Parser */}
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  background: 'var(--brand-light)',
+                  border: '1.5px solid var(--brand)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '16px',
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>⚡</span>
+                    <strong style={{ fontSize: 13, color: 'var(--brand)' }}>
+                      Quick WhatsApp / Phone Order Intake
+                    </strong>
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    Paste customer message in English or Arabic to auto-fill
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <textarea
+                    rows={2}
+                    value={pastedMessage}
+                    onChange={e => setPastedMessage(e.target.value)}
+                    placeholder="Paste order message (e.g. 'Name: Maya, 70 123 456, Hamra near Plaza, $35' or 'الاسم: رامي, 03555666...')"
+                    style={{
+                      flex: 1,
+                      fontSize: 12,
+                      padding: '8px 12px',
+                      borderRadius: 6,
+                      border: '1px solid var(--line)',
+                      background: 'var(--surface)',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleParseWhatsApp}
+                    className="btn btn-primary btn-sm"
+                    style={{ whiteSpace: 'nowrap', padding: '10px 14px', fontSize: 12, fontWeight: 700 }}
+                  >
+                    ⚡ Parse & Fill
+                  </button>
+                </div>
+              </div>
+
               {/* Quick Preset for Retail Return / Refund */}
               <div
                 style={{
@@ -1074,6 +1159,25 @@ export function NewOrderClient({
                     Return Pickup (مرتجع)
                   </button>
                 </div>
+              </div>
+
+              
+              {/* Delivery Time Slot */}
+              <div className="field">
+                <label htmlFor="order-time-slot">Delivery Time Slot (نافذة التوصيل)</label>
+                <select
+                  id="order-time-slot"
+                  value={timeSlot}
+                  onChange={e => setTimeSlot(e.target.value)}
+                >
+                  <option value="">Any time (Regular delivery)</option>
+                  <option value="09:00 - 13:00">Morning (09:00 - 13:00)</option>
+                  <option value="13:00 - 17:00">Afternoon (13:00 - 17:00)</option>
+                  <option value="17:00 - 21:00">Evening (17:00 - 21:00)</option>
+                </select>
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>
+                  Preferred delivery window for courier routing
+                </small>
               </div>
 
               {/* Package Weight */}

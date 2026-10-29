@@ -8,6 +8,7 @@ import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 import { findBestDriverForArea } from '@/lib/auto-dispatch'
 import { sendPushToDriver } from '@/lib/push'
 import { loadPricing, loadReturnPricing } from '@/lib/pricing-server'
+import { dispatchCustomerNotification } from '@/lib/messaging'
 import type { ReturnPricing } from '@/lib/orders'
 
 const CreateOrder = z.object({
@@ -32,6 +33,7 @@ const CreateOrder = z.object({
   destinationGovernorate: text(100),
   destinationCaza: text(100),
   destinationTown: text(100),
+  timeSlot: text(50),
   notes: text(4000),
 })
 // Field-level rules for edits live in orderPatch (shared with the courier app)
@@ -88,6 +90,7 @@ export const POST = api(async req => {
     destination_governorate:body.destinationGovernorate,
     destination_caza:body.destinationCaza,
     destination_town:body.destinationTown,
+    time_slot:body.timeSlot || null,
     notes:body.notes,created_by:user.id
   }).select(ORDER_SELECT).single())
 
@@ -98,6 +101,23 @@ export const POST = api(async req => {
       url: `/driver/${resolvedDriverId}`,
       tag: `order-${order.code}`,
     }).catch(e => console.error('[Push Dispatch Error]:', e))
+  }
+
+  // Automatic customer notification dispatch
+  if (order.recipient_phone) {
+    const origin = req.headers.get('origin') || req.headers.get('host') || 'http://localhost:3000'
+    const fullOrigin = origin.startsWith('http') ? origin : 'http://' + origin
+    dispatchCustomerNotification({
+      workspaceId,
+      orderId: order.id,
+      toPhone: order.recipient_phone,
+      template: 'order_created',
+      params: {
+        code: order.code,
+        shop: (order as any).shop?.name || 'Cedar Desk',
+        track_url: `${fullOrigin}/track/${order.tracking_token || order.code}`,
+      },
+    }).catch(e => console.warn('[Customer Notification Error]:', e))
   }
 
   return NextResponse.json({success:true,order})

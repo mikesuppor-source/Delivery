@@ -37,7 +37,9 @@ export async function middleware(request: NextRequest) {
       '/reset-password',
       '/shopify',
       '/track',
+      '/send',
       '/driver',
+      '/api/send',
       '/api/driver/auth',
       '/api/portal/auth/signup',
       '/api/webhooks/shopify',
@@ -52,7 +54,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/invite/') ||
     path === '/driver' ||
     path.startsWith('/driver/') ||
-    path.startsWith('/api/driver/')
+    path.startsWith('/api/driver/') ||
+    (path.startsWith('/api/orders/') && path.endsWith('/rating'))
 
   const hasDriverSession = Boolean(request.cookies.get('cedar_driver_session')?.value)
   const isDriverApi =
