@@ -71,22 +71,51 @@ test.describe('Phase 2: Design Foundation & App Shell', () => {
   })
 
   test('executive dashboard renders all 6 KPI cards, attention alerts, and fleet status', async ({ page }) => {
-    await signInOwner(page)
-    await page.goto('/')
+    // "Needs Attention" is only drawn when something needs attention, and a freshly seeded database has
+    // nothing that does. Add an order that has waited unassigned for 45 minutes (the dashboard flags
+    // pending orders with no courier after 30) and cancel it again afterwards.
+    const { db, workspaceId, shopId, areaId } = await seeded()
+    const { data: waiting, error } = await db
+      .from('orders')
+      .insert({
+        workspace_id: workspaceId,
+        shop_id: shopId,
+        area_id: areaId,
+        status: 'pending',
+        code: 'LS-WAIT' + Math.random().toString(36).slice(2, 7).toUpperCase(),
+        usd_to_lbp_rate: 89500,
+        collection_usd: 11,
+        delivery_fee_usd: 3,
+        driver_pay_usd: 2,
+        recipient_name: 'E2E Customer',
+        recipient_phone: '+961 3 555 666',
+        recipient_address: 'Hamra Street 12',
+        created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+      })
+      .select('id')
+      .single()
+    expect(error?.message).toBeUndefined()
 
-    // Check presence of 6 KPI Cards
-    await expect(page.locator('text=New Orders Today').first()).toBeVisible({ timeout: 15_000 })
-    await expect(page.locator('text=Delivered Today').first()).toBeVisible()
-    await expect(page.locator('text=Delivery Success Rate').first()).toBeVisible()
-    await expect(page.locator('text=On-Time Rate').first()).toBeVisible()
-    await expect(page.locator('text=Cash with Couriers').first()).toBeVisible()
-    await expect(page.locator("text=Today's Net Profit").first()).toBeVisible()
+    try {
+      await signInOwner(page)
+      await page.goto('/')
 
-    // Check Needs Attention section
-    await expect(page.locator('text=Needs Attention').first()).toBeVisible()
+      // Check presence of 6 KPI Cards
+      await expect(page.locator('text=New Orders Today').first()).toBeVisible({ timeout: 15_000 })
+      await expect(page.locator('text=Delivered Today').first()).toBeVisible()
+      await expect(page.locator('text=Delivery Success Rate').first()).toBeVisible()
+      await expect(page.locator('text=On-Time Rate').first()).toBeVisible()
+      await expect(page.locator('text=Cash with Couriers').first()).toBeVisible()
+      await expect(page.locator("text=Today's Net Profit").first()).toBeVisible()
 
-    // Check Couriers on duty section
-    await expect(page.locator('text=Couriers On Duty').first()).toBeVisible()
+      // Check Needs Attention section
+      await expect(page.locator('text=Needs Attention').first()).toBeVisible()
+
+      // Check Couriers on duty section
+      await expect(page.locator('text=Couriers On Duty').first()).toBeVisible()
+    } finally {
+      if (waiting) await db.from('orders').update({ status: 'cancelled' }).eq('id', waiting.id)
+    }
   })
 
   test('saved views API supports CRUD operations with strict tenant isolation', async ({ page }) => {
