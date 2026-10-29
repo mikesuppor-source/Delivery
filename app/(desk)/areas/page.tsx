@@ -18,11 +18,11 @@ export default async function AreasPage() {
   if (!member) return null
   await requireRole(member.workspace_id, 'manager')
 
-  const [areasRes, driversRes] = await Promise.all([
+  const [areasRes, driversRes, wsRes] = await Promise.all([
     allRows(
       supabase
         .from('delivery_areas')
-        .select('id, name, fee_usd, active, default_driver_id, assigned_driver_ids, default_driver:default_driver_id(id, name, phone)')
+        .select('id, name, fee_usd, driver_pay_usd, return_fee_usd, return_driver_pay_usd, active, default_driver_id, assigned_driver_ids, default_driver:default_driver_id(id, name, phone)')
         .eq('workspace_id', member.workspace_id)
         .eq('active', true)
         .order('name')
@@ -35,7 +35,16 @@ export default async function AreasPage() {
         .eq('active', true)
         .order('name')
     ),
+    supabase
+      .from('workspaces')
+      .select('default_delivery_fee_usd, default_driver_pay_usd')
+      .eq('id', member.workspace_id)
+      .single(),
   ])
+
+  const defaultDriverPayUsd = wsRes.data?.default_driver_pay_usd !== null && wsRes.data?.default_driver_pay_usd !== undefined
+    ? Number(wsRes.data.default_driver_pay_usd)
+    : 1
 
   return (
     <div className="content">
@@ -44,6 +53,7 @@ export default async function AreasPage() {
         drivers={(driversRes.data as any) || []}
         workspaceId={member.workspace_id}
         userRole={member.role as UserRole}
+        defaultDriverPayUsd={defaultDriverPayUsd}
       />
     </div>
   )

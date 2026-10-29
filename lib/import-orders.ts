@@ -2,7 +2,8 @@ import { ApiError, checked, money, textField } from './api'
 import { createServiceClient } from './supabase/server'
 import { generateUniqueOrderCode } from './order-codes'
 import { formatLebanesePhone } from './phone'
-export function matchArea(areas: {id:string;name:string;fee_usd:number;default_driver_id?:string|null}[], terms: unknown[]) {
+import { loadPricing } from './pricing-server'
+export function matchArea(areas: {id:string;name:string;fee_usd:number;driver_pay_usd?:number|null;return_fee_usd?:number;return_driver_pay_usd?:number;default_driver_id?:string|null}[], terms: unknown[]) {
  const normalized=terms.filter((v):v is string=>typeof v==='string'&&!!v.trim()).map(v=>v.trim().toLowerCase())
  const matches=areas.filter(a=>normalized.includes(a.name.trim().toLowerCase()))
  return matches.length===1?matches[0]:undefined
@@ -31,12 +32,16 @@ export async function importShopifyOrder(shop: {id:string;workspace_id:string;pr
   if(!driver)driverId=null
  }
  const collection=collectibleUsd(payload,Number(ws.usd_to_lbp))
- const fee=area?Number(area.fee_usd):3
+ const pricing=await loadPricing(db, {
+  workspaceId: shop.workspace_id,
+  areaId: area?.id || null,
+  shopId: shop.id,
+ })
  const code=await generateUniqueOrderCode(db,shop.prefix||'CD')
  const result=await db.from('orders').insert({
   workspace_id:shop.workspace_id,shop_id:shop.id,shopify_order_id:String(payload.id),shopify_order_number:String(payload.name||payload.order_number||payload.id),
-  code,status:driverId?'assigned':'pending',driver_id:driverId,area_id:area?.id||null,collection_usd:collection,delivery_fee_usd:fee,
-  driver_pay_usd:Math.max(1,fee-1),usd_to_lbp_rate:ws.usd_to_lbp,
+  code,status:driverId?'assigned':'pending',driver_id:driverId,area_id:area?.id||null,collection_usd:collection,delivery_fee_usd:pricing.feeUsd,
+  driver_pay_usd:pricing.driverPayUsd,usd_to_lbp_rate:ws.usd_to_lbp,
   recipient_name:textField(shipping.name||[shipping.first_name,shipping.last_name].filter(Boolean).join(' ')||'Shopify Customer','recipient',200),
   recipient_phone:formatLebanesePhone(String(shipping.phone||payload.customer?.phone||payload.phone||'')),
   recipient_address:[shipping.address1,shipping.address2,shipping.city,shipping.province,shipping.country].filter(Boolean).join(', ').slice(0,1000),

@@ -7,6 +7,8 @@ import { ORDER_SELECT, orderPatch } from '@/lib/orders'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 import { findBestDriverForArea } from '@/lib/auto-dispatch'
 import { sendPushToDriver } from '@/lib/push'
+import { loadPricing, loadReturnPricing } from '@/lib/pricing-server'
+import type { ReturnPricing } from '@/lib/orders'
 
 const CreateOrder = z.object({
   workspaceId: id,
@@ -16,8 +18,8 @@ const CreateOrder = z.object({
   autoAssign: z.boolean().optional(),
   code: text(60),
   collectionUsd: money(),
-  deliveryFeeUsd: money(),
-  driverPayUsd: money(),
+  deliveryFeeUsd: money().optional(),
+  driverPayUsd: money().optional(),
   recipientName: text(200),
   recipientPhone: text(40),
   recipientAddress: text(1000),
@@ -64,13 +66,18 @@ export const POST = api(async req => {
   }
   await validateReferences(db,workspaceId,{shops:body.shopId,drivers:resolvedDriverId,delivery_areas:body.areaId})
   const ws=checked(await db.from('workspaces').select('usd_to_lbp').eq('id',workspaceId).single())
+  // Fill pricing from the waterfall when the caller omits fee/pay (shops, API imports)
+  // Managers who send explicit values always win (§4.1)
+  const pricing=await loadPricing(db,{workspaceId,areaId:body.areaId||null,shopId:body.shopId||null})
+  const resolvedFee=body.deliveryFeeUsd??pricing.feeUsd
+  const resolvedPay=body.driverPayUsd??pricing.driverPayUsd
   const code=body.code ? formatOrderCode(body.code) : await generateUniqueOrderCode(db,'CD')
   if (!code) throw new ApiError(400,'Invalid tracking code')
   const order=checked(await db.from('orders').insert({
     workspace_id:workspaceId,code,shop_id:body.shopId||null,driver_id:resolvedDriverId||null,area_id:body.areaId||null,
     status:resolvedDriverId?'assigned':'pending',usd_to_lbp_rate:ws.usd_to_lbp,
-    collection_usd:body.collectionUsd,delivery_fee_usd:body.deliveryFeeUsd,
-    driver_pay_usd:body.driverPayUsd,recipient_name:body.recipientName,
+    collection_usd:body.collectionUsd,delivery_fee_usd:resolvedFee,
+    driver_pay_usd:resolvedPay,recipient_name:body.recipientName,
     recipient_phone:body.recipientPhone,recipient_address:body.recipientAddress,
     service_type:body.serviceType,
     weight_kg:body.weightKg,
@@ -106,7 +113,12 @@ export const PATCH = api(async req => {
     const {data:driver}=await db.from('drivers').select('id').eq('id',order.driver_id).eq('user_id',user.id).eq('active',true).maybeSingle()
     if(!driver) throw new ApiError(403,'Order is not assigned to you')
   }
-  const updates=orderPatch(body,order,isDriver)
+  let returnPricing: ReturnPricing|undefined
+  if(body.status==='returned'&&order.status!=='returned'){
+    const rp=await loadReturnPricing(db,order)
+    returnPricing={returnFeeUsd:rp.returnFeeUsd,returnDriverPayUsd:rp.returnDriverPayUsd}
+  }
+  const updates=orderPatch(body,order,isDriver,returnPricing)
   if(!isDriver && body.code!==undefined) {
     updates.code=formatOrderCode(body.code)
     if(!updates.code) throw new ApiError(400,'Invalid code')

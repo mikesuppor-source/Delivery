@@ -327,6 +327,9 @@ export type Database = {
           default_driver_id: string | null
           assigned_driver_ids: string[]
           fee_usd: number
+          driver_pay_usd: number | null
+          return_fee_usd: number
+          return_driver_pay_usd: number
           id: string
           name: string
           workspace_id: string
@@ -337,6 +340,9 @@ export type Database = {
           default_driver_id?: string | null
           assigned_driver_ids?: string[]
           fee_usd?: number
+          driver_pay_usd?: number | null
+          return_fee_usd?: number
+          return_driver_pay_usd?: number
           id?: string
           name: string
           workspace_id: string
@@ -347,6 +353,9 @@ export type Database = {
           default_driver_id?: string | null
           assigned_driver_ids?: string[]
           fee_usd?: number
+          driver_pay_usd?: number | null
+          return_fee_usd?: number
+          return_driver_pay_usd?: number
           id?: string
           name?: string
           workspace_id?: string
@@ -750,6 +759,38 @@ export type Database = {
           },
         ]
       }
+      shop_area_prices: {
+        Row: {
+          workspace_id: string
+          shop_id: string
+          area_id: string
+          fee_usd: number
+          updated_at: string
+        }
+        Insert: {
+          workspace_id: string
+          shop_id: string
+          area_id: string
+          fee_usd: number
+          updated_at?: string
+        }
+        Update: {
+          workspace_id?: string
+          shop_id?: string
+          area_id?: string
+          fee_usd?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_area_prices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
@@ -837,6 +878,7 @@ export type Database = {
         Returns: Database["public"]["Tables"]["cashout_requests"]["Row"]
       }
       set_driver_pin: { Args: { p_driver: string; p_pin: string }; Returns: boolean }
+      profit_report: { Args: { p_workspace: string; p_from: string; p_to: string }; Returns: Json }
       track_orders_by_phone: { Args: { p_phone: string }; Returns: Json }
       verify_driver_login: {
         Args: { p_phone: string; p_pin: string }

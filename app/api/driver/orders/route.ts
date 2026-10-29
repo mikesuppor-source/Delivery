@@ -3,6 +3,8 @@ import { api, ApiError, checked } from '@/lib/api'
 import { id, parseBody, z } from '@/lib/validation'
 import { driverAccess } from '@/lib/access'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
+import type { ReturnPricing } from '@/lib/orders'
+import { loadReturnPricing } from '@/lib/pricing-server'
 import { savePod } from '@/lib/pod'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 import { allRows } from '@/lib/pagination'
@@ -46,7 +48,12 @@ export const PATCH = api(async req => {
   const {db,driver}=await driverAccess(body.driverId)
   const order=checked(await db.from('orders').select('*').eq('id',body.orderId).eq('driver_id',driver.id).eq('workspace_id',driver.workspace_id).single())
   if(!order) throw new ApiError(404,'Order not found')
-  const updates=orderPatch(body,order,true)
+  let returnPricing: ReturnPricing|undefined
+  if(body.status==='returned'&&order.status!=='returned'){
+    const rp=await loadReturnPricing(db,order)
+    returnPricing={returnFeeUsd:rp.returnFeeUsd,returnDriverPayUsd:rp.returnDriverPayUsd}
+  }
+  const updates=orderPatch(body,order,true,returnPricing)
   if(body.podPhoto) updates.pod_photo=await savePod(db,order.id,body.podPhoto,'photo')
   if(body.podSignature) updates.pod_signature=await savePod(db,order.id,body.podSignature,'signature')
   const updated=checked(await db.from('orders').update(updates).eq('id',order.id).eq('driver_id',driver.id).eq('updated_at',order.updated_at).select(ORDER_SELECT).maybeSingle())

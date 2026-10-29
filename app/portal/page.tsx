@@ -22,7 +22,7 @@ export default async function MerchantPortalPage() {
   const serviceClient = createServiceClient()
 
   // Find shop connected to this user via multi-level fallback
-  let shop = await getShopForUser(serviceClient, user)
+  const shop = await getShopForUser(serviceClient, user)
 
 
 
@@ -44,20 +44,31 @@ export default async function MerchantPortalPage() {
     .eq('shop_id', effectiveShop.id)
     .order('created_at', { ascending: false }))
 
-  // Fetch delivery areas
-  const { data: areas } = await allRows(serviceClient
-    .from('delivery_areas')
-    .select('id, name, fee_usd')
-    .eq('workspace_id', effectiveShop.workspace_id)
-    .eq('active', true)
-    .order('name'))
+  // Fetch delivery areas and shop special prices
+  const [areasRes, pricesRes, wsRes] = await Promise.all([
+    allRows(
+      serviceClient
+        .from('delivery_areas')
+        .select('id, name, fee_usd')
+        .eq('workspace_id', effectiveShop.workspace_id)
+        .eq('active', true)
+        .order('name')
+    ),
+    serviceClient
+      .from('shop_area_prices')
+      .select('area_id, fee_usd')
+      .eq('workspace_id', effectiveShop.workspace_id)
+      .eq('shop_id', effectiveShop.id),
+    serviceClient
+      .from('workspaces')
+      .select('name, usd_to_lbp')
+      .eq('id', effectiveShop.workspace_id)
+      .single(),
+  ])
 
-  // Fetch workspace exchange rate
-  const { data: ws } = await serviceClient
-    .from('workspaces')
-    .select('name, usd_to_lbp')
-    .eq('id', effectiveShop.workspace_id)
-    .single()
+  const areas = areasRes.data || []
+  const specialPrices = (pricesRes.data as any[]) || []
+  const ws = wsRes.data
 
   const mappedOrders = ((orders || []) as any[]).map(o => ({
     ...o,
@@ -77,6 +88,7 @@ export default async function MerchantPortalPage() {
           shop={effectiveShop}
           initialOrders={mappedOrders}
           areas={areas || []}
+          specialPrices={specialPrices}
           rate={Number(ws?.usd_to_lbp) || 89500}
           workspaceName={ws?.name || 'Cedar Delivery'}
         />

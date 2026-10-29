@@ -43,3 +43,8 @@ supabase/.temp/
 # playwright
 /test-results/
 /playwright-report/
+
+# agent & local tools
+.agents/
+.claude/skills/
+skills-lock.json

@@ -62,6 +62,7 @@ interface PortalClientProps {
   shop: Shop
   initialOrders: PortalOrder[]
   areas: DeliveryArea[]
+  specialPrices?: Array<{ area_id: string; fee_usd: number }>
   rate: number
   workspaceName: string
 }
@@ -70,6 +71,7 @@ export function PortalClient({
   shop,
   initialOrders,
   areas,
+  specialPrices = [],
   rate,
   workspaceName,
 }: PortalClientProps) {
@@ -305,9 +307,18 @@ export function PortalClient({
     }
   }
 
-  // Derived selected area & fee
+  // Derived selected area & special prices lookup
+  const specialMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const sp of specialPrices) {
+      map.set(sp.area_id, Number(sp.fee_usd))
+    }
+    return map
+  }, [specialPrices])
+
   const selectedArea = areas.find(a => a.id === areaId) || areas[0]
-  const deliveryFeeUSD = selectedArea ? Number(selectedArea.fee_usd) : 3.00
+  const specialFee = selectedArea ? specialMap.get(selectedArea.id) : undefined
+  const deliveryFeeUSD = specialFee !== undefined ? specialFee : (selectedArea ? Number(selectedArea.fee_usd) : 3.00)
   const deliveryFeeLBP = usdToLbp(deliveryFeeUSD, rate)
 
   // Computed Net Merchandise, COD, and Payout
@@ -1293,11 +1304,15 @@ export function PortalClient({
               required
               style={{ fontSize: 13.5 }}
             >
-              {areas.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.name} — {formatUSD(Number(a.fee_usd))} ({formatLBP(usdToLbp(Number(a.fee_usd), rate))})
-                </option>
-              ))}
+              {areas.map(a => {
+                const spFee = specialMap.get(a.id)
+                const fee = spFee !== undefined ? spFee : Number(a.fee_usd)
+                return (
+                  <option key={a.id} value={a.id}>
+                    {a.name} — {formatUSD(fee)} ({formatLBP(usdToLbp(fee, rate))}){spFee !== undefined ? ' ★ Special Rate' : ''}
+                  </option>
+                )
+              })}
             </select>
           </div>
 

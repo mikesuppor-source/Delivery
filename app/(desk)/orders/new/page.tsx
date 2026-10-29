@@ -46,8 +46,8 @@ export default async function NewOrderPage() {
     redirect('/onboarding')
   }
 
-  // Parallel fetches for active shops, active drivers, and active delivery areas
-  const [shopsRes, driversRes, areasRes] = await Promise.all([
+  // Parallel fetches for shops, drivers, areas (with driver_pay_usd), and shop_area_prices
+  const [shopsRes, driversRes, areasRes, shopPricesRes] = await Promise.all([
     allRows(
       supabase
         .from('shops')
@@ -67,11 +67,15 @@ export default async function NewOrderPage() {
     allRows(
       supabase
         .from('delivery_areas')
-        .select('id, name, fee_usd')
+        .select('id, name, fee_usd, driver_pay_usd, return_fee_usd, return_driver_pay_usd')
         .eq('workspace_id', workspace.id)
         .eq('active', true)
         .order('name')
     ),
+    supabase
+      .from('shop_area_prices')
+      .select('shop_id, area_id, fee_usd')
+      .eq('workspace_id', workspace.id),
   ])
 
   return (
@@ -82,6 +86,7 @@ export default async function NewOrderPage() {
         shops={(shopsRes.data as any) || []}
         drivers={(driversRes.data as any) || []}
         areas={(areasRes.data as any) || []}
+        shopAreaPrices={(shopPricesRes.data as any) || []}
         userRole={member.role as UserRole}
         rate={Number(workspace.usd_to_lbp) || 89500}
         defaultDriverPayUsd={workspace.default_driver_pay_usd}

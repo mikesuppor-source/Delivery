@@ -8,12 +8,16 @@ import { id,money,optionalId,parseBody,requiredText,text,z } from './validation'
 const CreateCatalog=z.object({
  workspaceId:id,name:requiredText(200),phone:text(40),address:text(1000),
  pinCode:z.string().optional(),userId:optionalId,feeUsd:money(),assignedDriverIds:z.array(z.unknown()).optional(),
+ // Zone pricing (Phase 1): null means use the workspace default
+ driverPayUsd:money().optional(),returnFeeUsd:money().optional(),returnDriverPayUsd:money().optional(),
 })
 const ChangeCatalog=z.object({
  workspaceId:id,id:id.optional(),areaId:id.optional(),
  name:requiredText(200).optional(),phone:text(40).optional(),address:text(1000).optional(),
  pinCode:z.string().optional(),resetPin:z.boolean().optional(),active:z.boolean().optional(),
  feeUsd:money().optional(),defaultDriverId:optionalId.optional(),assignedDriverIds:z.array(z.unknown()).optional(),
+ // Zone pricing (Phase 1)
+ driverPayUsd:money().optional(),returnFeeUsd:money().optional(),returnDriverPayUsd:money().optional(),
 })
 type Db=Awaited<ReturnType<typeof workspaceAccess>>['db']
 // Area driver pools may only contain this workspace's couriers.
@@ -39,6 +43,9 @@ export function createCatalog(table:Table) {
   const row:Record<string,unknown>={workspace_id:workspaceId,name:body.name}
   if(table==='delivery_areas'){
    row.fee_usd=body.feeUsd
+   if(body.driverPayUsd!==undefined)row.driver_pay_usd=body.driverPayUsd
+   if(body.returnFeeUsd!==undefined)row.return_fee_usd=body.returnFeeUsd
+   if(body.returnDriverPayUsd!==undefined)row.return_driver_pay_usd=body.returnDriverPayUsd
    if(body.assignedDriverIds){
     const cleanDriverIds = await workspaceDriverIds(db,workspaceId,body.assignedDriverIds)
     row.assigned_driver_ids = cleanDriverIds
@@ -79,6 +86,9 @@ export async function changeCatalog(req:NextRequest,table:Table,recordId?:string
   if(body.active!==undefined)updates.active=body.active
   if(table==='delivery_areas'){
    if(body.feeUsd!==undefined)updates.fee_usd=body.feeUsd
+   if(body.driverPayUsd!==undefined)updates.driver_pay_usd=body.driverPayUsd
+   if(body.returnFeeUsd!==undefined)updates.return_fee_usd=body.returnFeeUsd
+   if(body.returnDriverPayUsd!==undefined)updates.return_driver_pay_usd=body.returnDriverPayUsd
    if(body.defaultDriverId!==undefined){
     await validateReferences(db,workspaceId,{drivers:body.defaultDriverId})
     updates.default_driver_id=body.defaultDriverId

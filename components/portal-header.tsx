@@ -83,6 +83,23 @@ export function PortalHeader({ shopName, shopPrefix, userEmail }: PortalHeaderPr
             {shopName}
           </span>
         </div>
+
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 16 }}>
+          <Link
+            href="/portal"
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}
+          >
+            Orders
+          </Link>
+          <Link
+            href="/portal/prices"
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}
+          >
+            My Prices
+          </Link>
+        </nav>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

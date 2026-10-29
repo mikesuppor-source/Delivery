@@ -32,8 +32,8 @@ export default async function ShopProfilePage({ params }: ShopProfilePageProps) 
   const workspace = wsData as { id: string; name: string; usd_to_lbp: number } | null
   if (!workspace) redirect('/login')
 
-  // Parallel fetches for shop, shop's orders, and shop payouts
-  const [shopRes, ordersRes, settlementsRes] = await Promise.all([
+  // Parallel fetches for shop, shop's orders, shop payouts, zones, and shop special prices
+  const [shopRes, ordersRes, settlementsRes, areasRes, pricesRes] = await Promise.all([
     supabase
       .from('shops')
       .select('*')
@@ -58,6 +58,19 @@ export default async function ShopProfilePage({ params }: ShopProfilePageProps) 
       .eq('workspace_id', workspace.id)
       .eq('shop_id', id)
       .order('created_at', { ascending: false })),
+
+    allRows(supabase
+      .from('delivery_areas')
+      .select('id, name, fee_usd')
+      .eq('workspace_id', workspace.id)
+      .eq('active', true)
+      .order('name')),
+
+    supabase
+      .from('shop_area_prices')
+      .select('area_id, fee_usd')
+      .eq('workspace_id', workspace.id)
+      .eq('shop_id', id),
   ])
 
   if (!shopRes.data) {
@@ -67,6 +80,8 @@ export default async function ShopProfilePage({ params }: ShopProfilePageProps) 
   const shop = shopRes.data
   const orders = (ordersRes.data as any[]) || []
   const settlements = (settlementsRes.data as any[]) || []
+  const areas = (areasRes.data as any[]) || []
+  const specialPrices = (pricesRes.data as any[]) || []
 
   return (
     <div className="content">
@@ -74,6 +89,8 @@ export default async function ShopProfilePage({ params }: ShopProfilePageProps) 
         shop={shop}
         initialOrders={orders}
         initialSettlements={settlements}
+        areas={areas}
+        initialSpecialPrices={specialPrices}
         workspace={workspace}
         userRole={member.role as UserRole}
       />

@@ -71,10 +71,23 @@ interface Workspace {
   usd_to_lbp: number
 }
 
+interface DeliveryAreaItem {
+  id: string
+  name: string
+  fee_usd: number
+}
+
+interface SpecialPriceItem {
+  area_id: string
+  fee_usd: number
+}
+
 interface ShopProfileClientProps {
   shop: Shop
   initialOrders: OrderItem[]
   initialSettlements: SettlementItem[]
+  areas?: DeliveryAreaItem[]
+  initialSpecialPrices?: SpecialPriceItem[]
   workspace: Workspace
   userRole: UserRole
 }
@@ -83,6 +96,8 @@ export function ShopProfileClient({
   shop: initialShop,
   initialOrders,
   initialSettlements,
+  areas = [],
+  initialSpecialPrices = [],
   workspace,
   userRole,
 }: ShopProfileClientProps) {
@@ -92,7 +107,45 @@ export function ShopProfileClient({
   const [settlements, setSettlements] = useState<SettlementItem[]>(initialSettlements)
 
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<'orders' | 'payouts' | 'statement'>('orders')
+  const [activeTab, setActiveTab] = useState<'orders' | 'payouts' | 'statement' | 'prices'>('orders')
+  const [specialPriceMap, setSpecialPriceMap] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {}
+    for (const p of initialSpecialPrices) {
+      map[p.area_id] = String(p.fee_usd)
+    }
+    return map
+  })
+  const [savingPrices, setSavingPrices] = useState(false)
+  const [pricesMessage, setPricesMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  async function handleSaveSpecialPrices() {
+    setSavingPrices(true)
+    setPricesMessage(null)
+    try {
+      const payload = {
+        workspaceId: workspace.id,
+        prices: areas.map(a => ({
+          areaId: a.id,
+          feeUsd: specialPriceMap[a.id] !== undefined && specialPriceMap[a.id].trim() !== ''
+            ? Number(specialPriceMap[a.id])
+            : null,
+        })),
+      }
+      const res = await fetch(`/api/shops/${shop.id}/prices`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save special prices')
+      setPricesMessage({ text: 'Special prices updated successfully!', type: 'success' })
+      setTimeout(() => setPricesMessage(null), 4000)
+    } catch (err: unknown) {
+      setPricesMessage({ text: err instanceof Error ? err.message : 'Error saving special prices', type: 'error' })
+    } finally {
+      setSavingPrices(false)
+    }
+  }
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'delivered' | 'active' | 'returned'>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -1062,6 +1115,24 @@ export function ShopProfileClient({
             >
               Printable Statement
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('prices')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 13,
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                background: activeTab === 'prices' ? 'var(--brand)' : 'transparent',
+                color: activeTab === 'prices' ? '#fff' : 'var(--muted)',
+                transition: 'all .15s',
+              }}
+            >
+              Special Prices ({Object.values(specialPriceMap).filter(v => v !== '').length})
+            </button>
           </div>
 
           {/* If on orders tab, show search & status filter */}
@@ -1609,6 +1680,153 @@ export function ShopProfileClient({
                   <small style={{ color: '#6b7280', fontSize: 10 }}>{shop.name} Representative Signature</small>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── SPECIAL PRICES PANEL ─── */}
+        {activeTab === 'prices' && (
+          <div style={{ padding: '24px 32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Custom Zone Pricing for {shop.name}</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>
+                  Set negotiated delivery fees for this merchant per zone. Leave empty to charge the standard zone price.
+                </p>
+              </div>
+
+              {(userRole === 'owner' || userRole === 'manager') && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={savingPrices}
+                  onClick={handleSaveSpecialPrices}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  {savingPrices ? 'Saving Prices…' : 'Save Special Prices'}
+                </button>
+              )}
+            </div>
+
+            {pricesMessage && (
+              <div
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 8,
+                  marginBottom: 16,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: pricesMessage.type === 'success' ? '#ecfdf5' : '#fef2f2',
+                  color: pricesMessage.type === 'success' ? '#065f46' : '#991b1b',
+                  border: `1px solid ${pricesMessage.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
+                }}
+              >
+                {pricesMessage.text}
+              </div>
+            )}
+
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Zone / Delivery Area</th>
+                    <th>Standard Fee</th>
+                    <th>Custom Fee for {shop.name} ($ USD)</th>
+                    <th>Difference / Discount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {areas.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: 'center', padding: '32px', color: 'var(--muted)' }}>
+                        No delivery areas configured. Add areas in the Delivery Areas desk first.
+                      </td>
+                    </tr>
+                  ) : (
+                    areas.map(area => {
+                      const val = specialPriceMap[area.id] ?? ''
+                      const hasSpecial = val.trim() !== ''
+                      const specialNum = Number(val)
+                      const diff = hasSpecial ? specialNum - Number(area.fee_usd) : 0
+
+                      return (
+                        <tr key={area.id}>
+                          <td>
+                            <strong>{area.name}</strong>
+                          </td>
+                          <td>
+                            <span style={{ color: 'var(--muted)', fontWeight: 600 }}>
+                              {formatUSD(Number(area.fee_usd))}
+                            </span>
+                          </td>
+                          <td style={{ maxWidth: 220 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ color: 'var(--muted)', fontSize: 13 }}>$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder={`Standard (${formatUSD(Number(area.fee_usd))})`}
+                                value={val}
+                                disabled={userRole !== 'owner' && userRole !== 'manager'}
+                                onChange={e => {
+                                  const newVal = e.target.value
+                                  setSpecialPriceMap(prev => ({ ...prev, [area.id]: newVal }))
+                                }}
+                                style={{
+                                  width: 140,
+                                  padding: '6px 10px',
+                                  fontSize: 13,
+                                  fontWeight: hasSpecial ? 700 : 400,
+                                  color: hasSpecial ? 'var(--brand)' : 'inherit',
+                                  borderRadius: 6,
+                                  border: hasSpecial ? '1.5px solid var(--brand)' : '1px solid var(--line)',
+                                }}
+                              />
+                              {hasSpecial && (
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => setSpecialPriceMap(prev => ({ ...prev, [area.id]: '' }))}
+                                  title="Reset to standard fee"
+                                  style={{ fontSize: 11, padding: '2px 6px', color: 'var(--muted)' }}
+                                >
+                                  Reset
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            {hasSpecial ? (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '2px 8px',
+                                  borderRadius: 99,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  background: diff < 0 ? '#ecfdf5' : diff > 0 ? '#eff6ff' : '#f3f4f6',
+                                  color: diff < 0 ? '#065f46' : diff > 0 ? '#1d4ed8' : '#374151',
+                                  border: `1px solid ${diff < 0 ? '#a7f3d0' : diff > 0 ? '#bfdbfe' : '#e5e7eb'}`,
+                                }}
+                              >
+                                {diff < 0
+                                  ? `${formatUSD(Math.abs(diff))} Discount`
+                                  : diff > 0
+                                  ? `+${formatUSD(diff)} Surcharge`
+                                  : 'Same as Standard'}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--muted)', fontSize: 12 }}>Standard rate applies</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

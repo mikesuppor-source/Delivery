@@ -159,7 +159,67 @@ test('migrations, isolation, atomic accounting, and idempotency',async t=>{
   await assert.rejects(db.query('select mark_cashout_paid($1,$2,$3)',[first,a,owner]),/already paid/)
   assert.equal((await db.query('select count(*) from settlements where idempotency_key=$1',[first])).rows[0].count,1)
   assert.equal(Number((await db.query('select balance_usd from shops where id=$1',[shop])).rows[0].balance_usd),20)
-  assert.equal((await db.query('select status from cashout_requests where id=$1',[first])).rows[0].status,'paid')
+assert.equal((await db.query('select status from cashout_requests where id=$1',[first])).rows[0].status,'paid')
  })
+  await t.test('shop_area_prices RLS, cross-workspace isolation, and returns accounting',async()=>{
+   const areaA = id(30)
+   const areaB = id(31)
+   await db.query("insert into delivery_areas(id,workspace_id,name,fee_usd,driver_pay_usd,return_fee_usd,return_driver_pay_usd) values($1,$2,'Zone A',8,1,2,1)",[areaA,a])
+   await db.query("insert into delivery_areas(id,workspace_id,name,fee_usd,driver_pay_usd,return_fee_usd,return_driver_pay_usd) values($1,$2,'Zone B',10,3,3,1.50)",[areaB,b])
+
+   // Cross-workspace foreign key rejects mixing workspace A shop with workspace B zone
+   await assert.rejects(
+     db.query("insert into shop_area_prices(workspace_id,shop_id,area_id,fee_usd) values($1,$2,$3,7)",[a,shop,areaB]),
+     /foreign key/i
+   )
+
+   // Service role / staff can insert price for workspace A
+   await db.query("insert into shop_area_prices(workspace_id,shop_id,area_id,fee_usd) values($1,$2,$3,6.50)",[a,shop,areaA])
+
+   // Staff (owner) reads price
+   await db.query("select set_config('test.user_id',$1,false)",[owner]);await db.exec('set role authenticated')
+   assert.equal((await db.query("select count(*) from shop_area_prices where shop_id=$1",[shop])).rows[0].count, 1)
+
+   // Direct writes from app users are revoked
+   await assert.rejects(
+     db.query("update shop_area_prices set fee_usd=5 where shop_id=$1",[shop]),
+     /permission denied/i
+   )
+   await db.exec('reset role')
+
+   // Merchant (owning shop) reads their special price
+   await db.query("select set_config('test.user_id',$1,false)",[merchant]);await db.exec('set role authenticated')
+   assert.equal((await db.query("select count(*) from shop_area_prices where shop_id=$1",[shop])).rows[0].count, 1)
+   await db.exec('reset role')
+
+   // Return parcel accounting: customer pays 0, return fee is charged to shop, courier earns return pay
+   const returnOrder = id(32)
+   const shopBefore = Number((await db.query('select balance_usd from shops where id=$1',[shop])).rows[0].balance_usd)
+   const drvBefore = Number((await db.query('select pay_owed_usd from drivers where id=$1',[drv])).rows[0].pay_owed_usd)
+   await db.query("insert into orders(id,workspace_id,shop_id,driver_id,area_id,usd_to_lbp_rate,collection_usd,delivery_fee_usd,driver_pay_usd,status) values($1,$2,$3,$4,$5,89500,0,2,1,'returned')",[returnOrder,a,shop,drv,areaA])
+
+   const shopAfter = Number((await db.query('select balance_usd from shops where id=$1',[shop])).rows[0].balance_usd)
+   const drvAfter = Number((await db.query('select pay_owed_usd from drivers where id=$1',[drv])).rows[0].pay_owed_usd)
+   assert.equal(shopAfter, shopBefore - 2)
+   assert.equal(drvAfter, drvBefore + 1)
+  })
+  await t.test('profit_report SQL function enforces role security and aggregates figures',async()=>{
+   // Owner can run profit report
+   await db.query("select set_config('test.user_id',$1,false)",[owner]);await db.exec('set role authenticated')
+   const reportRes = (await db.query("select profit_report($1, '2020-01-01'::timestamptz, '2030-01-01'::timestamptz) as r",[a])).rows[0].r
+   assert.ok(reportRes.totals, 'report has totals')
+   assert.ok(Array.isArray(reportRes.by_zone), 'report has by_zone array')
+   assert.ok(Array.isArray(reportRes.by_driver), 'report has by_driver array')
+   assert.ok(Array.isArray(reportRes.by_shop), 'report has by_shop array')
+   await db.exec('reset role')
+
+   // Driver/merchant/unauthorized roles are rejected
+   await db.query("select set_config('test.user_id',$1,false)",[driver]);await db.exec('set role authenticated')
+   await assert.rejects(
+     db.query("select profit_report($1, '2020-01-01'::timestamptz, '2030-01-01'::timestamptz)",[a]),
+     /Forbidden/i
+   )
+   await db.exec('reset role')
+  })
  }finally{await db.close()}
 })

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { LocationHelper } from '@/components/location-helper'
 import { searchLebaneseTowns, type TownSearchResult } from '@/lib/lebanon-geo'
 import { formatUSD } from '@/lib/utils'
+import { breakdown, priceOrder } from '@/lib/pricing'
 import type { UserRole } from '@/lib/auth'
 
 interface Shop {
@@ -24,6 +25,15 @@ interface DeliveryArea {
   id: string
   name: string
   fee_usd: number
+  driver_pay_usd?: number | null
+  return_fee_usd?: number | null
+  return_driver_pay_usd?: number | null
+}
+
+interface ShopAreaPrice {
+  shop_id: string
+  area_id: string
+  fee_usd: number
 }
 
 interface NewOrderClientProps {
@@ -32,6 +42,7 @@ interface NewOrderClientProps {
   shops: Shop[]
   drivers: Driver[]
   areas: DeliveryArea[]
+  shopAreaPrices?: ShopAreaPrice[]
   userRole: UserRole
   rate: number
   defaultDriverPayUsd?: number | null
@@ -44,7 +55,8 @@ export function NewOrderClient({
   shops,
   drivers,
   areas,
-  userRole: _userRole,
+  shopAreaPrices = [],
+  userRole,
   rate,
   defaultDriverPayUsd,
   defaultDeliveryFeeUsd,
@@ -66,6 +78,8 @@ export function NewOrderClient({
   // Pricing Mode: 'added' (Fee added on top of net order for customer) vs 'free_delivery' (shop absorbs fee)
   const [pricingMode, setPricingMode] = useState<'added' | 'free_delivery'>('added')
   const [customCode, setCustomCode] = useState('')
+  const [isPriceOverridden, setIsPriceOverridden] = useState(false)
+  const [showPriceEditor, setShowPriceEditor] = useState(false)
 
   // Customer & Geo
   const [recipientName, setRecipientName] = useState('')
@@ -130,18 +144,40 @@ export function NewOrderClient({
     }
   }, [townSearchQuery])
 
+  // Check if current shop has a special price for the selected zone
+  const specialMatch = shopAreaPrices.find(p => p.shop_id === shopId && p.area_id === areaId)
+  const specialFee = specialMatch ? Number(specialMatch.fee_usd) : null
+
+  function updatePricingFor(sId: string, aId: string) {
+    if (isPriceOverridden) return
+    const selArea = areas.find(a => a.id === aId) || null
+    const sp = shopAreaPrices.find(p => p.shop_id === sId && p.area_id === aId)
+    const spFee = sp ? Number(sp.fee_usd) : null
+    const computed = priceOrder(
+      selArea ? {
+        fee_usd: Number(selArea.fee_usd),
+        driver_pay_usd: selArea.driver_pay_usd !== null && selArea.driver_pay_usd !== undefined ? Number(selArea.driver_pay_usd) : null,
+        return_fee_usd: Number(selArea.return_fee_usd ?? 2),
+        return_driver_pay_usd: Number(selArea.return_driver_pay_usd ?? 1),
+      } : null,
+      spFee,
+      {
+        default_delivery_fee_usd: defaultDeliveryFeeUsd ?? null,
+        default_driver_pay_usd: defaultDriverPayUsd ?? null,
+      }
+    )
+    setDeliveryFeeUsd(String(computed.feeUsd))
+    setDriverPayUsd(String(computed.driverPayUsd))
+  }
+
   function handleAreaChange(newAreaId: string) {
     setAreaId(newAreaId)
-    const sel = areas.find(a => a.id === newAreaId)
-    if (sel) {
-      setDeliveryFeeUsd(String(sel.fee_usd))
-      // Maintain user's courier pay, or default if unset
-      if (!driverPayUsd || driverPayUsd === '0') {
-        setDriverPayUsd(initialDriverPay)
-      }
-    } else {
-      setDeliveryFeeUsd(initialDeliveryFee)
-    }
+    updatePricingFor(shopId, newAreaId)
+  }
+
+  function handleShopChange(newShopId: string) {
+    setShopId(newShopId)
+    updatePricingFor(newShopId, areaId)
   }
 
   function handleSelectTown(result: TownSearchResult) {
@@ -188,11 +224,8 @@ export function NewOrderClient({
   const codUsdNum = pricingMode === 'added' ? netItemNum + feeUsdNum : netItemNum
   const codLbpApprox = codUsdNum * rate
 
-  // In database trigger: shop_balance_usd = collection_usd - delivery_fee_usd
-  // When 'added': collection_usd is $28, fee is $3 -> shop gets $28 - $3 = $25 (100% full net merchandise price!)
-  // When 'free_delivery': collection_usd is $25, fee is $3 -> shop gets $25 - $3 = $22 (shop absorbs fee)
-  const shopNetUsd = codUsdNum - feeUsdNum
-  const companyMarginUsd = feeUsdNum - driverPayNum
+  const { customerPays, shopReceives, courierEarns, companyKeeps } = breakdown(codUsdNum, feeUsdNum, driverPayNum)
+  const shopNetUsd = shopReceives
 
   async function submitOrder(keepOnPage: boolean) {
     setError('')
@@ -463,7 +496,7 @@ export function NewOrderClient({
                 <label htmlFor="shop-id">
                   Select Shop <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
-                <select id="shop-id" value={shopId} onChange={e => setShopId(e.target.value)} required>
+                <select id="shop-id" value={shopId} onChange={e => handleShopChange(e.target.value)} required>
                   <option value="">-- Choose shop --</option>
                   {shops.map(s => (
                     <option key={s.id} value={s.id}>
@@ -664,43 +697,170 @@ export function NewOrderClient({
                 </span>
               </div>
 
-              {/* Live Settlement Breakdown Ribbon */}
+              {/* ─── PRICE CARD (§1.5) ─── */}
               <div
                 className="field full"
                 style={{
-                  background: '#0f172a',
-                  color: '#ffffff',
-                  padding: '12px 16px',
-                  borderRadius: 10,
-                  fontSize: 12,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 8,
+                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  borderRadius: 12,
+                  padding: '20px 24px',
+                  color: '#fff',
+                  boxShadow: '0 4px 14px rgba(15, 23, 42, 0.2)',
                 }}
               >
-                <div>
-                  <span style={{ color: '#94a3b8' }}>Net Goods:</span> <strong>{formatUSD(netItemNum)}</strong>
-                  <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                  <span style={{ color: '#94a3b8' }}>Fee ({pricingMode === 'added' ? 'Customer' : 'Shop'}):</span>{' '}
-                  <strong style={{ color: pricingMode === 'added' ? '#38bdf8' : '#f87171' }}>
-                    {pricingMode === 'added' ? `+${formatUSD(feeUsdNum)}` : `-${formatUSD(feeUsdNum)}`}
-                  </strong>
-                  <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                  <span style={{ color: '#4ade80' }}>Total COD:</span>{' '}
-                  <strong style={{ color: '#4ade80' }}>{formatUSD(codUsdNum)}</strong>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#94a3b8' }}>
+                      Price Card / بطاقة التسعير
+                    </span>
+                    {specialFee !== null && (
+                      <span
+                        style={{
+                          background: '#047857',
+                          color: '#ecfdf5',
+                          padding: '2px 8px',
+                          borderRadius: 99,
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Shop Special Price: ${specialFee.toFixed(2)}
+                      </span>
+                    )}
+                    {isPriceOverridden && (
+                      <span
+                        style={{
+                          background: '#b45309',
+                          color: '#fef3c7',
+                          padding: '2px 8px',
+                          borderRadius: 99,
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Custom Override Active
+                      </span>
+                    )}
+                  </div>
+
+                  {(userRole === 'owner' || userRole === 'manager') && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setShowPriceEditor(prev => !prev)}
+                      style={{
+                        fontSize: 11,
+                        color: showPriceEditor ? '#facc15' : '#38bdf8',
+                        padding: '3px 10px',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                      }}
+                    >
+                      {showPriceEditor ? 'Done Editing' : 'Edit Price Overrides'}
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <span style={{ color: '#38bdf8' }}>Shop Net:</span>{' '}
-                  <strong style={{ color: '#4ade80' }}>{formatUSD(shopNetUsd)}</strong>
-                  <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                  <span style={{ color: '#94a3b8' }}>Courier:</span>{' '}
-                  <strong style={{ color: '#facc15' }}>{formatUSD(driverPayNum)}</strong>
-                  <span style={{ margin: '0 8px', color: '#64748b' }}>•</span>
-                  <span style={{ color: '#94a3b8' }}>Margin:</span>{' '}
-                  <strong style={{ color: '#60a5fa' }}>{formatUSD(companyMarginUsd)}</strong>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: 16,
+                    padding: '16px',
+                    borderRadius: 8,
+                    background: 'rgba(0, 0, 0, 0.25)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>Customer pays (COD)</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#4ade80', marginTop: 2 }}>
+                      {formatUSD(customerPays)}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                      ≈ L.L. {codLbpApprox.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>Shop receives</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#38bdf8', marginTop: 2 }}>
+                      {formatUSD(shopReceives)}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>Net merchandise payout</div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>Courier earns</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#facc15', marginTop: 2 }}>
+                      {formatUSD(courierEarns)}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>Run-sheet earning</div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>Company keeps</div>
+                    <div
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 800,
+                        color: companyKeeps >= 0 ? '#34d399' : '#f87171',
+                        marginTop: 2,
+                      }}
+                    >
+                      {formatUSD(companyKeeps)}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>Gross delivery margin</div>
+                  </div>
                 </div>
+
+                {showPriceEditor && (userRole === 'owner' || userRole === 'manager') && (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 16,
+                      marginTop: 16,
+                      padding: 16,
+                      borderRadius: 8,
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px dashed rgba(255, 255, 255, 0.2)',
+                    }}
+                  >
+                    <div>
+                      <label style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>
+                        Custom Delivery Fee (Override for this order)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={deliveryFeeUsd}
+                        onChange={e => {
+                          setDeliveryFeeUsd(e.target.value)
+                          setIsPriceOverridden(true)
+                        }}
+                        style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>
+                        Custom Courier Pay (Override for this order)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={driverPayUsd}
+                        onChange={e => {
+                          setDriverPayUsd(e.target.value)
+                          setIsPriceOverridden(true)
+                        }}
+                        style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155' }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Customer / Recipient Full Name */}

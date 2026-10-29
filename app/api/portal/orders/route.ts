@@ -5,6 +5,7 @@ import { shopAccess } from '@/lib/access'
 import { generateUniqueOrderCode, formatOrderCode } from '@/lib/order-codes'
 import { ORDER_SELECT } from '@/lib/orders'
 import { isValidLebanesePhone, formatLebanesePhone } from '@/lib/phone'
+import { loadPricing } from '@/lib/pricing-server'
 const PlaceOrder=z.object({
  areaId:id,code:text(60),recipientPhone:requiredText(40),recipientName:requiredText(200),recipientAddress:requiredText(1000),
  collectionUsd:money(),serviceType,weightKg,isBreakable:flag,paymentMethod:text(40),
@@ -23,12 +24,15 @@ export const POST=api(async req=>{
  const body=await parseBody(req,PlaceOrder)
  const phone=body.recipientPhone
  if(!isValidLebanesePhone(phone))throw new ApiError(400,'Invalid Lebanese phone number')
- const area=checked(await db.from('delivery_areas').select('*').eq('id',body.areaId).eq('workspace_id',shop.workspace_id).eq('active',true).single())
+ // Verify the area belongs to this workspace before loading pricing
+ const area=checked(await db.from('delivery_areas').select('id').eq('id',body.areaId).eq('workspace_id',shop.workspace_id).eq('active',true).maybeSingle())
+ if(!area)throw new ApiError(400,'Invalid delivery area')
  const ws=checked(await db.from('workspaces').select('usd_to_lbp').eq('id',shop.workspace_id).single())
+ const pricing=await loadPricing(db,{workspaceId:shop.workspace_id,areaId:body.areaId,shopId:shop.id})
  const code=body.code?formatOrderCode(body.code):await generateUniqueOrderCode(db,shop.prefix||'CD')
  if(!code)throw new ApiError(400,'Invalid order code')
  const order=checked(await db.from('orders').insert({workspace_id:shop.workspace_id,shop_id:shop.id,area_id:area.id,code,status:'pending',
-  usd_to_lbp_rate:ws.usd_to_lbp,collection_usd:body.collectionUsd,delivery_fee_usd:area.fee_usd,driver_pay_usd:1,
+  usd_to_lbp_rate:ws.usd_to_lbp,collection_usd:body.collectionUsd,delivery_fee_usd:pricing.feeUsd,driver_pay_usd:pricing.driverPayUsd,
   service_type:body.serviceType,
   weight_kg:body.weightKg,
   is_breakable:body.isBreakable,

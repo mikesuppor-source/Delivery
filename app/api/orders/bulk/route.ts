@@ -3,6 +3,8 @@ import { api, ApiError, checked } from '@/lib/api'
 import { id, idList, optionalId, parseBody, z } from '@/lib/validation'
 import { workspaceAccess, validateReferences } from '@/lib/access'
 import { ORDER_SELECT, orderPatch } from '@/lib/orders'
+import type { ReturnPricing } from '@/lib/orders'
+import { loadReturnPricing } from '@/lib/pricing-server'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 const BulkAction = z.looseObject({ workspaceId: id, orderIds: idList, action: z.enum(['delete', 'assign_driver', 'update_status']), driverId: optionalId })
 export const POST = api(async req => {
@@ -16,7 +18,12 @@ export const POST = api(async req => {
   const updatedOrders=[], failures=[]
   for(const order of orders) {
     try {
-      const patch=body.action==='delete'?{status:'cancelled' as const}:orderPatch(body.action==='assign_driver'?{driverId:body.driverId}:body,order)
+      let returnPricing: ReturnPricing|undefined
+      if(body.action==='update_status'&&body.status==='returned'&&order.status!=='returned'){
+        const rp=await loadReturnPricing(db,order)
+        returnPricing={returnFeeUsd:rp.returnFeeUsd,returnDriverPayUsd:rp.returnDriverPayUsd}
+      }
+      const patch=body.action==='delete'?{status:'cancelled' as const}:orderPatch(body.action==='assign_driver'?{driverId:body.driverId}:body,order,false,returnPricing)
       const updated=checked(await db.from('orders').update(patch).eq('id',order.id).eq('updated_at',order.updated_at).select(ORDER_SELECT).maybeSingle())
       if(!updated) throw new ApiError(409,'Order changed concurrently')
       updatedOrders.push(updated)

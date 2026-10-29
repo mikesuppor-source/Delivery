@@ -1,9 +1,12 @@
 import type { Database } from './supabase/database.types'
 import { ApiError, money, textField } from './api'
 import type { OrderStatus } from './roles'
-export const ORDER_SELECT = '*, shop:shop_id(id,name,phone), driver:driver_id(id,name,phone), area:area_id(id,name,fee_usd)'
+export const ORDER_SELECT = '*, shop:shop_id(id,name,phone), driver:driver_id(id,name,phone), area:area_id(id,name,fee_usd,driver_pay_usd,return_fee_usd,return_driver_pay_usd)'
 const statuses = ['pending','assigned','picked_up','delivered','failed','returned','cancelled']
-export function orderPatch(body: Record<string, unknown>, order: Record<string, unknown>, driver = false) {
+
+export interface ReturnPricing { returnFeeUsd: number; returnDriverPayUsd: number }
+
+export function orderPatch(body: Record<string, unknown>, order: Record<string, unknown>, driver = false, returnPricing?: ReturnPricing) {
   const updates: Record<string, unknown> = {}
   if (body.status !== undefined) {
     if (typeof body.status !== 'string' || !statuses.includes(body.status)) throw new ApiError(400, 'Invalid order status')
@@ -13,7 +16,11 @@ export function orderPatch(body: Record<string, unknown>, order: Record<string, 
     }
     updates.status = body.status as OrderStatus
     if (body.status === 'returned' && order.status !== 'returned') {
-      updates.collection_usd = 0; updates.delivery_fee_usd = 2; updates.driver_pay_usd = Math.min(1, Number(order.driver_pay_usd))
+      updates.collection_usd = 0
+      updates.delivery_fee_usd = returnPricing ? returnPricing.returnFeeUsd : 2
+      updates.driver_pay_usd = returnPricing
+        ? returnPricing.returnDriverPayUsd
+        : Math.min(1, Number(order.driver_pay_usd))
     }
   }
   if (body.notes !== undefined) updates.notes = textField(body.notes, 'notes', 4000)
