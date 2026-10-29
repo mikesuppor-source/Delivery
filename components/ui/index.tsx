@@ -177,3 +177,18 @@ export function ActionTiles({ className, ...rest }: HTMLAttributes<HTMLDivElemen
 export function SoftLink({ tone, className, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { tone: 'green' | 'blue' }) {
   return <a className={cx('ui-soft-link', 'ui-soft-link--' + tone, className)} {...rest} />
 }
+
+// --- Design Foundation Kit Additions -----------------------
+export * from './status-badge'
+export * from './money-text'
+export * from './kpi-card'
+export * from './data-table'
+export * from './filter-bar'
+export * from './empty-state'
+export * from './drawer'
+export * from './tabs'
+export * from './date-range-picker'
+export * from './confirm-dialog'
+export * from './skeleton'
+export { ToastProvider, useToast } from './toast'
+

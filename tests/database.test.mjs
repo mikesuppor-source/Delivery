@@ -203,6 +203,28 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
    assert.equal(shopAfter, shopBefore - 2)
    assert.equal(drvAfter, drvBefore + 1)
   })
+  await t.test('saved_views RLS and isolation between users and workspaces', async () => {
+    await db.query("select set_config('test.user_id',$1,false)", [owner])
+    await db.exec('set role authenticated')
+    const viewA = id(33)
+    await db.query(
+      "insert into saved_views(id, workspace_id, user_id, page, name, filters) values($1, $2, $3, 'orders', 'Unassigned Today', '{\"status\":\"pending\"}')",
+      [viewA, a, owner]
+    )
+    assert.equal(
+      Number((await db.query("select count(*) from saved_views where id=$1", [viewA])).rows[0].count),
+      1
+    )
+    await db.exec('reset role')
+
+    await db.query("select set_config('test.user_id',$1,false)", [driver])
+    await db.exec('set role authenticated')
+    assert.equal(
+      Number((await db.query("select count(*) from saved_views where id=$1", [viewA])).rows[0].count),
+      0
+    )
+    await db.exec('reset role')
+  })
   await t.test('profit_report SQL function enforces role security and aggregates figures',async()=>{
    // Owner can run profit report
    await db.query("select set_config('test.user_id',$1,false)",[owner]);await db.exec('set role authenticated')

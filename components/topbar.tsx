@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatLBP } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
+import { useTheme } from '@/lib/theme'
+import { GlobalSearchModal } from './global-search-modal'
 
 interface TopbarProps {
   usdToLbp: number
@@ -14,8 +18,12 @@ const COMMON_RATES = [89500, 90000, 90500, 91000]
 
 export function Topbar({ usdToLbp: initialRate, workspaceId, userRole }: TopbarProps) {
   const router = useRouter()
+  const { locale, toggleLocale, t } = useI18n()
+  const { resolvedTheme, toggleTheme } = useTheme()
+
   const [currentRate, setCurrentRate] = useState<number>(initialRate)
   const [isOpen, setIsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [newRateInput, setNewRateInput] = useState<string>(String(initialRate))
   const [saving, setSaving] = useState(false)
   const [successNotice, setSuccessNotice] = useState(false)
@@ -24,13 +32,31 @@ export function Topbar({ usdToLbp: initialRate, workspaceId, userRole }: TopbarP
 
   const canEdit = userRole === 'owner' || userRole === 'manager'
 
+  // Global keyboard shortcut '/' or 'Cmd+K' / 'Ctrl+K' to open search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement
+      const isInput =
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        activeEl?.getAttribute('contenteditable') === 'true'
+
+      if ((e.key === '/' && !isInput) || ((e.metaKey || e.ctrlKey) && e.key === 'k')) {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // Sync prop changes
   useEffect(() => {
     setCurrentRate(initialRate)
     setNewRateInput(String(initialRate))
   }, [initialRate])
 
-  // Close on outside click
+  // Close rate popover on outside click
   useEffect(() => {
     if (!isOpen) return
     const handleClickOutside = (e: MouseEvent) => {
@@ -79,197 +105,289 @@ export function Topbar({ usdToLbp: initialRate, workspaceId, userRole }: TopbarP
     }
   }
 
-  const today = new Date().toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'Asia/Beirut',
-  })
-
   return (
-    <div className="topbar" style={{ position: 'relative' }}>
-      <span suppressHydrationWarning style={{ marginRight: 'auto', fontSize: 12, color: 'var(--muted)' }}>
-        {today.toUpperCase()}
-      </span>
-
-      {/* Rate Pill */}
-      <div style={{ position: 'relative' }} ref={popoverRef}>
-        <button
-          type="button"
-          onClick={() => {
-            if (canEdit) {
-              setIsOpen(prev => !prev)
-              setErrorNotice(null)
-              setNewRateInput(String(currentRate))
-            }
-          }}
-          className="rate-pill"
-          style={{
-            cursor: canEdit ? 'pointer' : 'default',
-            border: isOpen ? '1.5px solid var(--brand)' : '1.5px solid var(--line)',
-            background: isOpen ? 'var(--surface)' : 'var(--bg)',
-            transition: 'all 0.15s ease',
-            outline: 'none',
-          }}
-          title={canEdit ? 'Click to change Lebanese market exchange rate' : undefined}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="12" y1="1" x2="12" y2="23" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-          <span>1 USD = {formatLBP(currentRate)}</span>
-          {canEdit && (
-            <span
-              style={{
-                marginLeft: 4,
-                fontSize: 10,
-                color: 'var(--brand)',
-                fontWeight: 700,
-                background: 'rgba(37, 99, 235, 0.1)',
-                padding: '2px 5px',
-                borderRadius: 4,
-              }}
-            >
-              EDIT
-            </span>
-          )}
-          {successNotice && (
-            <span style={{ color: '#10b981', fontSize: 11, fontWeight: 700, marginLeft: 2 }}>✓</span>
-          )}
-        </button>
-
-        {/* Dropdown / Popover for Quick Rate Switcher */}
-        {isOpen && canEdit && (
-          <div
+    <>
+      <header
+        className="topbar"
+        style={{
+          height: 'var(--ui-topbar-h)',
+          background: 'var(--ui-surface)',
+          borderBottom: '1px solid var(--ui-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '0 24px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
+        }}
+      >
+        {/* Global Search Bar (Trigger) */}
+        <div style={{ flex: '1 1 320px', maxWidth: 440 }}>
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
             style={{
-              position: 'absolute',
-              top: 'calc(100% + 8px)',
-              right: 0,
-              width: 280,
-              background: 'var(--surface)',
-              border: '1.5px solid var(--line)',
-              borderRadius: 'var(--radius)',
-              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
-              padding: 16,
-              zIndex: 100,
+              width: '100%',
               display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '7px 12px',
+              borderRadius: 'var(--ui-radius-sm)',
+              border: '1px solid var(--ui-border)',
+              background: 'var(--ui-surface-2)',
+              color: 'var(--ui-text-muted)',
+              fontSize: 13,
+              cursor: 'pointer',
+              transition: 'border-color 0.15s ease',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>
-                Lebanese Market Rate
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14 }}>🔍</span>
+              <span>{t('searchPlaceholderGlobal')}</span>
+            </div>
+            <kbd
+              style={{
+                fontSize: 11,
+                padding: '2px 5px',
+                borderRadius: 4,
+                border: '1px solid var(--ui-border)',
+                background: 'var(--ui-surface)',
+                color: 'var(--ui-text-muted)',
+              }}
+            >
+              /
+            </kbd>
+          </button>
+        </div>
+
+        {/* Right side controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* New Order Quick Action Button */}
+          <Link
+            href="/orders/new"
+            className="ui-btn ui-btn--primary ui-btn--sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+          >
+            <span style={{ fontSize: 14 }}>＋</span>
+            <span>{t('actionNewOrder')}</span>
+          </Link>
+
+          {/* Rate Pill */}
+          <div style={{ position: 'relative' }} ref={popoverRef}>
+            <button
+              type="button"
+              onClick={() => {
+                if (canEdit) {
+                  setIsOpen(prev => !prev)
+                  setErrorNotice(null)
+                  setNewRateInput(String(currentRate))
+                }
+              }}
+              className="rate-pill"
+              style={{
+                cursor: canEdit ? 'pointer' : 'default',
+                border: isOpen ? '1.5px solid var(--ui-primary)' : '1px solid var(--ui-border)',
+                background: isOpen ? 'var(--ui-surface)' : 'var(--ui-surface-2)',
+                color: 'var(--ui-text)',
+                transition: 'all 0.15s ease',
+                outline: 'none',
+                padding: '4px 10px',
+                borderRadius: 9999,
+                fontSize: 12,
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+              title={canEdit ? 'Click to change Lebanese market exchange rate' : undefined}
+            >
+              <span style={{ color: 'var(--ui-primary)' }}>$</span>
+              <span>1 USD = {formatLBP(currentRate)}</span>
+              {canEdit && (
+                <span
+                  style={{
+                    fontSize: 9.5,
+                    color: 'var(--ui-primary)',
+                    fontWeight: 800,
+                    background: 'var(--ui-primary-soft)',
+                    padding: '2px 4px',
+                    borderRadius: 3,
+                  }}
+                >
+                  EDIT
+                </span>
+              )}
+              {successNotice && (
+                <span style={{ color: 'var(--ui-success)', fontSize: 11, fontWeight: 700 }}>✓</span>
+              )}
+            </button>
+
+            {/* Dropdown / Popover for Quick Rate Switcher */}
+            {isOpen && canEdit && (
+              <div
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--muted)',
-                  cursor: 'pointer',
-                  fontSize: 16,
-                  padding: 0,
-                  lineHeight: 1,
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  insetInlineEnd: 0,
+                  width: 290,
+                  background: 'var(--ui-surface)',
+                  border: '1.5px solid var(--ui-border)',
+                  borderRadius: 'var(--ui-radius)',
+                  boxShadow: 'var(--ui-shadow-modal)',
+                  padding: 16,
+                  zIndex: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
                 }}
               >
-                ✕
-              </button>
-            </div>
-
-            <p style={{ margin: 0, fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.4 }}>
-              Updates the exchange rate used across all delivery fees, COD calculations, and driver run sheets.
-            </p>
-
-            {/* Quick Presets */}
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
-                COMMON PRESETS
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {COMMON_RATES.map(rate => (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ui-text)' }}>
+                    Lebanese Market Rate
+                  </div>
                   <button
-                    key={rate}
                     type="button"
-                    onClick={() => {
-                      setNewRateInput(String(rate))
-                      handleUpdateRate(rate)
-                    }}
-                    disabled={saving}
+                    onClick={() => setIsOpen(false)}
                     style={{
-                      background: currentRate === rate ? 'var(--brand)' : 'var(--bg)',
-                      color: currentRate === rate ? '#fff' : 'var(--text)',
-                      border: '1px solid ' + (currentRate === rate ? 'var(--brand)' : 'var(--line)'),
-                      borderRadius: 6,
-                      padding: '6px 8px',
-                      fontSize: 12,
-                      fontWeight: 700,
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--ui-text-muted)',
                       cursor: 'pointer',
-                      textAlign: 'center',
+                      fontSize: 16,
+                      padding: 0,
+                      lineHeight: 1,
                     }}
                   >
-                    {rate.toLocaleString()} L.L.
+                    ✕
                   </button>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Custom Rate Input */}
-            <div>
-              <label
-                htmlFor="custom-rate-input"
-                style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 4 }}
-              >
-                CUSTOM RATE (LBP PER 1 USD)
-              </label>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input
-                  id="custom-rate-input"
-                  type="number"
-                  step="500"
-                  min="1000"
-                  placeholder="e.g. 89500"
-                  value={newRateInput}
-                  onChange={e => setNewRateInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleUpdateRate(Number(newRateInput))
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    background: 'var(--bg)',
-                    border: '1px solid var(--line)',
-                    color: 'var(--text)',
-                    borderRadius: 6,
-                    padding: '8px 10px',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    outline: 'none',
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleUpdateRate(Number(newRateInput))}
-                  disabled={saving}
-                  className="btn btn-primary btn-sm"
-                  style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700 }}
-                >
-                  {saving ? '…' : 'Save'}
-                </button>
-              </div>
-            </div>
+                <p style={{ margin: 0, fontSize: 11.5, color: 'var(--ui-text-muted)', lineHeight: 1.4 }}>
+                  Updates the exchange rate used across all delivery fees, COD calculations, and driver run sheets.
+                </p>
 
-            {errorNotice && (
-              <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '6px 8px', borderRadius: 4 }}>
-                {errorNotice}
+                {/* Quick Presets */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ui-text-muted)', marginBottom: 6 }}>
+                    COMMON PRESETS
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    {COMMON_RATES.map(rate => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => {
+                          setNewRateInput(String(rate))
+                          handleUpdateRate(rate)
+                        }}
+                        disabled={saving}
+                        style={{
+                          background: currentRate === rate ? 'var(--ui-primary)' : 'var(--ui-surface-2)',
+                          color: currentRate === rate ? '#fff' : 'var(--ui-text)',
+                          border: '1px solid ' + (currentRate === rate ? 'var(--ui-primary)' : 'var(--ui-border)'),
+                          borderRadius: 6,
+                          padding: '6px 8px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {rate.toLocaleString()} L.L.
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Custom Rate Input */}
+                <div>
+                  <label
+                    htmlFor="custom-rate-input"
+                    style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--ui-text-muted)', marginBottom: 4 }}
+                  >
+                    CUSTOM RATE (LBP PER 1 USD)
+                  </label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      id="custom-rate-input"
+                      type="number"
+                      step="500"
+                      min="1000"
+                      placeholder="e.g. 89500"
+                      value={newRateInput}
+                      onChange={e => setNewRateInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleUpdateRate(Number(newRateInput))
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        background: 'var(--ui-surface-2)',
+                        border: '1px solid var(--ui-border)',
+                        color: 'var(--ui-text)',
+                        borderRadius: 6,
+                        padding: '6px 10px',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateRate(Number(newRateInput))}
+                      disabled={saving}
+                      className="ui-btn ui-btn--primary ui-btn--sm"
+                    >
+                      {saving ? '…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+
+                {errorNotice && (
+                  <div style={{ fontSize: 11, color: 'var(--ui-danger)', background: 'var(--ui-danger-soft)', padding: '6px 8px', borderRadius: 4 }}>
+                    {errorNotice}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
-    </div>
+
+          {/* Theme Toggle (Light / Dark) */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="ui-btn ui-btn--subtle ui-btn--sm"
+            style={{ padding: '6px 10px', fontSize: 14 }}
+            title={t('actionToggleTheme')}
+            aria-label={t('actionToggleTheme')}
+          >
+            {resolvedTheme === 'dark' ? '☀️' : '🌙'}
+          </button>
+
+          {/* Language Toggle (EN / AR) */}
+          <button
+            type="button"
+            onClick={toggleLocale}
+            className="ui-btn ui-btn--subtle ui-btn--sm"
+            style={{ padding: '5px 9px', fontSize: 12, fontWeight: 700 }}
+            title="Switch Language"
+            aria-label="Switch Language"
+          >
+            {locale === 'en' ? 'عربي' : 'EN'}
+          </button>
+        </div>
+      </header>
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        workspaceId={workspaceId}
+      />
+    </>
   )
 }
