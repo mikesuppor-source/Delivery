@@ -81,7 +81,7 @@ export default async function CourierPayPage() {
   }))
 
   return (
-    <div className="content" style={{ maxWidth: 1400, margin: '0 auto', padding: '24px 20px' }}>
+    <div className="content" style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: '24px 20px' }}>
       <CourierPayClient
         workspaceId={workspaceId}
         couriers={couriers}

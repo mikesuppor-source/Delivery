@@ -1,17 +1,15 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { Button } from '@/components/ui'
 import type { DriverMarkerData, StopMarkerData } from '@/components/leaflet-map'
+import { driverStatus, type DriverStatus } from '@/lib/map'
 import { formatUSD } from '@/lib/utils'
 
 const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
   ssr: false,
-  loading: () => (
-    <div className="w-full h-full min-h-[500px] flex items-center justify-center bg-slate-100 rounded-2xl text-slate-400 font-semibold text-sm">
-      Loading OpenStreetMap Leaflet Engine...
-    </div>
-  ),
+  loading: () => <div className="ui-map-loading">Loading the map...</div>,
 })
 
 export interface OrderStop extends StopMarkerData {
@@ -24,272 +22,253 @@ interface MapClientProps {
   orders: OrderStop[]
 }
 
+type Filter = 'all' | DriverStatus
+
+const STATUS_LABEL: Record<DriverStatus, string> = { active: 'Active', idle: 'Idle', offline: 'Offline' }
+const STATUS_DOT: Record<DriverStatus, string> = {
+  active: 'var(--ui-success)',
+  idle: 'var(--ui-warning)',
+  offline: 'var(--ui-text-subtle)',
+}
+
+const vehicleIcon = (driver: DriverMarkerData) => (driver.vehicle_type === 'moto' ? '🛵' : '🚗')
+
+const searchStyle: React.CSSProperties = {
+  padding: '7px 12px',
+  fontSize: 13,
+  borderRadius: 8,
+  border: '1px solid var(--ui-border)',
+  background: 'var(--ui-surface-2)',
+  color: 'var(--ui-text)',
+  minWidth: 220,
+}
+
+const cardStyle: React.CSSProperties = {
+  padding: 10,
+  borderRadius: 10,
+  border: '1px solid var(--ui-border)',
+  background: 'var(--ui-surface-2)',
+}
+
+function StatusPill({ status }: { status: DriverStatus }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '2px 9px',
+        borderRadius: 99,
+        fontSize: 11,
+        fontWeight: 700,
+        border: '1px solid var(--ui-border)',
+        background: 'var(--ui-surface)',
+        color: 'var(--ui-text)',
+      }}
+    >
+      <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: STATUS_DOT[status] }} />
+      {STATUS_LABEL[status]}
+    </span>
+  )
+}
+
 export function MapClient({ drivers, orders }: MapClientProps) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'idle' | 'offline'>('all')
+  const [statusFilter, setStatusFilter] = useState<Filter>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Compute status for driver
-  function getStatus(d: DriverMarkerData): 'active' | 'idle' | 'offline' {
-    if (!d.last_seen_at || !d.current_lat || !d.current_lng) return 'offline'
-    const diff = (Date.now() - new Date(d.last_seen_at).getTime()) / (1000 * 60)
-    if (diff <= 15) return 'active'
-    if (diff <= 45) return 'idle'
-    return 'offline'
-  }
-
-  // Filter drivers
-  const filteredDrivers = drivers.filter(d => {
-    const status = getStatus(d)
-    if (statusFilter !== 'all' && status !== statusFilter) return false
-    if (searchQuery.trim() && !d.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false
-    }
-    return true
-  })
-
+  // Kept in step with their inputs so the map is not redrawn on every keystroke elsewhere
+  const filteredDrivers = useMemo(
+    () =>
+      drivers.filter(d => {
+        if (statusFilter !== 'all' && driverStatus(d) !== statusFilter) return false
+        const query = searchQuery.trim().toLowerCase()
+        return !query || d.name.toLowerCase().includes(query)
+      }),
+    [drivers, statusFilter, searchQuery],
+  )
   const selectedDriver = drivers.find(d => d.id === selectedDriverId) || null
-  const selectedDriverStops = orders.filter(o => o.driver_id === selectedDriverId)
+  const selectedDriverStops = useMemo(
+    () => orders.filter(o => o.driver_id === selectedDriverId),
+    [orders, selectedDriverId],
+  )
 
-  // Status counts
-  const counts = {
+  const counts: Record<Filter, number> = {
     all: drivers.length,
-    active: drivers.filter(d => getStatus(d) === 'active').length,
-    idle: drivers.filter(d => getStatus(d) === 'idle').length,
-    offline: drivers.filter(d => getStatus(d) === 'offline').length,
+    active: drivers.filter(d => driverStatus(d) === 'active').length,
+    idle: drivers.filter(d => driverStatus(d) === 'idle').length,
+    offline: drivers.filter(d => driverStatus(d) === 'offline').length,
   }
+  const onMap = drivers.filter(d => d.current_lat != null && d.current_lng != null).length
 
   return (
-    <div className="space-y-4">
-      {/* Top Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+    <div>
+      {/* Filter bar */}
+      <div
+        className="ui-box"
+        style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', marginBottom: 12 }}
+      >
+        <div role="group" aria-label="Filter couriers by status" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {(['all', 'active', 'idle', 'offline'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-                statusFilter === f
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <span className="capitalize">{f}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                  statusFilter === f ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'
-                }`}
-              >
-                {counts[f]}
-              </span>
-            </button>
+            <Button key={f} size="sm" variant={statusFilter === f ? 'primary' : 'subtle'} aria-pressed={statusFilter === f} onClick={() => setStatusFilter(f)}>
+              <span style={{ textTransform: 'capitalize' }}>{f}</span>
+              <span style={{ opacity: 0.8 }}>{counts[f]}</span>
+            </Button>
           ))}
         </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search couriers..."
-            className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full sm:w-48"
-          />
-        </div>
+        <input
+          type="search"
+          aria-label="Search couriers"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search couriers..."
+          style={searchStyle}
+        />
       </div>
 
-      {/* Main Map View Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[750px]">
-        {/* Leaflet Map Column */}
-        <div className="lg:col-span-2 h-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative">
+      {/* Why the map may be empty */}
+      <p role="status" style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ui-text-muted)' }}>
+        {onMap === 0
+          ? 'No courier has shared a GPS position yet. A courier appears on the map once they open the courier app and allow location access.'
+          : `${onMap} of ${drivers.length} courier${drivers.length === 1 ? '' : 's'} ${onMap === 1 ? 'has' : 'have'} a GPS position on the map.`}
+      </p>
+
+      <div className="ui-map-layout">
+        <div className="ui-map-canvas">
           <LeafletMap
             drivers={filteredDrivers}
             selectedDriverId={selectedDriverId}
             selectedDriverStops={selectedDriverStops}
-            onSelectDriver={id => setSelectedDriverId(id)}
+            onSelectDriver={setSelectedDriverId}
           />
         </div>
 
-        {/* Courier & Stops Drawer Column */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+        <aside className="ui-box ui-map-side" aria-label="Couriers">
           {selectedDriver ? (
-            <div className="flex flex-col h-full">
-              {/* Selected Driver Header */}
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center text-lg font-bold">
-                    {selectedDriver.vehicle_type === 'moto' ? '🛵' : '🚗'}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                      {selectedDriver.name}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                          getStatus(selectedDriver) === 'active'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : getStatus(selectedDriver) === 'idle'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {getStatus(selectedDriver)}
-                      </span>
-                      {selectedDriver.phone && (
-                        <span className="text-xs text-slate-500">{selectedDriver.phone}</span>
-                      )}
+            <>
+              <div className="ui-map-side__head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span
+                    aria-hidden="true"
+                    style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 10, background: 'var(--ui-surface)', border: '1px solid var(--ui-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}
+                  >
+                    {vehicleIcon(selectedDriver)}
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--ui-text)' }}>{selectedDriver.name}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                      <StatusPill status={driverStatus(selectedDriver)} />
+                      {selectedDriver.phone && <span style={{ fontSize: 12, color: 'var(--ui-text-muted)' }}>{selectedDriver.phone}</span>}
                     </div>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => setSelectedDriverId(null)}
-                  className="text-slate-400 hover:text-slate-700 text-xs font-bold p-1 rounded-lg hover:bg-slate-200 transition"
-                >
-                  ✕ Close
-                </button>
+                <Button size="sm" variant="subtle" onClick={() => setSelectedDriverId(null)}>
+                  <span aria-hidden="true">✕</span> Close
+                </Button>
               </div>
 
-              {/* Driver Actions & GPS timestamp */}
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between text-xs">
-                <div className="text-slate-500">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--ui-border)', fontSize: 12 }}>
+                <span style={{ color: 'var(--ui-text-muted)' }}>
                   Last GPS:{' '}
-                  <span className="font-semibold text-slate-800">
+                  <strong style={{ color: 'var(--ui-text)' }}>
                     {selectedDriver.last_seen_at
-                      ? new Date(selectedDriver.last_seen_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
+                      ? new Date(selectedDriver.last_seen_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                       : 'Never'}
-                  </span>
-                </div>
-
+                  </strong>
+                </span>
                 {selectedDriver.phone && (
-                  <a
-                    href={`tel:${selectedDriver.phone}`}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center gap-1.5 shadow-sm transition"
-                  >
-                    <span>📞 Call</span>
+                  <a className="ui-btn ui-btn--success ui-btn--sm" href={`tel:${selectedDriver.phone}`}>
+                    Call
                   </a>
                 )}
               </div>
 
-              {/* Stops list for this driver */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700 pb-1">
-                  <span>Assigned Deliveries ({selectedDriverStops.length})</span>
-                  <span>Stop Sequence</span>
+              <div className="ui-map-side__body">
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--ui-text)' }}>
+                  <span>Assigned deliveries ({selectedDriverStops.length})</span>
+                  <span style={{ color: 'var(--ui-text-muted)', fontWeight: 600 }}>In stop order</span>
                 </div>
 
                 {selectedDriverStops.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs italic">
-                    No active delivery stops currently assigned to this courier.
-                  </div>
+                  <p style={{ margin: 0, padding: '24px 8px', textAlign: 'center', fontSize: 12, fontStyle: 'italic', color: 'var(--ui-text-muted)' }}>
+                    No active delivery stops are assigned to this courier.
+                  </p>
                 ) : (
-                  selectedDriverStops.map((stop, idx) => (
-                    <div
-                      key={stop.id}
-                      className="p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-xs space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-sky-600 text-white font-bold text-[10px] flex items-center justify-center">
-                            {idx + 1}
+                  selectedDriverStops.map((stop, index) => (
+                    <div key={stop.id} style={{ ...cardStyle, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            aria-hidden="true"
+                            style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--ui-info)', color: '#fff', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            {index + 1}
                           </span>
-                          <span className="font-mono font-bold text-slate-900">{stop.code}</span>
-                        </div>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            stop.status === 'picked_up'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-sky-100 text-sky-800'
-                          }`}
-                        >
-                          {stop.status === 'picked_up' ? 'In Transit' : 'Assigned'}
+                          <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--ui-text)' }}>{stop.code}</span>
+                        </span>
+                        <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: stop.status === 'picked_up' ? 'var(--ui-success-soft)' : 'var(--ui-info-soft)', color: 'var(--ui-text)' }}>
+                          {stop.status === 'picked_up' ? 'In transit' : 'Assigned'}
                         </span>
                       </div>
-
-                      <div className="font-semibold text-slate-800">
-                        {stop.recipient_name || 'Customer'}
+                      <div style={{ fontWeight: 600, color: 'var(--ui-text)' }}>{stop.recipient_name || 'Customer'}</div>
+                      <div
+                        style={{ color: 'var(--ui-text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                      >
+                        {stop.recipient_address || 'Address not listed'}
                       </div>
-                      <div className="text-slate-500 line-clamp-2">
-                        {stop.recipient_address || 'Address unlisted'}
-                      </div>
-
                       {stop.collection_usd != null && Number(stop.collection_usd) > 0 && (
-                        <div className="pt-1 flex items-center justify-between text-slate-600 border-t border-slate-200/60 font-semibold">
-                          <span>COD:</span>
-                          <span className="text-emerald-700">
-                            {formatUSD(Number(stop.collection_usd))}
-                          </span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--ui-border)', fontWeight: 600, color: 'var(--ui-text-muted)' }}>
+                          <span>Cash to collect</span>
+                          <span style={{ color: 'var(--ui-text)' }}>{formatUSD(Number(stop.collection_usd))}</span>
                         </div>
                       )}
                     </div>
                   ))
                 )}
               </div>
-            </div>
+            </>
           ) : (
-            /* Courier Directory when no single courier is selected */
-            <div className="flex flex-col h-full">
-              <div className="p-4 border-b border-slate-100 bg-slate-50">
-                <h3 className="text-sm font-bold text-slate-900">Fleet Directory</h3>
-                <p className="text-xs text-slate-500">
-                  Select a courier on the map or list to view route stops
-                </p>
+            <>
+              <div className="ui-map-side__head">
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--ui-text)' }}>Fleet Directory</h3>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ui-text-muted)' }}>Choose a courier to see their route stops</p>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              <div className="ui-map-side__body">
                 {filteredDrivers.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs italic">
+                  <p style={{ margin: 0, padding: '24px 8px', textAlign: 'center', fontSize: 12, fontStyle: 'italic', color: 'var(--ui-text-muted)' }}>
                     No couriers match the selected filter.
-                  </div>
+                  </p>
                 ) : (
                   filteredDrivers.map(driver => {
-                    const status = getStatus(driver)
-                    const activeCount = orders.filter(o => o.driver_id === driver.id).length
-
+                    const stops = orders.filter(o => o.driver_id === driver.id).length
                     return (
-                      <div
+                      <button
                         key={driver.id}
+                        type="button"
                         onClick={() => setSelectedDriverId(driver.id)}
-                        className="p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 cursor-pointer transition flex items-center justify-between"
+                        style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', textAlign: 'start', font: 'inherit', color: 'inherit', cursor: 'pointer' }}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sm shadow-sm">
-                            {driver.vehicle_type === 'moto' ? '🛵' : '🚗'}
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-slate-900 leading-tight">
-                              {driver.name}
-                            </div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">
-                              {activeCount} active stop{activeCount === 1 ? '' : 's'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                              status === 'active'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : status === 'idle'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-slate-200 text-slate-600'
-                            }`}
-                          >
-                            {status}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <span aria-hidden="true" style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'var(--ui-surface)', border: '1px solid var(--ui-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>
+                            {vehicleIcon(driver)}
                           </span>
-                        </div>
-                      </div>
+                          <span style={{ minWidth: 0 }}>
+                            <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--ui-text)' }}>{driver.name}</span>
+                            <span style={{ display: 'block', fontSize: 11, color: 'var(--ui-text-muted)', marginTop: 2 }}>
+                              {stops} active stop{stops === 1 ? '' : 's'}
+                            </span>
+                          </span>
+                        </span>
+                        <StatusPill status={driverStatus(driver)} />
+                      </button>
                     )
                   })
                 )}
               </div>
-            </div>
+            </>
           )}
-        </div>
+        </aside>
       </div>
     </div>
   )

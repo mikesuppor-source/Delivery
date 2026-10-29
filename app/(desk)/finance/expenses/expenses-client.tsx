@@ -179,11 +179,11 @@ export function ExpensesClient({ workspaceId, rate, expenses }: Props) {
           onClearAll={() => { setSearch(''); setCategory('all'); setMonth('all') }}
         >
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <select value={month} onChange={e => setMonth(e.target.value)} className="ui-select" aria-label="Month" style={{ fontSize: 13, padding: '6px 10px' }}>
+            <select value={month} onChange={e => setMonth(e.target.value)} className="ui-select" aria-label="Month" style={{ fontSize: 13, padding: '6px 10px', width: 'auto' }}>
               <option value="all">All months</option>
               {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
-            <select value={category} onChange={e => setCategory(e.target.value)} className="ui-select" aria-label="Category" style={{ fontSize: 13, padding: '6px 10px' }}>
+            <select value={category} onChange={e => setCategory(e.target.value)} className="ui-select" aria-label="Category" style={{ fontSize: 13, padding: '6px 10px', width: 'auto' }}>
               <option value="all">All categories</option>
               {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{EXPENSE_CATEGORY_LABELS[c]}</option>)}
             </select>

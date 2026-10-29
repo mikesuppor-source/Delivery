@@ -567,3 +567,260 @@
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ─── Kit rules restored from commit 75601d8 ─────────────────────────────────
+ * The Phase 2 rewrite of this file dropped the rules for Pill, Panel, Notice, StatCard, Toast,
+ * StatusPanel, Card, Tag, StatusChip, Callout, ActionTile and SoftLink, and the info / on / toggle /
+ * pill / alert button variants, while the courier run sheet and the desk order list still use them.
+ * They are back as they were, with the tokens they read. The courier theme (above) sets its own values.
+ */
+:root {
+  --ui-muted: var(--muted);
+  --ui-success-strong: var(--brand);
+  --ui-warning-text: #1f2937;
+  --ui-info-text: var(--info);
+  --ui-info-border: var(--info);
+  --ui-toggle-on-text: #fff;
+}
+
+/* ── Button variants ────────────────────────────────────── */
+.ui-btn--info { background: var(--ui-surface); color: var(--ui-info-text); border-color: var(--ui-info-border); }
+.ui-btn--on { background: var(--ui-success-soft); color: #34d399; border-color: rgba(16, 185, 129, 0.3); font-weight: 700; }
+
+/* ── Pill ───────────────────────────────────────────────── */
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ui-pill--success { background: #064e3b; color: #6ee7b7; border-color: #059669; }
+.ui-pill--success-soft { background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4); border-radius: 6px; padding: 6px 8px; font-size: 11px; }
+.ui-pill--tag { background: rgba(16, 185, 129, 0.25); color: #6ee7b7; border-color: #10b981; border-radius: 4px; }
+
+/* ── Panel ──────────────────────────────────────────────── */
+.ui-panel {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+/* ── Notice ─────────────────────────────────────────────── */
+.ui-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1.5px solid;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.ui-notice__title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; }
+.ui-notice__body { margin: 0; font-size: 12px; line-height: 1.45; }
+.ui-notice__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.ui-notice--warning {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(180, 83, 9, 0.25) 100%);
+  border-color: #f59e0b;
+  gap: 4px;
+}
+.ui-notice--warning .ui-notice__title { color: #fef08a; }
+.ui-notice--warning .ui-notice__body { color: #fef3c7; }
+.ui-notice--info {
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.45) 0%, rgba(15, 23, 42, 0.9) 100%);
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+.ui-notice--info .ui-notice__title { color: #93c5fd; }
+.ui-notice--info .ui-notice__body { color: #cbd5e1; }
+
+/* ── Stat card ──────────────────────────────────────────── */
+.ui-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.ui-stat {
+  display: block;
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+button.ui-stat { cursor: pointer; transition: transform 0.1s ease; }
+button.ui-stat:active { transform: scale(0.98); }
+button.ui-stat:focus-visible { outline: 2px solid var(--ui-info-text); outline-offset: 2px; }
+.ui-stat__head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.ui-stat__label { font-size: 11px; font-weight: 700; color: var(--ui-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.ui-stat__value { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; font-size: 26px; font-weight: 900; color: var(--ui-text); }
+.ui-stat__suffix { font-size: 12px; font-weight: 400; color: #64748b; }
+.ui-stat__foot { margin-top: 2px; font-size: 11px; color: var(--ui-muted); }
+.ui-stat__foot--accent { color: var(--ui-info-text); font-weight: 600; }
+.ui-stat--success {
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+  border: 1.5px solid var(--ui-success);
+}
+.ui-stat--success .ui-stat__label { color: #6ee7b7; }
+.ui-stat--success .ui-stat__value { font-size: 24px; color: var(--ui-success-strong); }
+
+/* ── Toast ──────────────────────────────────────────────── */
+.ui-toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 90%;
+  padding: 10px 18px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ui-toast--success { background: #065f46; }
+.ui-toast--error { background: #991b1b; }
+
+/* Toggle (aria-pressed) and text-link buttons */
+.ui-btn--toggle { background: var(--ui-surface); color: var(--ui-muted); border-color: var(--ui-border); }
+.ui-btn--toggle[aria-pressed='true'] { background: var(--ui-success-strong); color: var(--ui-toggle-on-text); border-color: var(--ui-success-strong); }
+.ui-btn--pill { border-radius: 99px; padding: 4px 11px; font-size: 12px; font-weight: 600; }
+
+/* ── Status panel + dot ─────────────────────────────────── */
+.ui-status { display: flex; flex-direction: column; gap: 8px; border: 1px solid; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.ui-status--ok { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); }
+.ui-status--busy { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3); }
+.ui-status--error { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); }
+.ui-status--idle { background: rgba(30, 41, 59, 0.6); border-color: var(--ui-border); }
+.ui-status__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+/* The message keeps a usable width; on narrow phones the actions wrap below it */
+.ui-status__message { display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 0; font-size: 12px; }
+.ui-status__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ui-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: #64748b; }
+.ui-dot--ok { background: #10b981; box-shadow: 0 0 8px #10b981; }
+.ui-dot--busy { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+.ui-dot--error { background: #ef4444; }
+
+/* Large full-width action buttons (order workflow) */
+.ui-btn--alert { background: #334155; color: #f87171; border-color: #475569; font-weight: 700; }
+
+/* ── Card ───────────────────────────────────────────────── */
+.ui-card { background: var(--ui-surface); border: 1.5px solid var(--ui-border); border-radius: 12px; padding: 14px 16px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2); }
+.ui-card--success { background: #0f291e; border-color: var(--ui-success); }
+.ui-card--danger { background: #27171a; border-color: var(--ui-danger); }
+
+/* ── Tag (small square badge) ───────────────────────────── */
+.ui-tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border: 1px solid transparent; border-radius: 4px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+/* Desk (light) tones */
+.ui-tag--info { background: rgba(37, 99, 235, 0.1); color: #2563eb; border-color: rgba(37, 99, 235, 0.25); }
+.ui-tag--sky { background: #f0f9ff; color: #0284c7; border-color: #bae6fd; }
+.ui-tag--danger { background: rgba(220, 38, 38, 0.12); color: #dc2626; border-color: rgba(220, 38, 38, 0.25); }
+.ui-tag--neutral { background: var(--ui-surface); color: var(--ui-muted); border-color: var(--ui-border); font-weight: 600; }
+.ui-tag--success { background: rgba(150, 191, 54, 0.15); color: #5e8e3e; border-color: rgba(150, 191, 54, 0.3); }
+.ui-tag--success-soft { background: var(--ui-success-soft); color: var(--ui-success); }
+.ui-tag--warning { background: rgba(217, 119, 6, 0.15); color: #b45309; border-color: rgba(217, 119, 6, 0.3); }
+.ui-tag--violet { background: rgba(124, 58, 237, 0.15); color: #7c3aed; border-color: rgba(124, 58, 237, 0.3); }
+.ui-tag--pill { border-radius: 99px; padding: 2px 8px; font-size: 11px; }
+a.ui-tag { text-decoration: none; }
+/* Courier (dark) tones */
+.theme-courier .ui-tag--info { background: #172554; color: #60a5fa; border-color: transparent; font-size: 11px; }
+.theme-courier .ui-tag--danger { background: #7f1d1d; color: #fca5a5; border-color: #dc2626; font-weight: 800; }
+.theme-courier .ui-tag--neutral { background: #334155; color: #cbd5e1; border-color: transparent; font-weight: 700; }
+.theme-courier .ui-tag--success { background: #064e3b; color: #34d399; border-color: transparent; }
+.theme-courier .ui-tag--success-soft { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3); font-weight: 800; }
+.theme-courier .ui-tag--warning { background: #78350f; color: #fef08a; border-color: #ca8a04; border-radius: 99px; padding: 2px 7px; font-size: 10px; font-weight: 800; }
+
+/* Order status chip */
+.ui-chip { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 99px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.ui-chip--delivered { background: #064e3b; color: #6ee7b7; }
+.ui-chip--picked_up { background: #1e3a8a; color: #93c5fd; }
+.ui-chip--assigned { background: #3730a3; color: #c7d2fe; }
+.ui-chip--pending, .ui-chip--failed, .ui-chip--returned, .ui-chip--cancelled { background: #7f1d1d; color: #fca5a5; }
+
+/* ── Callout (inline coloured note) ─────────────────────── */
+.ui-callout { padding: 6px 10px; margin-bottom: 10px; border: 1px solid; border-radius: 6px; font-size: 12px; font-weight: 800; }
+.ui-callout small { display: block; font-size: 11px; font-weight: 500; }
+.ui-callout--warning { background: rgba(245, 158, 11, 0.15); border-color: #f59e0b; color: #fef08a; }
+.ui-callout--warning small { color: #fde68a; }
+.ui-callout--purple { background: rgba(168, 85, 247, 0.15); border-color: #a855f7; color: #e9d5ff; }
+.ui-callout--purple small { color: #d8b4fe; }
+.ui-callout--note { background: rgba(253, 224, 71, 0.1); border-color: rgba(253, 224, 71, 0.2); color: #fde047; font-size: 11px; font-weight: 400; padding: 4px 8px; margin: 6px 0 0; }
+
+/* ── Action tiles (icon + label links in a grid) ────────── */
+.ui-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+.ui-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 8px; color: #fff; font-size: 11px; font-weight: 700; text-align: center; text-decoration: none; }
+.ui-tile--waze { background: #0369a1; }
+.ui-tile--maps { background: #1d4ed8; }
+.ui-tile--whatsapp { background: #047857; }
+.ui-tile--neutral { background: #334155; color: #f8fafc; }
+.ui-tile--disabled { background: #334155; color: #64748b; }
+
+/* Soft link buttons (WhatsApp presets) */
+.ui-soft-link { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; border: 1px solid; border-radius: 6px; font-size: 11px; font-weight: 600; text-align: center; text-decoration: none; }
+.ui-soft-link--green { background: rgba(37, 211, 102, 0.1); border-color: rgba(37, 211, 102, 0.3); color: #4ade80; }
+.ui-soft-link--blue { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3); color: #60a5fa; }
+
+/* ── Desk table helpers ─────────────────────────────────── */
+/* Small select inside a table cell (e.g. quick courier assignment) */
+.ui-inline-select { max-width: 140px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--muted); font-size: 11px; cursor: pointer; }
+.ui-inline-select--attention { padding: 3px 8px; border: 1.5px solid #f59e0b; background: rgba(245, 158, 11, 0.08); color: #b45309; font-weight: 600; }
+/* Row-level action buttons */
+.btn.btn-compact { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: 11px; }
+
+/* ─── Plain themed box, and the live map layout ───────────────────────────────── */
+.ui-box {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow-card);
+}
+.ui-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
+  height: min(72vh, 760px);
+  min-height: 520px;
+}
+.ui-map-layout > * { min-height: 0; }
+.ui-map-canvas {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface-2);
+}
+.ui-map-canvas .leaflet-container { width: 100%; height: 100%; font: inherit; }
+.ui-map-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 320px;
+  color: var(--ui-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ui-map-side { display: flex; flex-direction: column; overflow: hidden; }
+.ui-map-side__head { padding: 14px 16px; border-bottom: 1px solid var(--ui-border); background: var(--ui-surface-2); }
+.ui-map-side__body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 900px) {
+  .ui-map-layout { grid-template-columns: 1fr; height: auto; min-height: 0; }
+  .ui-map-canvas { height: 420px; }
+  .ui-map-side { max-height: 520px; }
+}
+
+/* ─── Breadcrumb ──────────────────────────────────────────────────────────────
+ * globals.css styles every <nav> as the vertical sidebar menu. A breadcrumb is a plain row of links.
+ */
+.ui-breadcrumb { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+.ui-breadcrumb a { display: inline; padding: 0; border-radius: 0; background: none; font-size: inherit; font-weight: inherit; }
+.ui-breadcrumb a:hover { background: none; }

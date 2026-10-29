@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useDriverProfile } from '../context'
 import { formatUSD } from '@/lib/utils'
@@ -20,6 +20,11 @@ export function HeaderSection() {
     setEditError,
     setIsEditModalOpen,
   } = useDriverProfile()
+
+  // Only the browser knows the site address. Reading window while rendering made the server and the browser
+  // disagree, and React keeps the server's version, so the WhatsApp message went out with a link that had no address.
+  const [origin, setOrigin] = useState('')
+  useEffect(() => setOrigin(window.location.origin), [])
 
   return (
     <>
@@ -158,9 +163,7 @@ export function HeaderSection() {
               <a
                 href={getWhatsAppUrl(
                   driver.phone,
-                  `Marhaba ${driver.name}, here is your active Cedar Delivery Daily Run Sheet:\n\n${
-                    typeof window !== 'undefined' ? window.location.origin : ''
-                  }/driver/${driver.id}\n\nPlease update order statuses live as you deliver.`
+                  `Marhaba ${driver.name}, here is your active Cedar Delivery Daily Run Sheet:\n\n${origin}/driver/${driver.id}\n\nPlease update order statuses live as you deliver.`
                 )}
                 target="_blank"
                 rel="noopener noreferrer"

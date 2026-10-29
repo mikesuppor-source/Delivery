@@ -41,6 +41,7 @@ export function PageHeader({
         {breadcrumbs && breadcrumbs.length > 0 && (
           <nav
             aria-label="Breadcrumb"
+            className="ui-breadcrumb"
             style={{
               display: 'flex',
               alignItems: 'center',

@@ -116,7 +116,7 @@ export default async function WarehousePage() {
   ])
 
   return (
-    <div className="content" style={{ maxWidth: 1400, margin: '0 auto', padding: '24px 20px' }}>
+    <div className="content" style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: '24px 20px' }}>
       <WarehouseClient
         workspaceId={workspaceId}
         userRole={member.role}

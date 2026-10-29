@@ -296,7 +296,7 @@ export function CourierPayClient({ workspaceId, couriers, rules, bonuses, runs, 
 
       {tab === 'bonuses' && (
         <>
-          <div className="ui-panel" style={{ padding: 18, marginBottom: 20 }}>
+          <div className="ui-box" style={{ padding: 18, marginBottom: 20 }}>
             <h2 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>Calculate weekly bonuses</h2>
             <p style={{ fontSize: 12, color: 'var(--ui-text-muted)', margin: '0 0 12px' }}>
               Each courier gets the highest bonus rule their delivered orders reached in the week, once per week. The bonus is added to what they are owed.

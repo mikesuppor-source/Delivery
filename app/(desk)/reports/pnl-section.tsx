@@ -41,7 +41,7 @@ export function MonthlyChart({ months }: { months: PnlMonth[] }) {
   const summary = months.map(m => `${monthName(m.month)}: revenue ${formatUSD(Number(m.revenue_usd))}, costs ${formatUSD(Number(m.total_cost_usd))}`).join('; ')
 
   return (
-    <div className="ui-panel" style={{ padding: '14px 16px', marginBottom: 20, overflowX: 'auto' }}>
+    <div className="ui-box" style={{ padding: '14px 16px', marginBottom: 20, overflowX: 'auto' }}>
       <div style={{ display: 'flex', gap: 16, fontSize: 12, marginBottom: 6, color: 'var(--ui-text-muted)' }}>
         <span><span aria-hidden style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--ui-primary)', borderRadius: 2, marginInlineEnd: 6 }} />Revenue</span>
         <span><span aria-hidden style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--ui-warning)', borderRadius: 2, marginInlineEnd: 6 }} />Costs (courier pay, bonuses, expenses)</span>
@@ -150,7 +150,7 @@ export function PnlSection({ workspaceId }: { workspaceId: string }) {
       />
 
       {report && report.expenses_by_category.length > 0 && (
-        <div className="ui-panel" style={{ padding: '14px 18px', marginTop: 20 }}>
+        <div className="ui-box" style={{ padding: '14px 18px', marginTop: 20 }}>
           <h2 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 10px' }}>Expenses by category</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
             {report.expenses_by_category.map(c => (

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { PageHeader } from '@/components/page-header'
 import { MapClient, type OrderStop } from './map-client'
 import type { DriverMarkerData } from '@/components/leaflet-map'
 
@@ -68,17 +69,12 @@ export default async function LiveMapPage() {
   }))
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>🗺️</span> Live Courier Map & Fleet GPS
-          </h1>
-          <p className="text-xs text-slate-500">
-            Real-time fleet tracking, active stops sequence, and live courier positions
-          </p>
-        </div>
-      </div>
+    <div className="content" style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: '24px 20px' }}>
+      <PageHeader
+        title="Live Courier Map"
+        subtitle="Where each courier is now, and the deliveries they are carrying"
+        breadcrumbs={[{ label: 'Overview', href: '/' }, { label: 'Live map' }]}
+      />
 
       <MapClient drivers={drivers} orders={orders} />
     </div>

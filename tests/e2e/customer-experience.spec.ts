@@ -187,8 +187,8 @@ Notes: Urgent evening delivery`
     await expect(page.locator('text=Fleet Directory')).toBeVisible()
     await expect(page.locator('text=Rami Courier').first()).toBeVisible()
 
-    // Click on courier in directory to open drawer
-    await page.locator('div:has-text("Rami Courier")').last().click()
+    // Click on courier in directory to open drawer (the map pin has the same name, so look inside the directory)
+    await page.getByRole('complementary', { name: 'Couriers' }).getByRole('button', { name: /Rami Courier/ }).click()
 
     // Expect Courier details drawer with status and action buttons
     await expect(page.locator('h3:has-text("Rami Courier")')).toBeVisible()

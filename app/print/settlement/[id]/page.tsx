@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { formatUSD, formatLBP, usdToLbp, formatDate } from '@/lib/utils'
+import { AutoPrint } from '@/components/auto-print'
+import { PrintButton } from '@/components/print-button'
 import type { Metadata } from 'next'
 
 interface SettlementPrintPageProps {
@@ -22,14 +24,10 @@ export default async function SettlementPrintPage({ params, searchParams }: Sett
   const { print } = await searchParams
   const supabase = await createClient()
 
-  // 1. Fetch settlement record
+  // 1. The settlement itself
   const { data: settlement } = await supabase
     .from('settlements')
-    .select(`
-      id, type, amount_usd, usd_to_lbp, note, created_at, created_by, workspace_id,
-      driver:driver_id(id, name, phone, cash_held_usd, pay_owed_usd),
-      shop:shop_id(id, name, phone, balance_usd)
-    `)
+    .select('id, type, amount_usd, usd_to_lbp, note, created_at, created_by, workspace_id, driver_id, shop_id')
     .eq('id', id)
     .maybeSingle()
 
@@ -37,32 +35,31 @@ export default async function SettlementPrintPage({ params, searchParams }: Sett
     notFound()
   }
 
-  // 2. Fetch workspace details
-  const { data: ws } = await supabase
-    .from('workspaces')
-    .select('id, name')
-    .eq('id', settlement.workspace_id)
-    .single()
+  // 2. Who it was for, and who issued it. Plain lookups: a voucher must still print if one of them is gone.
+  const { data: ws } = await supabase.from('workspaces').select('id, name').eq('id', settlement.workspace_id).maybeSingle()
 
-  // 3. Fetch cashier user display name if available
+  const driver = settlement.driver_id
+    ? (await supabase.from('drivers').select('id, name, phone').eq('id', settlement.driver_id).maybeSingle()).data
+    : null
+  const shop = settlement.shop_id
+    ? (await supabase.from('shops').select('id, name, phone').eq('id', settlement.shop_id).maybeSingle()).data
+    : null
+
   let cashierName = 'Cedar Cashier Desk'
   if (settlement.created_by) {
     const { data: member } = await supabase
       .from('workspace_members')
       .select('display_name')
       .eq('user_id', settlement.created_by)
+      .eq('workspace_id', settlement.workspace_id)
       .maybeSingle()
     if (member?.display_name) {
       cashierName = member.display_name
     }
   }
 
-  const driver = (Array.isArray(settlement.driver) ? settlement.driver[0] : settlement.driver) as unknown as { id: string; name: string; phone: string | null } | null
-  const shop = (Array.isArray(settlement.shop) ? settlement.shop[0] : settlement.shop) as unknown as { id: string; name: string; phone: string | null } | null
-
   const isCashRemittance = settlement.type === 'driver_cash_remittance'
   const isDriverPay = settlement.type === 'driver_pay'
-  const isShopPayment = settlement.type === 'shop_payment'
 
   const voucherTitle = isCashRemittance
     ? 'COURIER COD CASH REMITTANCE VOUCHER'
@@ -115,9 +112,10 @@ export default async function SettlementPrintPage({ params, searchParams }: Sett
         </Link>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            onClick={() => window.print()}
+          {/* A client component: a server-rendered page cannot carry its own click handler */}
+          <PrintButton
+            label="Print Voucher Slip"
+            className=""
             style={{
               padding: '9px 18px',
               borderRadius: 8,
@@ -132,14 +130,7 @@ export default async function SettlementPrintPage({ params, searchParams }: Sett
               gap: 8,
               boxShadow: '0 2px 8px rgba(4, 120, 87, 0.25)',
             }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
-            Print Voucher Slip
-          </button>
+          />
         </div>
       </div>
 
@@ -248,13 +239,13 @@ export default async function SettlementPrintPage({ params, searchParams }: Sett
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
           <thead>
             <tr style={{ background: '#f1f5f9', borderTop: '1px solid #cbd5e1', borderBottom: '1px solid #cbd5e1' }}>
-              <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#475569' }}>
+              <th style={{ background: '#f1f5f9', padding: '10px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#475569' }}>
                 Description
               </th>
-              <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#475569' }}>
+              <th style={{ background: '#f1f5f9', padding: '10px 14px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#475569' }}>
                 Amount (USD)
               </th>
-              <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#475569' }}>
+              <th style={{ background: '#f1f5f9', padding: '10px 14px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#475569' }}>
                 Equivalent (LBP @ {rate.toLocaleString()})
               </th>
             </tr>
@@ -319,14 +310,8 @@ export default async function SettlementPrintPage({ params, searchParams }: Sett
         </div>
       </div>
 
-      {/* Auto-print script */}
-      {print === '1' && (
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.addEventListener('load', () => window.print());`,
-          }}
-        />
-      )}
+      {/* Opens the print dialog straight away when the voucher was opened from "Close Shift" */}
+      {print === '1' && <AutoPrint />}
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { driverPinHtml, driverStatus, stopPinHtml, stopPopupHtml } from '@/lib/map'
 
 export interface DriverMarkerData {
   id: string
@@ -30,16 +31,6 @@ interface LeafletMapProps {
   selectedDriverId?: string | null
   selectedDriverStops?: StopMarkerData[]
   onSelectDriver: (driverId: string) => void
-}
-
-function getDriverStatus(driver: DriverMarkerData): 'active' | 'idle' | 'offline' {
-  if (!driver.last_seen_at || !driver.current_lat || !driver.current_lng) {
-    return 'offline'
-  }
-  const diffMinutes = (Date.now() - new Date(driver.last_seen_at).getTime()) / (1000 * 60)
-  if (diffMinutes <= 15) return 'active'
-  if (diffMinutes <= 45) return 'idle'
-  return 'offline'
 }
 
 export default function LeafletMap({
@@ -78,6 +69,15 @@ export default function LeafletMap({
     }
   }, [])
 
+  // Redraw the map when its box changes size (the side panel, a narrow window, a rotated phone)
+  useEffect(() => {
+    const element = mapContainerRef.current
+    if (!element || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => mapInstanceRef.current?.invalidateSize())
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
   // Update Markers when drivers or selected driver changes
   useEffect(() => {
     const map = mapInstanceRef.current
@@ -86,57 +86,20 @@ export default function LeafletMap({
 
     layer.clearLayers()
 
-    const bounds: L.LatLngExpression[] = []
-
     // Add Driver Markers
     drivers.forEach(driver => {
       const lat = driver.current_lat
       const lng = driver.current_lng
       if (lat == null || lng == null) return
 
-      const status = getDriverStatus(driver)
-      const isSelected = driver.id === selectedDriverId
-
-      const colorMap = {
-        active: '#059669', // emerald
-        idle: '#d97706',   // amber
-        offline: '#64748b' // slate
-      }
-      const markerColor = colorMap[status]
-
-      const vehicleIcon = driver.vehicle_type === 'moto' ? '🛵' : '🚗'
-
       const customIcon = L.divIcon({
         className: 'custom-driver-pin',
-        html: `
-          <div style="
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            background: white;
-            padding: 3px 8px;
-            border-radius: 20px;
-            border: 2.5px solid ${markerColor};
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            font-family: inherit;
-            cursor: pointer;
-            transform: scale(${isSelected ? 1.15 : 1});
-            transition: transform 0.2s;
-            white-space: nowrap;
-          ">
-            <span style="font-size: 14px;">${vehicleIcon}</span>
-            <span style="font-size: 11px; font-weight: 800; color: #1e293b;">
-              ${driver.name}
-            </span>
-            <span style="
-              width: 8px;
-              height: 8px;
-              border-radius: 50%;
-              background: ${markerColor};
-              margin-left: 2px;
-            "></span>
-          </div>
-        `,
+        html: driverPinHtml({
+          name: driver.name,
+          status: driverStatus(driver),
+          selected: driver.id === selectedDriverId,
+          icon: driver.vehicle_type === 'moto' ? '🛵' : '🚗',
+        }),
         iconSize: [100, 32],
         iconAnchor: [50, 16],
       })
@@ -147,67 +110,40 @@ export default function LeafletMap({
       })
 
       marker.addTo(layer)
-      bounds.push([lat, lng])
     })
 
     // Add Stop Markers for Selected Driver
-    if (selectedDriverStops && selectedDriverStops.length > 0) {
-      selectedDriverStops.forEach((stop, index) => {
-        if (stop.location_lat != null && stop.location_lng != null) {
-          const stopIcon = L.divIcon({
-            className: 'custom-stop-pin',
-            html: `
-              <div style="
-                background: #0284c7;
-                color: white;
-                font-size: 11px;
-                font-weight: 900;
-                width: 24px;
-                height: 24px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border: 2px solid white;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-              ">
-                ${index + 1}
-              </div>
-            `,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12],
-          })
+    selectedDriverStops.forEach((stop, index) => {
+      if (stop.location_lat == null || stop.location_lng == null) return
 
-          const stopMarker = L.marker([stop.location_lat, stop.location_lng], {
-            icon: stopIcon,
-          }).bindPopup(`
-            <div style="font-family: inherit; font-size: 12px; padding: 4px;">
-              <b>Stop #${index + 1}: ${stop.code}</b><br/>
-              <span>${stop.recipient_name || 'Customer'}</span><br/>
-              <small style="color: #64748b;">${stop.recipient_address || ''}</small>
-            </div>
-          `)
-
-          stopMarker.addTo(layer)
-          bounds.push([stop.location_lat, stop.location_lng])
-        }
+      const stopIcon = L.divIcon({
+        className: 'custom-stop-pin',
+        html: stopPinHtml(index + 1),
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
       })
-    }
 
-    // Adjust view to fit markers if there are any
-    if (bounds.length > 0 && selectedDriverId) {
+      L.marker([stop.location_lat, stop.location_lng], { icon: stopIcon })
+        .bindPopup(
+          stopPopupHtml({
+            number: index + 1,
+            code: stop.code,
+            recipientName: stop.recipient_name,
+            recipientAddress: stop.recipient_address,
+          }),
+        )
+        .addTo(layer)
+    })
+
+    // Centre on the selected courier
+    if (selectedDriverId) {
       const selected = drivers.find(d => d.id === selectedDriverId)
-      if (selected && selected.current_lat && selected.current_lng) {
+      if (selected && selected.current_lat != null && selected.current_lng != null) {
         map.setView([selected.current_lat, selected.current_lng], 13, { animate: true })
       }
     }
   }, [drivers, selectedDriverId, selectedDriverStops, onSelectDriver])
 
-  return (
-    <div
-      ref={mapContainerRef}
-      className="w-full h-full min-h-[500px] rounded-2xl overflow-hidden shadow-inner border border-slate-200"
-      style={{ zIndex: 1 }}
-    />
-  )
+  // The box that holds the map must have a height, or Leaflet draws nothing
+  return <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: 320, zIndex: 1 }} />
 }
