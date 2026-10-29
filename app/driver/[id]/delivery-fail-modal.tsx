@@ -16,27 +16,33 @@ interface DeliveryFailModalProps {
   onConfirm: (data: {
     status: 'failed' | 'returned'
     failureReason: string
+    resultId: string
+    rescheduledFor?: string
     notes?: string
   }) => Promise<void>
 }
 
 const PRESET_REASONS = [
   { id: 'no_answer', label: 'Customer Not Answering', ar: 'لم يرد على الاتصال' },
-  { id: 'postponed', label: 'Rescheduled to Tomorrow', ar: 'تأجيل الاستلام إلى الغد' },
-  { id: 'refused', label: 'Refused / Canceled by Customer', ar: 'رفض الاستلام أو إلغاء الطلب' },
+  { id: 'rescheduled', label: 'Customer Rescheduled', ar: 'تأجيل الاستلام إلى موعد آخر' },
+  { id: 'refused', label: 'Refused / Cancelled by Customer', ar: 'رفض الاستلام أو إلغاء الطلب' },
   { id: 'wrong_address', label: 'Wrong Address or Unreachable', ar: 'عنوان خاطئ أو تعذر الوصول' },
-  { id: 'no_change', label: 'No Change Available ($100 bill)', ar: 'عدم توفر فكة أو صرف' },
-]
+  { id: 'closed', label: 'Location or Store Closed', ar: 'المحل أو العنوان مغلق' },
+  { id: 'other', label: 'Other Problem', ar: 'سبب آخر' },
+] as const
 
 export function DeliveryFailModal({
   order,
   onClose,
   onConfirm,
 }: DeliveryFailModalProps) {
-  const [selectedReason, setSelectedReason] = useState<string>(PRESET_REASONS[0].label)
+  const [selectedReasonId, setSelectedReasonId] = useState<string>(PRESET_REASONS[0].id)
   const [statusType, setStatusType] = useState<'failed' | 'returned'>('failed')
+  const [rescheduledFor, setRescheduledFor] = useState<string>('')
   const [customNote, setCustomNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  const selectedReason = PRESET_REASONS.find(r => r.id === selectedReasonId) || PRESET_REASONS[0]
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -44,8 +50,10 @@ export function DeliveryFailModal({
 
     try {
       await onConfirm({
-        status: statusType,
-        failureReason: selectedReason,
+        status: selectedReasonId === 'refused' ? 'returned' : statusType,
+        failureReason: selectedReason.label,
+        resultId: selectedReasonId,
+        rescheduledFor: selectedReasonId === 'rescheduled' ? rescheduledFor : undefined,
         notes: customNote.trim() || undefined,
       })
       onClose()
@@ -63,7 +71,7 @@ export function DeliveryFailModal({
     ? `https://wa.me/${merchantPhone}?text=${encodeURIComponent(
         `Hello ${order.shop?.name || 'Merchant'}, order #${order.code} for ${
           order.recipient_name || 'Customer'
-        } could not be delivered: ${selectedReason}. ${customNote ? 'Note: ' + customNote : ''}`
+        } could not be delivered: ${selectedReason.label}. ${customNote ? 'Note: ' + customNote : ''}`
       )}`
     : null
 
@@ -142,16 +150,16 @@ export function DeliveryFailModal({
           {/* Preset Reason Selector Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-              Common Reasons
+              Select Reason (Mandatory)
             </span>
 
             {PRESET_REASONS.map(r => {
-              const isSelected = selectedReason === r.label
+              const isSelected = selectedReasonId === r.id
               return (
                 <button
                   key={r.id}
                   type="button"
-                  onClick={() => setSelectedReason(r.label)}
+                  onClick={() => setSelectedReasonId(r.id)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -171,6 +179,29 @@ export function DeliveryFailModal({
               )
             })}
           </div>
+
+          {/* If customer rescheduled, ask for date */}
+          {selectedReasonId === 'rescheduled' && (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 12, border: '1px solid #3b82f6' }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd', display: 'block', marginBottom: 6 }}>
+                📅 Reschedule Delivery Date (Placed on Warehouse Hold until date)
+              </label>
+              <input
+                type="date"
+                value={rescheduledFor}
+                onChange={e => setRescheduledFor(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: 6,
+                  color: '#fff',
+                  padding: '8px 10px',
+                  fontSize: 13,
+                }}
+              />
+            </div>
+          )}
 
           {/* Action Destination: Reschedule (failed) vs Return to Merchant (returned) */}
           <div style={{ background: '#1e293b', borderRadius: 8, padding: 10, border: '1px solid #334155' }}>

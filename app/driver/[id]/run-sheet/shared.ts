@@ -22,11 +22,28 @@ export interface DriverRunSheetOrder {
   recipient_address: string | null
   location_lat?: number | null
   location_lng?: number | null
+  route_position?: number | null
+  received_at_hub?: string | null
+  returns_handed_at?: string | null
   shop?: { id: string; name: string; phone?: string | null } | null
   area?: { id: string; name: string } | null
   pod_signature?: string | null
   pod_photo?: string | null
   pod_collected_lbp?: number | null
+}
+
+export interface DriverPickup {
+  id: string
+  workspace_id: string
+  shop_id: string
+  driver_id: string | null
+  status: 'requested' | 'assigned' | 'collected' | 'cancelled'
+  requested_at: string
+  collected_at?: string | null
+  parcel_count: number
+  note?: string | null
+  proof_photo_path?: string | null
+  shop?: { id: string; name: string; phone?: string | null; address?: string | null } | null
 }
 
 export interface DriverInfo {
@@ -60,6 +77,7 @@ export interface OfflineSyncItem {
 export interface RunSheetProps {
   driver: DriverInfo
   initialOrders: DriverRunSheetOrder[]
+  initialPickups?: DriverPickup[]
   rate: number
   workspaceName: string
 }

@@ -281,6 +281,8 @@ export function useDriverOrders({
       podCollectedUsd?: number | null
       podCollectedLbp?: number | null
       failureReason?: string
+      resultId?: string
+      rescheduledFor?: string
     }
   ) {
     setUpdatingId(orderId)
@@ -345,6 +347,31 @@ export function useDriverOrders({
       )
 
       showNotification('success', `Order #${data.order.code} updated to ${ORDER_STATUS_LABELS[newStatus] || newStatus}!`)
+
+      if (newStatus === 'failed' || newStatus === 'returned') {
+        const attemptResult = extraData?.resultId || (newStatus === 'returned' ? 'refused' : 'no_answer')
+        try {
+          const attemptRes = await fetch('/api/orders/attempts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId,
+              driverId: driver.id,
+              result: attemptResult,
+              note: extraData?.notes || extraData?.failureReason,
+              rescheduledFor: extraData?.rescheduledFor,
+            }),
+          })
+          const attemptData = await attemptRes.json()
+          if (attemptData.attempt?.new_status) {
+            setOrders(prev =>
+              prev.map(o => (o.id === orderId ? { ...o, status: attemptData.attempt.new_status } : o))
+            )
+          }
+        } catch (_e) {
+          void _e
+        }
+      }
     } catch (err: unknown) {
       // If it failed due to network / fetch error, save to offline queue instead of failing
       const isNetworkError =
@@ -390,5 +417,5 @@ export function useDriverOrders({
     }
   }
 
-  return { orders, updatingId, isOnline, offlineQueue, isSyncing, syncOfflineQueue, handleUpdateStatus }
+  return { orders, setOrders, updatingId, isOnline, offlineQueue, isSyncing, syncOfflineQueue, handleUpdateStatus }
 }

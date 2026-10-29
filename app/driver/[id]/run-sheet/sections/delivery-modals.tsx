@@ -3,10 +3,23 @@
 import { DeliveryPodModal } from '../../delivery-pod-modal'
 import { DeliveryFailModal } from '../../delivery-fail-modal'
 import { DeliveryPodViewModal } from '../../delivery-pod-view-modal'
+import { DeliveryReturnHandoverModal } from '../../delivery-return-handover-modal'
 import { useRunSheet } from '../context'
 
 export function DeliveryModals() {
-  const { failModalOrder, handleUpdateStatus, podModalOrder, rate, setFailModalOrder, setPodModalOrder, setViewPodOrder, viewPodOrder } = useRunSheet()
+  const {
+    failModalOrder,
+    handleReturnHandoverSuccess,
+    handleUpdateStatus,
+    podModalOrder,
+    rate,
+    returnHandoverOrder,
+    setFailModalOrder,
+    setPodModalOrder,
+    setReturnHandoverOrder,
+    setViewPodOrder,
+    viewPodOrder,
+  } = useRunSheet()
   return (
     <>
       {/* ─── PROOF OF DELIVERY MODAL ─── */}
@@ -29,6 +42,8 @@ export function DeliveryModals() {
           onConfirm={async failData => {
             await handleUpdateStatus(failModalOrder.id, failData.status, {
               failureReason: failData.failureReason,
+              resultId: failData.resultId,
+              rescheduledFor: failData.rescheduledFor,
               notes: failData.notes,
             })
           }}
@@ -40,6 +55,15 @@ export function DeliveryModals() {
         <DeliveryPodViewModal
           order={viewPodOrder}
           onClose={() => setViewPodOrder(null)}
+        />
+      )}
+
+      {/* ─── RETURN HANDOVER MODAL ─── */}
+      {returnHandoverOrder && (
+        <DeliveryReturnHandoverModal
+          order={returnHandoverOrder}
+          onClose={() => setReturnHandoverOrder(null)}
+          onSuccess={orderId => handleReturnHandoverSuccess(orderId)}
         />
       )}
     </>

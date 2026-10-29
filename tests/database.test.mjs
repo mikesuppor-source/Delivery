@@ -344,5 +344,111 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
      assert.equal(Number(bHolds), 0)
      await db.exec('reset role')
    })
- }finally{await db.close()}
+ 
+  await t.test('dispatch pro: pickups isolation, attempts auto-return limit, and handover', async () => {
+    const a = id(1), b = id(2), merchant = id(4), shopA = id(6), driverA = id(8)
+
+    // 1. Merchant creates a pickup request
+    const pickupId = id(50)
+    await db.query(
+      "insert into pickups(id, workspace_id, shop_id, status, parcel_count, note) values($1, $2, $3, 'requested', 5, '5 boxes ready at counter')",
+      [pickupId, a, shopA]
+    )
+
+    // Verify merchant can read their own pickup via RLS
+    await db.query("select set_config('test.user_id',$1,false)", [merchant])
+    await db.exec('set role authenticated')
+    const merchantPickups = (await db.query('select count(*) from pickups where id=$1', [pickupId])).rows[0].count
+    assert.equal(Number(merchantPickups), 1)
+
+    // Other workspace cannot see pickup
+    const userB = id(49)
+    await db.query("select set_config('test.user_id',$1,false)", [userB])
+    const bPickups = (await db.query('select count(*) from pickups where id=$1', [pickupId])).rows[0].count
+    assert.equal(Number(bPickups), 0)
+    await db.exec('reset role')
+
+    // 2. Dispatch assigns courier and courier collects pickup
+    const order1 = id(51)
+    const order2 = id(52)
+    await db.query("insert into orders(id, workspace_id, shop_id, code, collection_usd, delivery_fee_usd, driver_pay_usd, usd_to_lbp_rate, status) values($1, $2, $3, 'CD-PICKUP1', 30, 3, 1, 89500, 'pending')", [order1, a, shopA])
+    await db.query("insert into orders(id, workspace_id, shop_id, code, collection_usd, delivery_fee_usd, driver_pay_usd, usd_to_lbp_rate, status) values($1, $2, $3, 'CD-PICKUP2', 45, 3, 1, 89500, 'pending')", [order2, a, shopA])
+
+    const collectRes = (await db.query(
+      "select collect_pickup($1, $2, 'proofs/pickup_50.jpg', $3) as r",
+      [pickupId, driverA, [order1, order2]]
+    )).rows[0].r
+    assert.equal(collectRes.success, true)
+    assert.equal(collectRes.orders_collected, 2)
+
+    const pickupRow = (await db.query('select status, driver_id, collected_at, proof_photo_path from pickups where id=$1', [pickupId])).rows[0]
+    assert.equal(pickupRow.status, 'collected')
+    assert.equal(pickupRow.driver_id, driverA)
+    assert.ok(pickupRow.collected_at)
+    assert.equal(pickupRow.proof_photo_path, 'proofs/pickup_50.jpg')
+
+    // Orders linked in pickup_orders and transitioned to picked_up
+    const o1 = (await db.query('select status, driver_id from orders where id=$1', [order1])).rows[0]
+    assert.equal(o1.status, 'picked_up')
+    assert.equal(o1.driver_id, driverA)
+
+    // 3. Mark received at hub
+    const hubScanRes = (await db.query("select mark_received_at_hub($1) as r", [order1])).rows[0].r
+    assert.equal(hubScanRes.success, true)
+    const hubScanRow = (await db.query('select received_at_hub from orders where id=$1', [order1])).rows[0]
+    assert.ok(hubScanRow.received_at_hub)
+
+    // 4. Set route positions for courier
+    const routePosRes = (await db.query(
+      "select set_route_positions($1, $2::jsonb) as r",
+      [driverA, JSON.stringify([{ order_id: order1, position: 1 }, { order_id: order2, position: 2 }])]
+    )).rows[0].r
+    assert.equal(routePosRes.success, true)
+    const o1Route = (await db.query('select route_position from orders where id=$1', [order1])).rows[0].route_position
+    assert.equal(o1Route, 1)
+
+    // 5. Delivery attempt 1: Customer no answer -> status failed, attempt_no = 1
+    const att1 = (await db.query(
+      "select record_delivery_attempt($1, $2, 'no_answer', 'Customer phone was off', null, 33.8938, 35.5018, null) as r",
+      [order1, driverA]
+    )).rows[0].r
+    assert.equal(att1.success, true)
+    assert.equal(att1.attempt_no, 1)
+    assert.equal(att1.new_status, 'failed')
+
+    const o1AfterAtt1 = (await db.query('select status from orders where id=$1', [order1])).rows[0].status
+    assert.equal(o1AfterAtt1, 'failed')
+
+    // Delivery attempt 2: Customer rescheduled -> status failed, attempt_no = 2
+    const att2 = (await db.query(
+      "select record_delivery_attempt($1, $2, 'rescheduled', 'Customer asked for next week', null, 33.8938, 35.5018, null) as r",
+      [order1, driverA]
+    )).rows[0].r
+    assert.equal(att2.attempt_no, 2)
+    assert.equal(att2.new_status, 'failed')
+
+    // Delivery attempt 3 (reaches max_attempts = 3) -> auto-moves to returned
+    const att3 = (await db.query(
+      "select record_delivery_attempt($1, $2, 'no_answer', 'Third attempt no answer', null, 33.8938, 35.5018, null) as r",
+      [order1, driverA]
+    )).rows[0].r
+    assert.equal(att3.attempt_no, 3)
+    assert.equal(att3.new_status, 'returned')
+
+    const o1AfterAtt3 = (await db.query('select status from orders where id=$1', [order1])).rows[0].status
+    assert.equal(o1AfterAtt3, 'returned')
+
+    // 6. Return Handover with Merchant Signature
+    const handoverRes = (await db.query(
+      "select handover_returns($1, $2, 'signatures/shopA_return.png') as r",
+      [shopA, [order1]]
+    )).rows[0].r
+    assert.equal(handoverRes.success, true)
+    assert.equal(handoverRes.count, 1)
+
+    const o1AfterHandover = (await db.query('select returns_handed_at, returns_signature_path from orders where id=$1', [order1])).rows[0]
+    assert.ok(o1AfterHandover.returns_handed_at)
+    assert.equal(o1AfterHandover.returns_signature_path, 'signatures/shopA_return.png')
+  })
+  }finally{await db.close()}
 })

@@ -14,6 +14,7 @@ export function HeaderSection() {
     handleDownloadTemplate,
     setFormError,
     setIsModalOpen,
+    setIsPickupModalOpen,
   } = usePortal()
 
   return (
@@ -47,6 +48,27 @@ export function HeaderSection() {
       </div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={() => setIsPickupModalOpen(true)}
+          className="btn btn-secondary"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '11px 16px',
+            fontSize: 13,
+            fontWeight: 700,
+            borderRadius: 8,
+            border: '1.5px solid #d97706',
+            color: '#b45309',
+            background: 'rgba(245, 158, 11, 0.08)',
+          }}
+          title="Request courier collection from your shop"
+        >
+          <span>🏪 Request Pickup</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setIsShopifyModalOpen(true)}

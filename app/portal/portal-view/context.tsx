@@ -45,6 +45,20 @@ interface PortalContextType {
   isCashoutModalOpen: boolean
   setIsCashoutModalOpen: (o: boolean) => void
   openCashoutModal: () => void
+
+  // Pickup Request Modal
+  isPickupModalOpen: boolean
+  setIsPickupModalOpen: (o: boolean) => void
+  pickupCount: number
+  setPickupCount: (n: number) => void
+  pickupNote: string
+  setPickupNote: (s: string) => void
+  isSubmittingPickup: boolean
+  pickupSuccess: string
+  pickupError: string
+  recentPickups: any[]
+  handleRequestPickup: (e: React.FormEvent) => Promise<void>
+
   confirmedOrder: PortalOrder | null
   setConfirmedOrder: (o: PortalOrder | null) => void
   inspectingOrder: PortalOrder | null
@@ -131,6 +145,8 @@ interface PortalContextType {
   inTransitCount: number
   deliveredCount: number
   returnedCount: number
+  returnedWaitingCount: number
+  returnedThisMonthCount: number
   totalCollectedUSD: number
 }
 
@@ -151,6 +167,61 @@ export function PortalProvider({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isShopifyModalOpen, setIsShopifyModalOpen] = useState(false)
   const [isBulkImportModalOpen, setIsBulkImportModalOpen] = useState(false)
+
+  // Pickup Request Modal State
+  const [isPickupModalOpen, setIsPickupModalOpen] = useState(false)
+  const [pickupCount, setPickupCount] = useState<number>(1)
+  const [pickupNote, setPickupNote] = useState('')
+  const [isSubmittingPickup, setIsSubmittingPickup] = useState(false)
+  const [pickupSuccess, setPickupSuccess] = useState('')
+  const [pickupError, setPickupError] = useState('')
+  const [recentPickups, setRecentPickups] = useState<any[]>([])
+
+  const fetchPickups = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/pickups?shopId=${shop.id}&workspaceId=${shop.workspace_id}`)
+      const data = await res.json()
+      if (data.pickups) setRecentPickups(data.pickups)
+    } catch (_err) {
+      void _err
+    }
+  }, [shop.id, shop.workspace_id])
+
+  useEffect(() => {
+    fetchPickups()
+  }, [fetchPickups])
+
+  async function handleRequestPickup(e: React.FormEvent) {
+    e.preventDefault()
+    setIsSubmittingPickup(true)
+    setPickupError('')
+    setPickupSuccess('')
+    try {
+      const res = await fetch('/api/pickups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: shop.workspace_id,
+          shopId: shop.id,
+          parcelCount: Number(pickupCount) || 1,
+          note: pickupNote.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to request pickup')
+      setPickupSuccess(`Pickup requested for ${pickupCount} parcel${Number(pickupCount) === 1 ? '' : 's'}! A courier will be assigned.`)
+      fetchPickups()
+      setTimeout(() => {
+        setIsPickupModalOpen(false)
+        setPickupSuccess('')
+        setPickupNote('')
+      }, 2000)
+    } catch (err: unknown) {
+      setPickupError(err instanceof Error ? err.message : 'Error requesting pickup')
+    } finally {
+      setIsSubmittingPickup(false)
+    }
+  }
 
   // Order creation state
   const [recipientName, setRecipientName] = useState('')
@@ -400,6 +471,9 @@ export function PortalProvider({
   const inTransitCount = orders.filter(o => o.status === 'assigned' || o.status === 'picked_up').length
   const deliveredCount = orders.filter(o => o.status === 'delivered').length
   const returnedCount = orders.filter(o => o.status === 'returned').length
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+  const returnedWaitingCount = orders.filter(o => o.status === 'returned' && !o.returns_handed_at).length
+  const returnedThisMonthCount = orders.filter(o => o.status === 'returned' && o.returns_handed_at && o.returns_handed_at >= startOfMonth).length
 
   const totalCollectedUSD = orders
     .filter(o => o.status === 'delivered')
@@ -669,11 +743,24 @@ export function PortalProvider({
         cashoutSuccess,
         cashoutHistory,
         handleRequestCashout,
+        isPickupModalOpen,
+        setIsPickupModalOpen,
+        pickupCount,
+        setPickupCount,
+        pickupNote,
+        setPickupNote,
+        isSubmittingPickup,
+        pickupSuccess,
+        pickupError,
+        recentPickups,
+        handleRequestPickup,
         totalOrdersCount,
         pendingCount,
         inTransitCount,
         deliveredCount,
         returnedCount,
+        returnedWaitingCount,
+        returnedThisMonthCount,
         totalCollectedUSD,
       }}
     >

@@ -44,14 +44,17 @@ export async function findBestDriverForArea(
   // 2. Filter only active drivers in this workspace
   const { data: activeDrivers, error: drvErr } = await db
     .from('drivers')
-    .select('id')
+    .select('id, last_location_at')
     .in('id', poolIds)
     .eq('workspace_id', workspaceId)
     .eq('active', true)
 
   if (drvErr || !activeDrivers || activeDrivers.length === 0) return null
 
-  const validDriverIds = activeDrivers.map(d => d.id)
+  const offlineCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  const onlineCandidates = activeDrivers.filter(d => !d.last_location_at || d.last_location_at >= offlineCutoff)
+  const candidateDrivers = onlineCandidates.length > 0 ? onlineCandidates : activeDrivers
+  const validDriverIds = candidateDrivers.map(d => d.id)
   if (validDriverIds.length === 1) return validDriverIds[0]
 
   // 3. Count active orders ('assigned' or 'picked_up') for each candidate to balance the workload
@@ -121,14 +124,34 @@ export async function batchAutoAssignOrders(
     return { assignedCount: 0, assignedCodes: [], areaSummaries: [] }
   }
 
-  // 2. Fetch all active drivers
+  // 2. Fetch all active drivers with GPS telemetry
   const { data: activeDrivers } = await db
     .from('drivers')
-    .select('id')
+    .select('id, last_location_at')
     .eq('workspace_id', workspaceId)
     .eq('active', true)
 
-  const activeDriverSet = new Set((activeDrivers || []).map(d => d.id))
+  const { data: wsData } = await db
+    .from('workspaces')
+    .select('max_driver_load')
+    .eq('id', workspaceId)
+    .maybeSingle()
+
+  const maxDriverLoad = wsData?.max_driver_load ?? 50
+  const offlineCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+
+  // Build set of eligible drivers: active, not offline (> 30 min with stale GPS)
+  const eligibleDrivers = (activeDrivers || []).filter(d => {
+    if (d.last_location_at && d.last_location_at < offlineCutoff) {
+      // Driver hasn't reported GPS in over 30 minutes
+      return false
+    }
+    return true
+  })
+
+  // If all drivers have stale GPS (e.g. testing), fall back to active drivers so dispatch isn't permanently blocked
+  const effectiveDrivers = eligibleDrivers.length > 0 ? eligibleDrivers : (activeDrivers || [])
+  const activeDriverSet = new Set(effectiveDrivers.map(d => d.id))
 
   // Build area to driver pool map
   const areaPoolMap = new Map<string, string[]>()
@@ -194,17 +217,19 @@ export async function batchAutoAssignOrders(
     const candidatePool = areaPoolMap.get(order.area_id)!
     if (candidatePool.length === 0) continue
 
-    // Find the driver with the lowest load in this area pool
-    let chosenDriverId = candidatePool[0]
+    // Find the driver with the lowest load in this area pool that is not over max load
+    let chosenDriverId: string | null = null
     let minLoad = Infinity
 
     for (const dId of candidatePool) {
       const load = driverLoads.get(dId) ?? 0
-      if (load < minLoad) {
+      if (load < maxDriverLoad && load < minLoad) {
         minLoad = load
         chosenDriverId = dId
       }
     }
+
+    if (!chosenDriverId) continue
 
     // Assign order to chosen driver
     const { data: updated, error: updErr } = await db

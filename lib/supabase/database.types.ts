@@ -121,6 +121,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"delivery_attempts": {
+                  Row: {
+                    "attempt_no": number,"created_at": string,"driver_id": string | null,"id": string,"lat": number | null,"lng": number | null,"note": string | null,"order_id": string,"photo_path": string | null,"rescheduled_for": string | null,"result": Database["public"]['Enums']["attempt_result"],"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempt_no": number,"created_at"?: string,"driver_id"?: string | null,"id"?: string,"lat"?: number | null,"lng"?: number | null,"note"?: string | null,"order_id": string,"photo_path"?: string | null,"rescheduled_for"?: string | null,"result": Database["public"]['Enums']["attempt_result"],"workspace_id": string
+                  }
+                  Update: {
+                    "attempt_no"?: number,"created_at"?: string,"driver_id"?: string | null,"id"?: string,"lat"?: number | null,"lng"?: number | null,"note"?: string | null,"order_id"?: string,"photo_path"?: string | null,"rescheduled_for"?: string | null,"result"?: Database["public"]['Enums']["attempt_result"],"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "delivery_attempts_driver_id_fkey"
+      columns: ["driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "delivery_attempts_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "delivery_attempts_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"driver_credentials": {
                   Row: {
                     "driver_id": string,"pin_hash": string,"session_version": number,"updated_at": string
@@ -356,6 +388,12 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
+      foreignKeyName: "order_holds_hub_id_fkey"
+      columns: ["hub_id"]
+isOneToOne: false
+      referencedRelation: "hubs"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "order_holds_hub_id_workspace_id_fkey"
       columns: ["hub_id","workspace_id"]
 isOneToOne: false
@@ -377,14 +415,14 @@ isOneToOne: false
                   ]
                 },"orders": {
                   Row: {
-                    "accounting_version": number,"area_id": string | null,"carrier_name": string | null,"carrier_tracking_code": string | null,"cash_discrepancy_usd": number | null,"code": string,"collection_usd": number,"created_at": string,"created_by": string | null,"delivered_at": string | null,"delivery_fee_usd": number,"destination_caza": string | null,"destination_governorate": string | null,"destination_town": string | null,"driver_id": string | null,"driver_pay_usd": number,"hub_id": string | null,"id": string,"is_breakable": boolean,"is_held": boolean,"location_lat": number | null,"location_lng": number | null,"notes": string | null,"payment_method": string,"pod_collected_lbp": number | null,"pod_collected_usd": number | null,"pod_photo": string | null,"pod_signature": string | null,"recipient_address": string | null,"recipient_name": string | null,"recipient_phone": string | null,"service_type": Database["public"]['Enums']["order_service_type"],"shop_balance_usd": number,"shop_id": string | null,"shopify_order_id": string | null,"shopify_order_number": string | null,"status": Database["public"]['Enums']["order_status"],"storage_fee_usd": number,"tracking_token": string,"updated_at": string,"usd_to_lbp_rate": number,"weight_kg": number,"workspace_id": string
+                    "accounting_version": number,"area_id": string | null,"carrier_name": string | null,"carrier_tracking_code": string | null,"cash_discrepancy_usd": number | null,"code": string,"collection_usd": number,"created_at": string,"created_by": string | null,"delivered_at": string | null,"delivery_fee_usd": number,"destination_caza": string | null,"destination_governorate": string | null,"destination_town": string | null,"driver_id": string | null,"driver_pay_usd": number,"hub_id": string | null,"id": string,"is_breakable": boolean,"is_held": boolean,"location_lat": number | null,"location_lng": number | null,"notes": string | null,"payment_method": string,"pod_collected_lbp": number | null,"pod_collected_usd": number | null,"pod_photo": string | null,"pod_signature": string | null,"received_at_hub": string | null,"recipient_address": string | null,"recipient_name": string | null,"recipient_phone": string | null,"returns_handed_at": string | null,"returns_signature_path": string | null,"route_position": number | null,"service_type": Database["public"]['Enums']["order_service_type"],"shop_balance_usd": number,"shop_id": string | null,"shopify_order_id": string | null,"shopify_order_number": string | null,"status": Database["public"]['Enums']["order_status"],"storage_fee_usd": number,"tracking_token": string,"updated_at": string,"usd_to_lbp_rate": number,"weight_kg": number,"workspace_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate": number,"weight_kg"?: number,"workspace_id": string
+                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"received_at_hub"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"returns_handed_at"?: string | null,"returns_signature_path"?: string | null,"route_position"?: number | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate": number,"weight_kg"?: number,"workspace_id": string
                   }
                   Update: {
-                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate"?: number,"weight_kg"?: number,"workspace_id"?: string
+                    "accounting_version"?: number,"area_id"?: string | null,"carrier_name"?: string | null,"carrier_tracking_code"?: string | null,"cash_discrepancy_usd"?: number | null,"code"?: string,"collection_usd"?: number,"created_at"?: string,"created_by"?: string | null,"delivered_at"?: string | null,"delivery_fee_usd"?: number,"destination_caza"?: string | null,"destination_governorate"?: string | null,"destination_town"?: string | null,"driver_id"?: string | null,"driver_pay_usd"?: number,"hub_id"?: string | null,"id"?: string,"is_breakable"?: boolean,"is_held"?: boolean,"location_lat"?: number | null,"location_lng"?: number | null,"notes"?: string | null,"payment_method"?: string,"pod_collected_lbp"?: number | null,"pod_collected_usd"?: number | null,"pod_photo"?: string | null,"pod_signature"?: string | null,"received_at_hub"?: string | null,"recipient_address"?: string | null,"recipient_name"?: string | null,"recipient_phone"?: string | null,"returns_handed_at"?: string | null,"returns_signature_path"?: string | null,"route_position"?: number | null,"service_type"?: Database["public"]['Enums']["order_service_type"],"shop_balance_usd"?: number,"shop_id"?: string | null,"shopify_order_id"?: string | null,"shopify_order_number"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"storage_fee_usd"?: number,"tracking_token"?: string,"updated_at"?: string,"usd_to_lbp_rate"?: number,"weight_kg"?: number,"workspace_id"?: string
                   }
                   Relationships: [
                     {
@@ -431,6 +469,70 @@ isOneToOne: false
       referencedColumns: ["id"]
     },{
       foreignKeyName: "orders_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"pickup_orders": {
+                  Row: {
+                    "created_at": string,"order_id": string,"pickup_id": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"order_id": string,"pickup_id": string,"workspace_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"order_id"?: string,"pickup_id"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pickup_orders_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pickup_orders_pickup_id_fkey"
+      columns: ["pickup_id"]
+isOneToOne: false
+      referencedRelation: "pickups"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pickup_orders_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"pickups": {
+                  Row: {
+                    "collected_at": string | null,"created_at": string,"driver_id": string | null,"id": string,"note": string | null,"parcel_count": number,"proof_photo_path": string | null,"requested_at": string,"shop_id": string,"status": Database["public"]['Enums']["pickup_status"],"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "collected_at"?: string | null,"created_at"?: string,"driver_id"?: string | null,"id"?: string,"note"?: string | null,"parcel_count"?: number,"proof_photo_path"?: string | null,"requested_at"?: string,"shop_id": string,"status"?: Database["public"]['Enums']["pickup_status"],"workspace_id": string
+                  }
+                  Update: {
+                    "collected_at"?: string | null,"created_at"?: string,"driver_id"?: string | null,"id"?: string,"note"?: string | null,"parcel_count"?: number,"proof_photo_path"?: string | null,"requested_at"?: string,"shop_id"?: string,"status"?: Database["public"]['Enums']["pickup_status"],"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pickups_driver_id_fkey"
+      columns: ["driver_id"]
+isOneToOne: false
+      referencedRelation: "drivers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pickups_shop_id_fkey"
+      columns: ["shop_id"]
+isOneToOne: false
+      referencedRelation: "shops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pickups_workspace_id_fkey"
       columns: ["workspace_id"]
 isOneToOne: false
       referencedRelation: "workspaces"
@@ -615,14 +717,14 @@ isOneToOne: false
                   ]
                 },"workspaces": {
                   Row: {
-                    "created_at": string,"currency": string,"default_delivery_fee_usd": number | null,"default_driver_pay_usd": number | null,"id": string,"name": string,"slug": string,"usd_to_lbp": number
+                    "created_at": string,"currency": string,"default_delivery_fee_usd": number | null,"default_driver_pay_usd": number | null,"id": string,"max_delivery_attempts": number,"max_driver_load": number,"name": string,"slug": string,"usd_to_lbp": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"name": string,"slug": string,"usd_to_lbp"?: number
+                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name": string,"slug": string,"usd_to_lbp"?: number
                   }
                   Update: {
-                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"name"?: string,"slug"?: string,"usd_to_lbp"?: number
+                    "created_at"?: string,"currency"?: string,"default_delivery_fee_usd"?: number | null,"default_driver_pay_usd"?: number | null,"id"?: string,"max_delivery_attempts"?: number,"max_driver_load"?: number,"name"?: string,"slug"?: string,"usd_to_lbp"?: number
                   }
                   Relationships: [
                     
@@ -636,8 +738,14 @@ isOneToOne: false
             "accept_staff_invite":
 { Args: { "p_email": string,"p_name": string,"p_token": string,"p_user": string }; Returns: boolean
                            },
+"collect_pickup":
+{ Args: { "p_driver_id": string,"p_order_ids"?: (string)[],"p_pickup_id": string,"p_proof_photo_path"?: string }; Returns: Json
+                           },
 "consume_limit":
 { Args: { "p_key": string,"p_max": number }; Returns: boolean
+                           },
+"handover_returns":
+{ Args: { "p_order_ids": (string)[],"p_shop_id": string,"p_signature_path"?: string }; Returns: Json
                            },
 "hold_order":
 { Args: { "p_deliver_after"?: string,"p_hub": string,"p_note"?: string,"p_order": string,"p_reason": Database["public"]['Enums']["hold_reason"],"p_shelf": string,"p_user"?: string }; Returns: Json
@@ -648,6 +756,9 @@ isOneToOne: false
 "mark_cashout_paid":
 { Args: { "p_request": string,"p_user": string,"p_workspace": string }; Returns: string
                            },
+"mark_received_at_hub":
+{ Args: { "p_order_id": string }; Returns: Json
+                           },
 "my_role":
 { Args: { "ws_id": string }; Returns: Database["public"]['Enums']["user_role"]
                            },
@@ -656,6 +767,9 @@ isOneToOne: false
                            },
 "profit_report":
 { Args: { "p_from": string,"p_to": string,"p_workspace": string }; Returns: Json
+                           },
+"record_delivery_attempt":
+{ Args: { "p_driver_id": string,"p_lat"?: number,"p_lng"?: number,"p_note"?: string,"p_order_id": string,"p_photo_path"?: string,"p_rescheduled_for"?: string,"p_result": Database["public"]['Enums']["attempt_result"] }; Returns: Json
                            },
 "release_order":
 { Args: { "p_note"?: string,"p_order": string,"p_user"?: string }; Returns: Json
@@ -688,6 +802,9 @@ isOneToOne: false
 "set_driver_pin":
 { Args: { "p_driver": string,"p_pin": string }; Returns: boolean
                            },
+"set_route_positions":
+{ Args: { "p_driver_id": string,"p_positions": Json }; Returns: Json
+                           },
 "track_orders_by_phone":
 { Args: { "p_phone": string }; Returns: Json
                            },
@@ -698,7 +815,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "cashout_status": "pending"|"approved"|"rejected"|"paid","hold_reason": "weather"|"far_zone"|"customer_request"|"scheduled"|"address_problem"|"shop_request"|"other","order_service_type": "delivery"|"replacement"|"pickup","order_status": "pending"|"assigned"|"picked_up"|"delivered"|"failed"|"returned"|"cancelled","settlement_type": "shop_payment"|"driver_cash_remittance"|"driver_pay","user_role": "owner"|"manager"|"driver"|"readonly"
+            "attempt_result": "delivered"|"no_answer"|"refused"|"wrong_address"|"rescheduled"|"closed"|"other","cashout_status": "pending"|"approved"|"rejected"|"paid","hold_reason": "weather"|"far_zone"|"customer_request"|"scheduled"|"address_problem"|"shop_request"|"other","order_service_type": "delivery"|"replacement"|"pickup","order_status": "pending"|"assigned"|"picked_up"|"delivered"|"failed"|"returned"|"cancelled","pickup_status": "requested"|"assigned"|"collected"|"cancelled","settlement_type": "shop_payment"|"driver_cash_remittance"|"driver_pay","user_role": "owner"|"manager"|"driver"|"readonly"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -818,7 +935,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "cashout_status": ["pending", "approved", "rejected", "paid"],"hold_reason": ["weather", "far_zone", "customer_request", "scheduled", "address_problem", "shop_request", "other"],"order_service_type": ["delivery", "replacement", "pickup"],"order_status": ["pending", "assigned", "picked_up", "delivered", "failed", "returned", "cancelled"],"settlement_type": ["shop_payment", "driver_cash_remittance", "driver_pay"],"user_role": ["owner", "manager", "driver", "readonly"]
+            "attempt_result": ["delivered", "no_answer", "refused", "wrong_address", "rescheduled", "closed", "other"],"cashout_status": ["pending", "approved", "rejected", "paid"],"hold_reason": ["weather", "far_zone", "customer_request", "scheduled", "address_problem", "shop_request", "other"],"order_service_type": ["delivery", "replacement", "pickup"],"order_status": ["pending", "assigned", "picked_up", "delivered", "failed", "returned", "cancelled"],"pickup_status": ["requested", "assigned", "collected", "cancelled"],"settlement_type": ["shop_payment", "driver_cash_remittance", "driver_pay"],"user_role": ["owner", "manager", "driver", "readonly"]
           }
         }
 } as const

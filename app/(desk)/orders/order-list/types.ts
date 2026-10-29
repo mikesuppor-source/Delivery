@@ -27,6 +27,10 @@ export interface Order {
   is_held?: boolean
   hub_id?: string | null
   storage_fee_usd?: number
+  received_at_hub?: string | null
+  route_position?: number | null
+  returns_handed_at?: string | null
+  returns_signature_path?: string | null
   created_at: string
   shop: { id: string; name: string; phone?: string | null } | null
   driver: { id: string; name: string; phone?: string | null } | null

@@ -52,6 +52,7 @@ export function orderPatch(body: Record<string, unknown>, order: Record<string, 
       if (order.status === 'pending' && body.driverId && !body.status) updates.status='assigned'
     }
     if (body.areaId !== undefined) updates.area_id=body.areaId || null
+    if (body.receivedAtHub) updates.received_at_hub = new Date().toISOString()
   }
   for (const [input,column] of Object.entries({podCollectedUsd:'pod_collected_usd',podCollectedLbp:'pod_collected_lbp'}))
     if (body[input] !== undefined) updates[column]=money(body[input],input)

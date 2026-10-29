@@ -41,7 +41,7 @@ export function formatLebanesePhone(phone: string): string {
   const cleaned = cleanPhone(phone)
   let digits = cleaned.replace(/^\+/, '').replace(/^00/, '')
 
-  let countryCode = '+961'
+  const countryCode = '+961'
   if (digits.startsWith('961')) {
     digits = digits.slice(3)
   }

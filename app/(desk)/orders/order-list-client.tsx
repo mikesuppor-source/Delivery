@@ -12,6 +12,7 @@ import { ScannerModal } from './order-list/sections/scanner-modal'
 import { DriverRequiredModal } from './order-list/sections/driver-required-modal'
 import { EditOrderModal } from './order-list/sections/edit-order-modal'
 import { ReceiptAndImportModals } from './order-list/sections/receipt-and-import'
+import { ReturnsHandoverModal } from './order-list/sections/returns-handover-modal'
 
 // Desk order list. State lives in ./order-list/use-*.ts hooks; each part of the
 // screen is a component in ./order-list/sections reading that state via context.
@@ -31,6 +32,7 @@ export function OrderListClient(props: OrderListClientProps) {
         <EditOrderModal key={state.editingOrder.id} editingOrder={state.editingOrder} onClose={() => state.setEditingOrder(null)} />
       )}
       <ReceiptAndImportModals />
+      <ReturnsHandoverModal />
     </OrderListProvider>
   )
 }

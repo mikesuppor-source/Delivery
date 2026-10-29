@@ -66,6 +66,16 @@ async function signIn(page: Page, path: string, account: { email: string; passwo
 export const signInOwner = (page: Page) => signIn(page, '/login', OWNER, /localhost:3000\/$/)
 export const signInMerchant = (page: Page) => signIn(page, '/portal/login', MERCHANT, /\/portal$/)
 
+export async function signInCourier(page: Page) {
+  const { courierId } = await seeded()
+  await page.goto('/driver')
+  await page.locator('input[type=tel]').fill(COURIER.phone)
+  await page.locator('input[type=password]').fill(COURIER.pin)
+  await page.locator('button[type=submit]').click()
+  await expect(page).toHaveURL(new RegExp('/driver/' + courierId), { timeout: 30_000 })
+  return courierId
+}
+
 /** Calls the app's API from inside the page so the browser's own cookies are used. */
 export async function apiCall(page: Page, path: string, method = 'GET', body?: unknown) {
   return page.evaluate(

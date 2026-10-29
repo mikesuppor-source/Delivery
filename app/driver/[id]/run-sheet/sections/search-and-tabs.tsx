@@ -4,7 +4,7 @@ import { SearchIcon } from '@/components/icons'
 import { useRunSheet } from '../context'
 
 export function SearchAndTabs() {
-  const { filterTab, search, setFilterTab, setSearch, stats, t } = useRunSheet()
+  const { filterTab, search, setFilterTab, setSearch, stats, t, pickups } = useRunSheet()
   return (
     <>
         {/* ─── SEARCH & FILTER TABS ─── */}
@@ -80,6 +80,40 @@ export function SearchAndTabs() {
               }}
             >
               {t('toDeliverTab')} ({stats.toDeliver})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterTab('pickups')}
+              style={{
+                background: filterTab === 'pickups' ? '#d97706' : '#1e293b',
+                color: filterTab === 'pickups' ? '#ffffff' : '#fbbf24',
+                border: '1px solid ' + (filterTab === 'pickups' ? '#f59e0b' : '#334155'),
+                padding: '6px 12px',
+                borderRadius: 99,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🏪 Pickups ({pickups?.filter(p => p.status !== 'cancelled').length || 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterTab('earnings')}
+              style={{
+                background: filterTab === 'earnings' ? '#15803d' : '#1e293b',
+                color: filterTab === 'earnings' ? '#ffffff' : '#86efac',
+                border: '1px solid ' + (filterTab === 'earnings' ? '#22c55e' : '#334155'),
+                padding: '6px 12px',
+                borderRadius: 99,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              💵 Earnings & Cash
             </button>
             <button
               type="button"

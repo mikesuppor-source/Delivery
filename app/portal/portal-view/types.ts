@@ -44,6 +44,8 @@ export interface PortalOrder {
   recipient_address: string | null
   area: { id: string; name: string; fee_usd: number } | null
   driver: { id: string; name: string; phone?: string | null } | null
+  returns_handed_at?: string | null
+  returns_signature_path?: string | null
   shopify_order_id?: string | null
   shopify_order_number?: string | null
 }

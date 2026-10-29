@@ -34,6 +34,8 @@ export function OrdersSection() {
     inTransitCount,
     deliveredCount,
     returnedCount,
+    returnedWaitingCount,
+    returnedThisMonthCount,
   } = usePortal()
 
   const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || '')
@@ -92,6 +94,36 @@ export function OrdersSection() {
           </div>
         </div>
       </div>
+
+      {/* Returned Parcels Summary Banner */}
+      {statusFilter === 'returned' && (
+        <div
+          style={{
+            padding: '14px 18px',
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid #ef4444',
+            borderRadius: 10,
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 800, color: '#dc2626', fontSize: 14 }}>
+              Returned parcels waiting for you: {returnedWaitingCount} parcels
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+              These parcels have completed return delivery attempts and are queued for courier return to your shop.
+            </div>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+            Returned this month: <strong style={{ color: '#059669' }}>{returnedThisMonthCount} parcels</strong>
+          </div>
+        </div>
+      )}
 
       {/* Batch Selection Action Bar */}
       {selectedOrderIds.length > 0 && (
@@ -354,6 +386,44 @@ export function OrdersSection() {
                               </span>
                             )}
                           </span>
+                        </div>
+                      )}
+
+                      {order.status === 'returned' && (
+                        <div style={{ marginTop: 4 }}>
+                          {order.returns_handed_at ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: '#047857',
+                                background: '#d1fae5',
+                                padding: '2px 7px',
+                                borderRadius: 6,
+                              }}
+                            >
+                              ✓ Handed to Shop
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: '#b45309',
+                                background: '#fef3c7',
+                                padding: '2px 7px',
+                                borderRadius: 6,
+                              }}
+                            >
+                              ⏳ In Return Queue
+                            </span>
+                          )}
                         </div>
                       )}
                     </td>

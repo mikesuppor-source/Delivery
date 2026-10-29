@@ -240,6 +240,62 @@ export function OrderRow({ order }: { order: Order }) {
             </option>
           ))}
         </select>
+        {order.status === 'returned' && (
+          <div style={{ marginTop: 4 }}>
+            {order.returns_handed_at ? (
+              <span
+                style={{
+                  display: 'inline-block',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#059669',
+                  border: '1px solid #10b981',
+                  borderRadius: 4,
+                  padding: '1px 6px',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+                title={`Handed over to shop on ${order.returns_handed_at}`}
+              >
+                ✓ Handed to Shop
+              </span>
+            ) : (
+              <span
+                style={{
+                  display: 'inline-block',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: '#d97706',
+                  border: '1px solid #f59e0b',
+                  borderRadius: 4,
+                  padding: '1px 6px',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+                title="Returned parcel waiting for handover to merchant"
+              >
+                ⏳ Waiting Handover
+              </span>
+            )}
+          </div>
+        )}
+        {order.received_at_hub && (
+          <div style={{ marginTop: 3 }}>
+            <span
+              style={{
+                display: 'inline-block',
+                background: 'rgba(59, 130, 246, 0.12)',
+                color: '#2563eb',
+                border: '1px solid #60a5fa',
+                borderRadius: 4,
+                padding: '1px 6px',
+                fontSize: 10,
+                fontWeight: 700,
+              }}
+              title={`Checked into hub on ${order.received_at_hub}`}
+            >
+              🏢 Hub Checked
+            </span>
+          </div>
+        )}
       </td>
 
       <td>

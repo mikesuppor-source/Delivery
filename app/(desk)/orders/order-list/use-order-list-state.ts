@@ -18,6 +18,7 @@ export function useOrderListState({ orders: initialOrders, shops, drivers, areas
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
+  const [isReturnsHandoverOpen, setIsReturnsHandoverOpen] = useState(false)
 
   const selection = useOrderSelection({
     workspaceId,
@@ -52,6 +53,8 @@ export function useOrderListState({ orders: initialOrders, shops, drivers, areas
     editingOrder,
     setEditingOrder,
     openEditOrderModal: setEditingOrder,
+    isReturnsHandoverOpen,
+    setIsReturnsHandoverOpen,
     handleExportCsv: () => exportOrdersCsv(filters.filteredOrders),
   }
 }

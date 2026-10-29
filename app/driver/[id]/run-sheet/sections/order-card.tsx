@@ -11,8 +11,33 @@ import { buildCourierToCustomerMessage, getWhatsAppUrl } from '@/lib/whatsapp'
 import { resolveOrderCoordinates, type DriverRunSheetOrder } from '../shared'
 import { useRunSheet } from '../context'
 
-export function OrderCard({ order, idx }: { order: DriverRunSheetOrder; idx: number }) {
-  const { driver, driverGps, getStatusLabel, handleUpdateStatus, lang, offlineQueue, rate, setFailModalOrder, setPodModalOrder, setViewPodOrder, t, updatingId } = useRunSheet()
+export function OrderCard({
+  order,
+  idx,
+  isFirst,
+  isLast,
+}: {
+  order: DriverRunSheetOrder
+  idx: number
+  isFirst?: boolean
+  isLast?: boolean
+}) {
+  const {
+    driver,
+    driverGps,
+    getStatusLabel,
+    handleUpdateStatus,
+    handleMoveOrderPosition,
+    lang,
+    offlineQueue,
+    rate,
+    setFailModalOrder,
+    setPodModalOrder,
+    setViewPodOrder,
+    setReturnHandoverOrder,
+    t,
+    updatingId,
+  } = useRunSheet()
   const ar = lang === 'ar'
   const isUpdating = updatingId === order.id
   const parsedLoc = parseLocation(order.recipient_address)
@@ -48,6 +73,48 @@ export function OrderCard({ order, idx }: { order: DriverRunSheetOrder; idx: num
           >
             {isDelivered ? '✓' : idx + 1}
           </span>
+          {!isDelivered && !isFailed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {!isFirst && (
+                <button
+                  type="button"
+                  onClick={() => handleMoveOrderPosition(order.id, 'up')}
+                  style={{
+                    background: '#1e293b',
+                    border: '1px solid #334155',
+                    color: '#94a3b8',
+                    borderRadius: 3,
+                    padding: '0 4px',
+                    fontSize: 8,
+                    lineHeight: '10px',
+                    cursor: 'pointer',
+                  }}
+                  title="Move stop earlier"
+                >
+                  ▲
+                </button>
+              )}
+              {!isLast && (
+                <button
+                  type="button"
+                  onClick={() => handleMoveOrderPosition(order.id, 'down')}
+                  style={{
+                    background: '#1e293b',
+                    border: '1px solid #334155',
+                    color: '#94a3b8',
+                    borderRadius: 3,
+                    padding: '0 4px',
+                    fontSize: 8,
+                    lineHeight: '10px',
+                    cursor: 'pointer',
+                  }}
+                  title="Move stop later"
+                >
+                  ▼
+                </button>
+              )}
+            </div>
+          )}
           <Link
             href={`/track/${order.tracking_token || order.code}`}
             target="_blank"
@@ -256,14 +323,52 @@ export function OrderCard({ order, idx }: { order: DriverRunSheetOrder; idx: num
         )}
 
         {isFailed && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
-            <span style={{ fontSize: 12, color: '#fca5a5', fontWeight: 700 }}>
-              {order.status === 'returned' ? (ar ? 'تم الإرجاع' : 'Returned') : ar ? 'تمت المحاولة / مؤجل' : 'Attempted / Postponed'}
-            </span>
-            {/* Only failed attempts can be retried; returned parcels are closed */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: '#fca5a5', fontWeight: 700 }}>
+                {order.status === 'returned' ? (ar ? 'تم الإرجاع للمتجر' : 'Returned') : ar ? 'تمت المحاولة / مؤجل' : 'Attempted / Postponed'}
+              </span>
+              {order.status === 'returned' && (
+                order.returns_handed_at ? (
+                  <span
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      color: '#10b981',
+                      border: '1px solid #059669',
+                      borderRadius: 4,
+                      padding: '1px 6px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {ar ? '✓ تم التسليم للمتجر' : '✓ Handed to Shop'}
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#fbbf24',
+                      border: '1px solid #d97706',
+                      borderRadius: 4,
+                      padding: '1px 6px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {ar ? '⏳ بانتظار التسليم للمتجر' : '⏳ Waiting Shop Handover'}
+                  </span>
+                )
+              )}
+            </div>
+            {/* Only failed attempts can be retried; returned parcels can be handed over to shop */}
             {order.status === 'failed' && (
               <Button size="sm" disabled={isUpdating} onClick={() => handleUpdateStatus(order.id, 'picked_up')}>
                 {ar ? 'إعادة المحاولة' : 'Retry Delivery'}
+              </Button>
+            )}
+            {order.status === 'returned' && !order.returns_handed_at && (
+              <Button size="sm" variant="success" disabled={isUpdating} onClick={() => setReturnHandoverOrder(order)}>
+                {ar ? '✍️ تسليم للمتجر وتوقيع' : '✍️ Handover & Sign'}
               </Button>
             )}
           </div>

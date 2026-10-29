@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+  const supabaseResponse = NextResponse.next({ request })
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
@@ -54,8 +54,18 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/driver/') ||
     path.startsWith('/api/driver/')
 
+  const hasDriverSession = Boolean(request.cookies.get('cedar_driver_session')?.value)
+  const isDriverApi =
+    hasDriverSession &&
+    [
+      '/api/pickups',
+      '/api/orders/attempts',
+      '/api/orders/route',
+      '/api/orders/returns-handover',
+    ].some(p => path === p || path.startsWith(p + '/'))
+
   // Redirect unauthenticated users
-  if (!user && !isPublic) {
+  if (!user && !isPublic && !isDriverApi) {
     if (path.startsWith('/api/')) return NextResponse.json({ error: 'Please sign in' }, { status: 401 })
     const url = request.nextUrl.clone()
     if (path.startsWith('/portal')) {

@@ -13,6 +13,8 @@ export function KpiSection() {
     inTransitCount,
     pendingCount,
     deliveredCount,
+    returnedWaitingCount,
+    returnedThisMonthCount,
     totalCollectedUSD,
   } = usePortal()
 
@@ -85,6 +87,18 @@ export function KpiSection() {
         </div>
         <small style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
           Total COD: {formatUSD(totalCollectedUSD)}
+        </small>
+      </div>
+
+      <div style={{ background: 'var(--surface)', border: '1.5px solid var(--line)', borderRadius: 12, padding: '16px 18px' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+          Returns & Handovers
+        </span>
+        <div style={{ fontSize: 22, fontWeight: 900, color: returnedWaitingCount > 0 ? '#dc2626' : 'var(--text)', marginTop: 4 }}>
+          {returnedWaitingCount} waiting
+        </div>
+        <small style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
+          {returnedThisMonthCount} returned this month
         </small>
       </div>
     </div>

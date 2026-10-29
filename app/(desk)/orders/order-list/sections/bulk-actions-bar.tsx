@@ -4,7 +4,26 @@ import Link from 'next/link'
 import { useOrderList } from '../context'
 
 export function BulkActionsBar() {
-  const { bulkDriverId, bulkLoading, bulkMessage, canManage, drivers, handleBulkExecute, handleDeleteOrders, isOwner, selectedOrderIds, setBulkDriverId, setSelectedOrderIds } = useOrderList()
+  const {
+    bulkDriverId,
+    bulkLoading,
+    bulkMessage,
+    canManage,
+    drivers,
+    handleBulkExecute,
+    handleDeleteOrders,
+    isOwner,
+    selectedOrderIds,
+    setBulkDriverId,
+    setSelectedOrderIds,
+    orders,
+    setIsReturnsHandoverOpen,
+  } = useOrderList()
+
+  const returnedSelectedCount = orders.filter(
+    o => selectedOrderIds.includes(o.id) && o.status === 'returned' && !o.returns_handed_at
+  ).length
+
   return (
     <>
       {/* ─── FLOATING BATCH ACTIONS TOOLBAR (WHEN ORDERS SELECTED) ─── */}
@@ -120,6 +139,27 @@ export function BulkActionsBar() {
             >
               Mark Returned
             </button>
+
+            {/* Return Handover to Shop */}
+            {returnedSelectedCount > 0 && (
+              <button
+                type="button"
+                disabled={bulkLoading}
+                onClick={() => setIsReturnsHandoverOpen(true)}
+                className="btn btn-sm"
+                style={{
+                  fontSize: 12,
+                  background: '#059669',
+                  color: '#fff',
+                  border: '1px solid #10b981',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                <span>📦 Handover to Shop ({returnedSelectedCount})</span>
+              </button>
+            )}
 
             {/* Batch Waybills Print */}
             <Link

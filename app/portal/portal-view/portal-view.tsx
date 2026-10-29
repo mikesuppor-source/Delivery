@@ -7,6 +7,7 @@ import { OrdersSection } from './sections/orders-section'
 import { CreateOrderModal } from './sections/create-order-modal'
 import { OrderModals } from './sections/order-modals'
 import { CashoutModal } from './sections/cashout-modal'
+import { PickupModal } from './sections/pickup-modal'
 import { IntegrationsModals } from './sections/integrations-modals'
 
 export function PortalView() {
@@ -18,6 +19,7 @@ export function PortalView() {
       <CreateOrderModal />
       <OrderModals />
       <CashoutModal />
+      <PickupModal />
       <IntegrationsModals />
     </div>
   )

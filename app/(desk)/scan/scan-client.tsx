@@ -51,6 +51,8 @@ interface ScannedOrder {
   is_held?: boolean
   hub_id?: string | null
   storage_fee_usd?: number
+  received_at_hub?: string | null
+  route_position?: number | null
   shop?: { id: string; name: string; phone: string | null } | null
   area?: { id: string; name: string } | null
   driver?: { id: string; name: string; phone: string | null } | null
@@ -112,10 +114,15 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [scanHistory, setScanHistory] = useState<Array<{ code: string; status: string; time: string }>>([])
   const [continuousMode, setContinuousMode] = useState(false)
-  const [targetAction, setTargetAction] = useState<'view' | 'pickup' | 'deliver' | 'warehouse'>('view')
+  const [targetAction, setTargetAction] = useState<'view' | 'pickup' | 'deliver' | 'warehouse' | 'sort'>('sort')
   const [targetDriverId, setTargetDriverId] = useState<string>('')
   const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([])
   const [selectedCameraId, setSelectedCameraId] = useState<string>('')
+
+  // Hub Sort Mode States
+  const [deliveryAreas, setDeliveryAreas] = useState<Array<{ id: string; name: string; default_driver_id: string | null; assigned_driver_ids: string[] | null }>>([])
+  const [sortedBags, setSortedBags] = useState<Record<string, ScannedOrder[]>>({})
+  const [bagDriverAssignments, setBagDriverAssignments] = useState<Record<string, string>>({})
 
   // Warehouse Holding States
   const [warehouseHubs, setWarehouseHubs] = useState<Array<{ id: string; name: string; is_default?: boolean }>>([])
@@ -136,7 +143,24 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
         }
       })
       .catch(() => {})
+
+    fetch(`/api/areas?workspaceId=${workspaceId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.areas) {
+          setDeliveryAreas(data.areas)
+        }
+      })
+      .catch(() => {})
   }, [workspaceId])
+
+  const suggestedDriver = React.useMemo(() => {
+    if (!order?.area?.id) return null
+    const area = deliveryAreas.find(a => a.id === order.area?.id)
+    if (!area) return null
+    const targetDriverId = area.default_driver_id || (Array.isArray(area.assigned_driver_ids) && area.assigned_driver_ids[0])
+    return drivers.find(d => d.id === targetDriverId) || null
+  }, [order, deliveryAreas, drivers])
 
   const scannerRef = useRef<unknown>(null)
   const stoppingPromiseRef = useRef<Promise<void> | null>(null)
@@ -191,6 +215,29 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
           { code: matchedOrder!.code, status: matchedOrder!.status, time: new Date().toLocaleTimeString() },
           ...prev.slice(0, 9),
         ])
+
+        // Hub Sort Mode: mark received at hub and bucket into zone bag
+        if (targetAction === 'sort') {
+          if (!matchedOrder.received_at_hub) {
+            fetch('/api/orders', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId: matchedOrder.id,
+                workspaceId,
+                receivedAtHub: true,
+              }),
+            }).catch(() => {})
+            matchedOrder.received_at_hub = new Date().toISOString()
+          }
+
+          const zone = matchedOrder.area?.name || 'Unassigned Zone'
+          setSortedBags(prev => {
+            const list = prev[zone] || []
+            if (list.some(o => o.id === matchedOrder!.id)) return prev
+            return { ...prev, [zone]: [matchedOrder!, ...list] }
+          })
+        }
 
         // Automatic action if continuous mode is on
         if (continuousMode) {
@@ -339,6 +386,38 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
     } catch (err: unknown) {
       playScannerBeep(false)
       showMessage(err instanceof Error ? err.message : 'Failed to release order', 'error')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // 1-Click assign entire zone bag to courier
+  async function handleAssignZoneBag(zoneName: string, driverId: string) {
+    const list = sortedBags[zoneName] || []
+    if (list.length === 0 || !driverId) return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/orders/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId,
+          orderIds: list.map(o => o.id),
+          action: 'assign_driver',
+          driverId,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to assign zone bag')
+      const driver = drivers.find(d => d.id === driverId)
+      showMessage(`Assigned all ${list.length} parcels in ${zoneName} to ${driver?.name || 'Courier'}!`, 'success')
+      setSortedBags(prev => {
+        const next = { ...prev }
+        delete next[zoneName]
+        return next
+      })
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Bulk assign failed', 'error')
     } finally {
       setActionLoading(false)
     }
@@ -827,6 +906,18 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
                   <input
                     type="radio"
                     name="action"
+                    checked={targetAction === 'sort'}
+                    onChange={() => setTargetAction('sort')}
+                  />
+                  <span style={{ fontWeight: 600, color: 'var(--brand)' }}>
+                    ⚡ Sort Mode (Huge Zone Display, Suggested Courier & Hub Intake)
+                  </span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="action"
                     checked={targetAction === 'view'}
                     onChange={() => setTargetAction('view')}
                   />
@@ -1070,6 +1161,75 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
             background: 'linear-gradient(135deg, var(--surface) 0%, rgba(20, 83, 45, 0.03) 100%)',
           }}
         >
+          {/* Hub Sort Mode Huge Zone & Courier Banner */}
+          {targetAction === 'sort' && (
+            <div
+              style={{
+                padding: '24px 28px',
+                background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
+                borderRadius: 14,
+                color: '#ffffff',
+                textAlign: 'center',
+                marginBottom: 22,
+                boxShadow: '0 8px 24px rgba(22, 101, 52, 0.35)',
+              }}
+            >
+              <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 2, fontWeight: 800, opacity: 0.9 }}>
+                SORT DESTINATION ZONE
+              </div>
+              <div
+                style={{
+                  fontSize: 48,
+                  fontWeight: 900,
+                  letterSpacing: -1,
+                  margin: '10px 0',
+                  textShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                }}
+              >
+                {order.area?.name || 'No Zone Assigned'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+                {suggestedDriver ? (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      background: 'rgba(255, 255, 255, 0.22)',
+                      padding: '8px 18px',
+                      borderRadius: 999,
+                      fontSize: 15,
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span>Suggested Courier:</span>
+                    <strong style={{ textDecoration: 'underline' }}>{suggestedDriver.name}</strong>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, opacity: 0.85 }}>
+                    No assigned courier in zone pool
+                  </div>
+                )}
+                {order.received_at_hub && (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#047857',
+                      padding: '6px 14px',
+                      borderRadius: 999,
+                      fontSize: 13,
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span>✓ Checked In at Hub</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1347,6 +1507,118 @@ export function ScanClient({ workspaceId, drivers, exchangeRate }: ScanClientPro
                 Revert to In-Transit
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Hub Sort Bags Section */}
+      {targetAction === 'sort' && Object.keys(sortedBags).length > 0 && (
+        <div className="panel" style={{ marginTop: 24, padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div>
+              <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--brand)' }}>
+                Sorted Zone Bags
+              </h3>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
+                {Object.values(sortedBags).reduce((sum, list) => sum + list.length, 0)} parcels sorted in current session. 1-click assigns the entire bag to a courier.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSortedBags({})}
+              className="btn btn-ghost"
+              style={{ fontSize: 12 }}
+            >
+              Clear Bags
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+            {Object.entries(sortedBags).map(([zoneName, bagOrders]) => {
+              const matchedArea = deliveryAreas.find(a => a.name.toLowerCase() === zoneName.toLowerCase())
+              const defaultCourierId = matchedArea?.default_driver_id || (Array.isArray(matchedArea?.assigned_driver_ids) ? matchedArea?.assigned_driver_ids[0] : '') || ''
+              const selectedCourierId = bagDriverAssignments[zoneName] !== undefined ? bagDriverAssignments[zoneName] : defaultCourierId
+
+              return (
+                <div
+                  key={zoneName}
+                  style={{
+                    padding: 16,
+                    background: 'var(--ui-surface-2, rgba(20, 83, 45, 0.04))',
+                    border: '1px solid var(--line)',
+                    borderRadius: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>{zoneName}</span>
+                      <span className="badge badge-assigned" style={{ fontSize: 12, fontWeight: 700 }}>
+                        {bagOrders.length} parcel{bagOrders.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                      {bagOrders.slice(0, 8).map(o => (
+                        <span
+                          key={o.id}
+                          style={{
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            padding: '2px 6px',
+                            background: 'var(--surface)',
+                            border: '1px solid var(--line)',
+                            borderRadius: 4,
+                          }}
+                        >
+                          {o.code}
+                        </span>
+                      ))}
+                      {bagOrders.length > 8 && (
+                        <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center' }}>
+                          +{bagOrders.length - 8} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                    <select
+                      value={selectedCourierId}
+                      onChange={e => setBagDriverAssignments(prev => ({ ...prev, [zoneName]: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: 6,
+                        border: '1px solid var(--line)',
+                        background: 'var(--surface)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <option value="">Select courier for {zoneName}…</option>
+                      {drivers.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} {d.phone ? `(${d.phone})` : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={actionLoading || !selectedCourierId}
+                      onClick={() => handleAssignZoneBag(zoneName, selectedCourierId)}
+                      className="btn btn-primary"
+                      style={{ width: '100%', fontWeight: 700 }}
+                    >
+                      Assign Bag ({bagOrders.length} Parcels)
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

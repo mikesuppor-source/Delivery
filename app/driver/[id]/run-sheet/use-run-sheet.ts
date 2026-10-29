@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { calculateDistanceKm } from '@/lib/maps'
-import { resolveOrderCoordinates, type DriverRunSheetOrder, type RunSheetProps } from './shared'
+import { resolveOrderCoordinates, type DriverRunSheetOrder, type DriverPickup, type RunSheetProps } from './shared'
 import { useDriverLanguage } from './use-driver-language'
 import { useToast } from './use-toast'
 import { useInstallPrompt } from './use-install-prompt'
@@ -12,7 +12,7 @@ import { useOrderAlerts } from './use-order-alerts'
 import { useDriverOrders } from './use-driver-orders'
 
 /** Everything the run sheet shows and does, composed from the focused hooks above. */
-export function useRunSheetState({ driver, initialOrders, rate, workspaceName }: RunSheetProps) {
+export function useRunSheetState({ driver, initialOrders, initialPickups, rate, workspaceName }: RunSheetProps) {
   const language = useDriverLanguage()
   const { lang, t } = language
   const toast = useToast()
@@ -38,13 +38,125 @@ export function useRunSheetState({ driver, initialOrders, rate, workspaceName }:
   })
   const { orders } = ordersState
 
-  const [filterTab, setFilterTab] = useState<'to_deliver' | 'all' | 'delivered' | 'failed'>('to_deliver')
+  const [filterTab, setFilterTab] = useState<'to_deliver' | 'all' | 'delivered' | 'failed' | 'pickups' | 'earnings'>('to_deliver')
   const [search, setSearch] = useState('')
+
+  // Pickups State
+  const [pickups, setPickups] = useState<DriverPickup[]>(initialPickups || [])
+  const [loadingPickups, setLoadingPickups] = useState(false)
+  const [collectingPickup, setCollectingPickup] = useState<DriverPickup | null>(null)
+
+  const fetchPickups = useCallback(async () => {
+    try {
+      setLoadingPickups(true)
+      const res = await fetch(`/api/pickups?driverId=${driver.id}`)
+      const data = await res.json()
+      if (data.pickups) setPickups(data.pickups)
+    } catch {
+      // offline fallback
+    } finally {
+      setLoadingPickups(false)
+    }
+  }, [driver.id])
+
+  useEffect(() => {
+    fetchPickups()
+  }, [fetchPickups])
+
+  const handleCollectPickup = async (pickupId: string, proofPhoto?: string, orderIds?: string[]) => {
+    try {
+      const res = await fetch('/api/pickups', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pickupId,
+          driverId: driver.id,
+          status: 'collected',
+          proofPhoto,
+          orderIds,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to collect pickup')
+      toast.showNotification('success', 'Pickup marked as collected!')
+      setCollectingPickup(null)
+      fetchPickups()
+    } catch (err: unknown) {
+      toast.showNotification('error', err instanceof Error ? err.message : 'Error collecting pickup')
+    }
+  }
+
+  // Best Order Route Optimization State & Logic
+  const [optimizingRoute, setOptimizingRoute] = useState(false)
+  const handleOptimizeRoute = async () => {
+    try {
+      setOptimizingRoute(true)
+      const res = await fetch('/api/orders/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: driver.id,
+          optimize: true,
+          lat: driverGps?.lat,
+          lng: driverGps?.lng,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to optimize route')
+      if (Array.isArray(data.orders)) {
+        ordersState.setOrders(prev => {
+          const updatedMap = new Map<string, number>(data.orders.map((o: any) => [o.id, o.route_position]))
+          return prev.map(o => updatedMap.has(o.id) ? { ...o, route_position: updatedMap.get(o.id) } : o)
+        })
+      }
+      toast.showNotification('success', `Route optimized by nearest stops from your current GPS!`)
+    } catch (err: unknown) {
+      toast.showNotification('error', err instanceof Error ? err.message : 'Optimization failed')
+    } finally {
+      setOptimizingRoute(false)
+    }
+  }
+
+  const handleMoveOrderPosition = async (orderId: string, direction: 'up' | 'down') => {
+    const active = orders.filter(o => o.status === 'assigned' || o.status === 'picked_up')
+    const idx = active.findIndex(o => o.id === orderId)
+    if (idx < 0) return
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= active.length) return
+
+    const reordered = [...active]
+    const [moved] = reordered.splice(idx, 1)
+    reordered.splice(targetIdx, 0, moved)
+
+    const positions = reordered.map((o, i) => ({ order_id: o.id, position: i + 1 }))
+    ordersState.setOrders(prev => {
+      const map = new Map(positions.map(p => [p.order_id, p.position]))
+      return prev.map(o => map.has(o.id) ? { ...o, route_position: map.get(o.id) } : o)
+    })
+
+    fetch('/api/orders/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ driverId: driver.id, positions }),
+    }).catch(() => {})
+  }
 
   // POD & Failure modals
   const [podModalOrder, setPodModalOrder] = useState<DriverRunSheetOrder | null>(null)
   const [failModalOrder, setFailModalOrder] = useState<DriverRunSheetOrder | null>(null)
   const [viewPodOrder, setViewPodOrder] = useState<DriverRunSheetOrder | null>(null)
+  const [returnHandoverOrder, setReturnHandoverOrder] = useState<DriverRunSheetOrder | null>(null)
+
+  const handleReturnHandoverSuccess = (orderId: string) => {
+    ordersState.setOrders(prev =>
+      prev.map(o =>
+        o.id === orderId
+          ? { ...o, returns_handed_at: new Date().toISOString() }
+          : o
+      )
+    )
+    toast.showNotification('success', 'Return handed over to merchant!')
+  }
 
   const [showShiftSummaryModal, setShowShiftSummaryModal] = useState<boolean>(false)
   const [shiftQrDataUrl, setShiftQrDataUrl] = useState<string>('')
@@ -100,6 +212,14 @@ export function useRunSheetState({ driver, initialOrders, rate, workspaceName }:
         const distA = calculateDistanceKm(driverGps.lat, driverGps.lng, coordsA.lat, coordsA.lng)
         const distB = calculateDistanceKm(driverGps.lat, driverGps.lng, coordsB.lat, coordsB.lng)
         return distA - distB
+      })
+    }
+
+    if (filterTab === 'to_deliver' && !sortByNearest) {
+      return [...list].sort((a, b) => {
+        const posA = a.route_position ?? 9999
+        const posB = b.route_position ?? 9999
+        return posA - posB
       })
     }
 
@@ -172,6 +292,9 @@ export function useRunSheetState({ driver, initialOrders, rate, workspaceName }:
     setFailModalOrder,
     viewPodOrder,
     setViewPodOrder,
+    returnHandoverOrder,
+    setReturnHandoverOrder,
+    handleReturnHandoverSuccess,
     showShiftSummaryModal,
     setShowShiftSummaryModal,
     shiftQrDataUrl,
@@ -179,6 +302,15 @@ export function useRunSheetState({ driver, initialOrders, rate, workspaceName }:
     filteredOrders,
     stats,
     handleSwitchCourier,
+    pickups,
+    loadingPickups,
+    collectingPickup,
+    setCollectingPickup,
+    fetchPickups,
+    handleCollectPickup,
+    optimizingRoute,
+    handleOptimizeRoute,
+    handleMoveOrderPosition,
   }
 }
 

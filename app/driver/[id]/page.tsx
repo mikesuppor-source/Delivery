@@ -54,10 +54,24 @@ export default async function DriverRunSheetPage({ params }: DriverRunSheetPageP
 
   const orders = ((rawOrders as any[]) || []).map(o => ({...o, recipient_address: o.location_lat != null && o.location_lng != null ? (o.recipient_address || '') + ' (https://maps.google.com/?q=' + o.location_lat + ',' + o.location_lng + ')' : o.recipient_address}))
 
+  // 4. Fetch pickups assigned to this driver
+  const { data: rawPickups } = await supabase
+    .from('pickups')
+    .select(`
+      *,
+      shop:shop_id(id, name, phone, address),
+      driver:driver_id(id, name, phone)
+    `)
+    .eq('driver_id', id)
+    .order('requested_at', { ascending: false })
+
+  const initialPickups = (rawPickups as any[]) || []
+
   return (
     <DriverRunSheetClient
       driver={driver}
       initialOrders={orders}
+      initialPickups={initialPickups}
       rate={rate}
       workspaceName={workspaceName}
     />
