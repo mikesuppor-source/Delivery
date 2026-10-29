@@ -1,6 +1,7 @@
 'use client'
 
 import React, { type ReactNode } from 'react'
+import { useI18n } from '@/lib/i18n'
 
 export interface FilterChip {
   id: string
@@ -35,6 +36,7 @@ export function FilterBar({
   children,
   className = '',
 }: FilterBarProps) {
+  const { t } = useI18n()
   return (
     <div
       className={`ui-filter-bar ${className}`}
@@ -55,7 +57,7 @@ export function FilterBar({
               type="text"
               value={search.value}
               onChange={e => search.onChange(e.target.value)}
-              placeholder={search.placeholder || 'Filter records...'}
+              placeholder={search.placeholder || t('Filter records...')}
               style={{
                 paddingInlineStart: 32,
                 fontSize: 13,
@@ -133,7 +135,7 @@ export function FilterBar({
             onClick={onClearAll}
             style={{ fontSize: 12 }}
           >
-            Clear all
+            {t('Clear all')}
           </button>
         )}
       </div>
@@ -154,7 +156,7 @@ export function FilterBar({
               width: 'auto',
             }}
           >
-            <option value="">Default View</option>
+            <option value="">{t('Default View')}</option>
             {savedViews.views.map(v => (
               <option key={v.id} value={v.id}>
                 {v.name}

@@ -20,9 +20,9 @@ export function usdToLbp(usd: number, rate: number): number {
   return Math.round(usd * rate)
 }
 
-/** Format date for display */
-export function formatDate(dateStr: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
+/** Format date for display. Pass 'ar' for Arabic month names (digits stay 0-9, as in Lebanon). */
+export function formatDate(dateStr: string, locale: string = 'en'): string {
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-LB-u-nu-latn' : 'en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

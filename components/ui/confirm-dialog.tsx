@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, type ReactNode } from 'react'
+import { useI18n } from '@/lib/i18n'
 
 export interface ConfirmDialogProps {
   isOpen: boolean
@@ -20,11 +21,12 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   tone = 'danger',
   loading = false,
 }: ConfirmDialogProps) {
+  const { t } = useI18n()
   useEffect(() => {
     if (!isOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -85,7 +87,7 @@ export function ConfirmDialog({
             onClick={onClose}
             disabled={loading}
           >
-            {cancelLabel}
+            {cancelLabel ?? t('actionCancel')}
           </button>
           <button
             type="button"
@@ -93,7 +95,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? 'Processing...' : confirmLabel}
+            {loading ? t('Processing...') : confirmLabel ?? t('actionConfirm')}
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, type ReactNode } from 'react'
+import { useI18n } from '@/lib/i18n'
 
 export interface DrawerProps {
   isOpen: boolean
@@ -19,6 +20,7 @@ export function Drawer({
   footer,
   width = 460,
 }: DrawerProps) {
+  const { t } = useI18n()
   useEffect(() => {
     if (!isOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -61,7 +63,7 @@ export function Drawer({
             type="button"
             className="ui-btn ui-btn--subtle ui-btn--sm"
             onClick={onClose}
-            aria-label="Close drawer"
+            aria-label={t('Close drawer')}
             style={{ marginInlineStart: 'auto' }}
           >
             ✕

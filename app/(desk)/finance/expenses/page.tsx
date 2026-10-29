@@ -29,7 +29,7 @@ export default async function ExpensesPage() {
     supabase.from('workspaces').select('usd_to_lbp').eq('id', workspaceId).single(),
     supabase
       .from('expenses')
-      .select('id, date, category, amount_usd, amount_lbp, usd_to_lbp, note')
+      .select('id, date, category, amount_usd, amount_lbp, usd_to_lbp, note, receipt_path')
       .eq('workspace_id', workspaceId)
       .gte('date', since.toISOString().slice(0, 10))
       .order('date', { ascending: false })
@@ -45,6 +45,7 @@ export default async function ExpensesPage() {
     amount_lbp: Number(e.amount_lbp),
     usd_to_lbp: Number(e.usd_to_lbp),
     note: e.note,
+    has_receipt: Boolean(e.receipt_path),
   }))
 
   return (

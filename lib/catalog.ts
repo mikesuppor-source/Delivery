@@ -23,6 +23,8 @@ const ChangeCatalog=z.object({
  storageFeePerDayUsd:money().optional(),freeStorageDays:z.number().int().min(0).max(365).optional(),
  // Payouts and courier pay (Phase 6)
  payoutMethod:z.enum(PAYOUT_METHODS).optional(),payoutAccount:text(200).optional(),
+ // Where a shop's account statements are emailed ('' clears it)
+ contactEmail:z.union([z.literal(''),z.string().trim().max(254).email()]).optional(),
  payMode:z.enum(['fixed','percent']).optional(),payPercent:z.number().min(0).max(100).nullable().optional(),
 })
 type Db=Awaited<ReturnType<typeof workspaceAccess>>['db']
@@ -95,6 +97,7 @@ export async function changeCatalog(req:NextRequest,table:Table,recordId?:string
   if(table==='shops'){
    if(body.payoutMethod!==undefined)updates.payout_method=body.payoutMethod
    if(body.payoutAccount!==undefined)updates.payout_account=body.payoutAccount||null
+   if(body.contactEmail!==undefined)updates.contact_email=body.contactEmail||null
   }
   if(table==='drivers'&&body.payMode){
    // A percent courier is paid a share of each order's fee; a fixed one keeps the zone rate

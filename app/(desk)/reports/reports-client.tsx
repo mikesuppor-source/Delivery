@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/lib/i18n'
 import { formatUSD } from '@/lib/utils'
 import type { UserRole } from '@/lib/roles'
 import { RefreshIcon } from '@/components/icons'
@@ -66,6 +67,7 @@ export function ReportsClient({
   initialFrom,
   initialTo,
 }: ReportsClientProps) {
+  const { t } = useI18n()
   const [view, setView] = useState<'profit' | 'pnl'>('profit')
   const [report, setReport] = useState<ProfitReportData | null>(initialReport)
   const [datePreset, setDatePreset] = useState<DatePreset>('this_month')
@@ -235,7 +237,7 @@ export function ReportsClient({
   }
 
   const viewSwitch = (
-    <div role="group" aria-label="Report" style={{ display: 'inline-flex', gap: 4, padding: 3, border: '1px solid var(--line)', borderRadius: 8 }}>
+    <div role="group" aria-label={t('Report')} style={{ display: 'inline-flex', gap: 4, padding: 3, border: '1px solid var(--line)', borderRadius: 8 }}>
       {([['profit', 'Profit'], ['pnl', 'Profit & loss']] as const).map(([key, label]) => (
         <button
           key={key}
@@ -245,7 +247,7 @@ export function ReportsClient({
           onClick={() => setView(key)}
           style={{ fontSize: 12, padding: '4px 12px' }}
         >
-          {label}
+          {t(label)}
         </button>
       ))}
     </div>
@@ -256,8 +258,8 @@ export function ReportsClient({
       <>
         <div className="page-heading">
           <div>
-            <h1>Profit & Loss</h1>
-            <p>What the company earned each month after courier pay, bonuses and expenses</p>
+            <h1>{t('Profit & Loss')}</h1>
+            <p>{t('What the company earned each month after courier pay, bonuses and expenses')}</p>
           </div>
           {viewSwitch}
         </div>

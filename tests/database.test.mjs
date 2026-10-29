@@ -797,6 +797,37 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     })
   })
 
+  await t.test('finance pro: an expense receipt is kept in a private bucket and only in its own expense folder', async () => {
+    const { ws } = fin
+    const bucket = (await db.query("select public, file_size_limit, allowed_mime_types from storage.buckets where id='expense-receipts'")).rows[0]
+    assert.equal(bucket.public, false)
+    assert.ok(Number(bucket.file_size_limit) <= 3000000)
+    assert.deepEqual([...bucket.allowed_mime_types].sort(), ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+
+    const book = async () => (await db.query("insert into expenses(workspace_id,date,category,amount_usd,note) values($1,current_date,'fuel',5,'Receipt test') returning id", [ws])).rows[0].id
+    const [mine, other] = [await book(), await book()]
+    const setPath = path => db.query('update expenses set receipt_path=$2 where id=$1', [mine, path])
+    await setPath(`${ws}/${mine}/receipt.jpg`)
+    assert.equal((await db.query('select receipt_path from expenses where id=$1', [mine])).rows[0].receipt_path, `${ws}/${mine}/receipt.jpg`)
+    await assert.rejects(setPath(`${b}/${mine}/receipt.jpg`), /expenses_receipt_path_check/) // another company's folder
+    await assert.rejects(setPath(`${ws}/${other}/receipt.jpg`), /expenses_receipt_path_check/) // another expense's folder
+    await assert.rejects(setPath('receipt.jpg'), /expenses_receipt_path_check/)
+    await setPath(null)
+    assert.equal((await db.query('select receipt_path from expenses where id=$1', [mine])).rows[0].receipt_path, null)
+  })
+
+  await t.test('finance pro: a shop email address must look like one', async () => {
+    const { shopA } = fin
+    const setEmail = value => db.query('update shops set contact_email=$2 where id=$1', [shopA, value])
+    await setEmail('accounts@example.com')
+    await setEmail('maya.b+statements@sub.example.co.uk')
+    await setEmail(null)
+    for (const bad of ['not an email', 'two@@example.com', 'no-dot@example', '@example.com', 'maya@', 'spa ce@example.com', 'a@b.c ', 'x'.repeat(250) + '@example.com']) {
+      await assert.rejects(setEmail(bad), /shops_contact_email_check/, bad)
+    }
+    assert.equal((await db.query('select contact_email from shops where id=$1', [shopA])).rows[0].contact_email, null)
+  })
+
   await t.test('profit report refuses anyone who is not an owner or manager of that workspace', async () => {
     const { ws, manager, shopUser, ownerB } = fin
     const ask = () => db.query("select profit_report($1, now() - interval '1 day', now() + interval '1 day') as r", [ws])

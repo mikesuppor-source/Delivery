@@ -3,10 +3,12 @@
 import React from 'react'
 import { Modal } from '@/components/modal'
 import { useShopProfile } from '../context'
+import { useI18n } from '@/lib/i18n'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import { ShopifyIntegrationModal } from '@/components/shopify-integration-modal'
 
 export function ModalsSection() {
+  const { t } = useI18n()
   const {
     shop,
     workspace,
@@ -31,6 +33,8 @@ export function ModalsSection() {
     setEditPhone,
     editAddress,
     setEditAddress,
+    editEmail,
+    setEditEmail,
     editActive,
     setEditActive,
     savingEdit,
@@ -222,6 +226,17 @@ export function ModalsSection() {
                 placeholder="Street, City, Building"
                 value={editAddress}
                 onChange={e => setEditAddress(e.target.value)}
+              />
+            </div>
+
+            <div className="field full">
+              <label>{t('Email (for account statements)')}</label>
+              <input
+                type="email"
+                placeholder="accounts@example.com"
+                value={editEmail}
+                onChange={e => setEditEmail(e.target.value)}
+                maxLength={254}
               />
             </div>
 

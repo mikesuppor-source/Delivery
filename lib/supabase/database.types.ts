@@ -842,14 +842,14 @@ isOneToOne: true
                   ]
                 },"shops": {
                   Row: {
-                    "active": boolean,"address": string | null,"balance_usd": number,"created_at": string,"id": string,"is_walkin": boolean,"name": string,"phone": string | null,"prefix": string | null,"shopify_domain": string | null,"user_id": string | null,"workspace_id": string,"payout_account": string | null,"payout_method": string
+                    "active": boolean,"address": string | null,"balance_usd": number,"created_at": string,"id": string,"is_walkin": boolean,"name": string,"phone": string | null,"prefix": string | null,"shopify_domain": string | null,"user_id": string | null,"workspace_id": string,"payout_account": string | null,"payout_method": string,"contact_email": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name": string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id": string,"payout_account"?: string | null,"payout_method"?: string
+                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name": string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id": string,"payout_account"?: string | null,"payout_method"?: string,"contact_email"?: string | null
                   }
                   Update: {
-                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name"?: string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id"?: string,"payout_account"?: string | null,"payout_method"?: string
+                    "active"?: boolean,"address"?: string | null,"balance_usd"?: number,"created_at"?: string,"id"?: string,"is_walkin"?: boolean,"name"?: string,"phone"?: string | null,"prefix"?: string | null,"shopify_domain"?: string | null,"user_id"?: string | null,"workspace_id"?: string,"payout_account"?: string | null,"payout_method"?: string,"contact_email"?: string | null
                   }
                   Relationships: [
                     {

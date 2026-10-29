@@ -1,6 +1,7 @@
 'use client'
 
 import React, { type ReactNode, useMemo } from 'react'
+import { useI18n } from '@/lib/i18n'
 
 export interface Column<T> {
   key: string
@@ -44,12 +45,13 @@ export function DataTable<T extends Record<string, any>>({
   sortDirection = 'asc',
   onSort,
   loading = false,
-  emptyMessage = 'No records found',
+  emptyMessage,
   bulkActions,
   stickyHeader = false,
   className = '',
   pagination,
 }: DataTableProps<T>) {
+  const { t } = useI18n()
   const getRowKey = (row: T): string => {
     if (typeof keyField === 'function') return keyField(row)
     return String(row[keyField])
@@ -93,17 +95,17 @@ export function DataTable<T extends Record<string, any>>({
     <div className={`ui-table-wrapper ${className}`}>
       {/* Bulk actions banner if any selected */}
       {hasSelection && selectedCount > 0 && (
-        <div className="ui-bulk-bar" role="toolbar" aria-label="Bulk actions">
+        <div className="ui-bulk-bar" role="toolbar" aria-label={t('Bulk actions')}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span>
-              <strong>{selectedCount}</strong> selected
+              <strong>{selectedCount}</strong> {t('selected')}
             </span>
             <button
               type="button"
               className="ui-btn ui-btn--subtle ui-btn--sm"
               onClick={() => onSelectionChange?.(new Set())}
             >
-              Deselect All
+              {t('Deselect All')}
             </button>
           </div>
           {bulkActions && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{bulkActions}</div>}
@@ -123,7 +125,7 @@ export function DataTable<T extends Record<string, any>>({
                       if (input) input.indeterminate = someSelected
                     }}
                     onChange={toggleAll}
-                    aria-label="Select all rows"
+                    aria-label={t('Select all rows')}
                     style={{ cursor: 'pointer', width: 'auto' }}
                   />
                 </th>
@@ -174,13 +176,13 @@ export function DataTable<T extends Record<string, any>>({
             {loading ? (
               <tr>
                 <td colSpan={columns.length + (hasSelection ? 1 : 0)} style={{ textAlign: 'center', padding: '36px 16px' }}>
-                  <div style={{ color: 'var(--ui-text-muted)', fontSize: 13, fontWeight: 600 }}>Loading data...</div>
+                  <div style={{ color: 'var(--ui-text-muted)', fontSize: 13, fontWeight: 600 }}>{t('Loading data...')}</div>
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length + (hasSelection ? 1 : 0)} style={{ textAlign: 'center', padding: '48px 16px' }}>
-                  <div style={{ color: 'var(--ui-text-muted)', fontSize: 13 }}>{emptyMessage}</div>
+                  <div style={{ color: 'var(--ui-text-muted)', fontSize: 13 }}>{emptyMessage ?? t('No records found')}</div>
                 </td>
               </tr>
             ) : (
@@ -195,7 +197,7 @@ export function DataTable<T extends Record<string, any>>({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRow(rowKey)}
-                          aria-label={`Select row ${rowKey}`}
+                          aria-label={t('Select row {key}', { key: rowKey })}
                           style={{ cursor: 'pointer', width: 'auto' }}
                         />
                       </td>

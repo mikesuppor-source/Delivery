@@ -4,6 +4,7 @@ import { id, money, parseBody, text, z } from '@/lib/validation'
 import { workspaceAccess } from '@/lib/access'
 import { writeAuditLog } from '@/lib/auth'
 import { EXPENSE_CATEGORIES } from '@/lib/finance'
+import { RECEIPT_BUCKET } from '@/lib/receipts'
 
 const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const Expense = {
@@ -68,6 +69,7 @@ export const DELETE = api(async req => {
   const body = await parseBody(req, RemoveExpense)
   const { db, user, workspaceId } = await workspaceAccess(body.workspaceId)
   const expense = checked(await db.from('expenses').delete().eq('id', body.id).eq('workspace_id', workspaceId).select().maybeSingle())
+  if (expense.receipt_path) await db.storage.from(RECEIPT_BUCKET).remove([expense.receipt_path])
   await writeAuditLog({
     workspaceId, actorId: user.id, actorEmail: user.email ?? '', action: 'expense.deleted', entityType: 'expense', entityId: expense.id,
     diff: { date: expense.date, category: expense.category, amount_usd: expense.amount_usd, amount_lbp: expense.amount_lbp, note: expense.note },

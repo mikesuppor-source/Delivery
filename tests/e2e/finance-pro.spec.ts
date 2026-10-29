@@ -116,6 +116,13 @@ test.describe('Phase 6: Finance pro', () => {
     expect(pdf.headers()['content-disposition']).toContain('attachment')
     expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-')
 
+    // The Arabic version is a PDF too (right-to-left, in an Arabic-capable font), and only English or Arabic are accepted
+    const arabic = await page.request.get(url('pdf') + '&lang=ar')
+    expect(arabic.status()).toBe(200)
+    expect(arabic.headers()['content-disposition']).toContain('-ar.pdf')
+    expect((await arabic.body()).subarray(0, 5).toString()).toBe('%PDF-')
+    expect((await apiCall(page, url('json') + '&lang=fr')).status).toBe(400)
+
     // The shop's own merchant can download it too
     const merchantContext = await browser.newContext()
     const merchantPage = await merchantContext.newPage()

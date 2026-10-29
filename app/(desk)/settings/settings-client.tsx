@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/lib/i18n'
 import { WEEKDAYS, WEEKDAY_LABELS } from '@/lib/finance'
 import { formatDate } from '@/lib/utils'
 
@@ -36,6 +37,7 @@ interface SettingsClientProps {
 }
 
 export function SettingsClient({ workspace, isOwner, rateHistory = [] }: SettingsClientProps) {
+  const { t, locale } = useI18n()
   const [name, setName] = useState(workspace.name)
   const [currency, setCurrency] = useState(workspace.currency)
   const [usdToLbp, setUsdToLbp] = useState(String(workspace.usd_to_lbp))
@@ -193,12 +195,12 @@ export function SettingsClient({ workspace, isOwner, rateHistory = [] }: Setting
         {/* PANEL: PAYOUT SCHEDULE AND STATEMENTS (Finance pro) */}
         <div className="panel" style={{ marginBottom: 24 }}>
           <div className="panel-title">
-            <h2>Payouts & Statements</h2>
-            <small>When shops are paid and what their statements show</small>
+            <h2>{t('Payouts & Statements')}</h2>
+            <small>{t('When shops are paid and what their statements show')}</small>
           </div>
           <div style={{ padding: '24px' }}>
             <fieldset style={{ border: 'none', padding: 0, margin: '0 0 18px' }}>
-              <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Payout days</legend>
+              <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{t('Payout days')}</legend>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 18px' }}>
                 {WEEKDAYS.map(day => (
                   <label key={day} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: isOwner ? 'pointer' : 'default', fontSize: 13 }}>
@@ -209,18 +211,18 @@ export function SettingsClient({ workspace, isOwner, rateHistory = [] }: Setting
                       onChange={e => setPayoutDays(prev => (e.target.checked ? [...prev, day] : prev.filter(d => d !== day)))}
                       style={{ width: 16, height: 16, accentColor: 'var(--brand)' }}
                     />
-                    {WEEKDAY_LABELS[day]}
+                    {t(WEEKDAY_LABELS[day])}
                   </label>
                 ))}
               </div>
               <small style={{ color: 'var(--muted)', fontSize: 11, display: 'block', marginTop: 6 }}>
-                The Shop Payouts screen shows whether today is a payout day. Payouts can still be made on any day.
+                {t('The Shop Payouts screen shows whether today is a payout day. Payouts can still be made on any day.')}
               </small>
             </fieldset>
 
             <div className="form-grid">
               <div className="field">
-                <label>Smallest payout (USD $)</label>
+                <label>{t('Smallest payout (USD $)')}</label>
                 <input
                   type="number"
                   step="1"
@@ -230,11 +232,11 @@ export function SettingsClient({ workspace, isOwner, rateHistory = [] }: Setting
                   disabled={!isOwner}
                   required
                 />
-                <small style={{ color: 'var(--muted)', fontSize: 11 }}>Shops owed less than this wait for the next run</small>
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>{t('Shops owed less than this wait for the next run')}</small>
               </div>
 
               <div className="field full">
-                <label>Company logo address (https, PNG or JPEG)</label>
+                <label>{t('Company logo address (https, PNG or JPEG)')}</label>
                 <input
                   type="url"
                   placeholder="https://example.com/logo.png"
@@ -242,7 +244,7 @@ export function SettingsClient({ workspace, isOwner, rateHistory = [] }: Setting
                   onChange={e => setLogoUrl(e.target.value)}
                   disabled={!isOwner}
                 />
-                <small style={{ color: 'var(--muted)', fontSize: 11 }}>Printed on shop statements next to the company name. Leave empty for none.</small>
+                <small style={{ color: 'var(--muted)', fontSize: 11 }}>{t('Printed on shop statements next to the company name. Leave empty for none.')}</small>
               </div>
             </div>
           </div>
@@ -387,27 +389,27 @@ export function SettingsClient({ workspace, isOwner, rateHistory = [] }: Setting
       {/* Every change of the exchange rate is kept, with who made it */}
       <div className="panel" style={{ maxWidth: 640, marginTop: 24 }}>
         <div className="panel-title">
-          <h2>Exchange Rate History</h2>
-          <small>Orders and expenses keep the rate they were saved at</small>
+          <h2>{t('Exchange Rate History')}</h2>
+          <small>{t('Orders and expenses keep the rate they were saved at')}</small>
         </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Changed</th>
-                <th style={{ textAlign: 'right' }}>1 USD in LBP</th>
-                <th>By</th>
+                <th>{t('Changed')}</th>
+                <th style={{ textAlign: 'end' }}>{t('1 USD in LBP')}</th>
+                <th>{t('By')}</th>
               </tr>
             </thead>
             <tbody>
               {rateHistory.length === 0 ? (
-                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>No changes recorded yet.</td></tr>
+                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>{t('No changes recorded yet.')}</td></tr>
               ) : (
                 rateHistory.map(item => (
                   <tr key={item.id}>
-                    <td>{formatDate(item.set_at)}</td>
-                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} dir="ltr">{item.rate.toLocaleString('en-US')}</td>
-                    <td>{item.set_by_name ?? 'System'}</td>
+                    <td>{formatDate(item.set_at, locale)}</td>
+                    <td style={{ textAlign: 'end', fontVariantNumeric: 'tabular-nums' }} dir="ltr">{item.rate.toLocaleString('en-US')}</td>
+                    <td>{item.set_by_name ?? t('System')}</td>
                   </tr>
                 ))
               )}

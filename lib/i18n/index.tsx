@@ -3,12 +3,18 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react'
 import { en, type TranslationKey } from './en'
 import { ar } from './ar'
+import { arFinance } from './ar-finance'
 import type { Locale, Direction } from './types'
 
 export type { Locale, Direction, TranslationKey }
 export { en, ar }
 
-export const DICTIONARIES = { en, ar } as const
+// The finance screens ask for their Arabic by the English sentence (see ar-finance.ts)
+export const DICTIONARIES = { en, ar: { ...ar, ...arFinance } } as const
+
+/** Unicode "first strong isolate" and "pop directional isolate": invisible marks that keep a value's own direction. */
+const ISOLATE_START = String.fromCharCode(0x2068)
+const ISOLATE_END = String.fromCharCode(0x2069)
 
 /**
  * Pure translation lookup function.
@@ -24,7 +30,10 @@ export function t(
 
   if (params) {
     for (const [pKey, pVal] of Object.entries(params)) {
-      text = text.replace(new RegExp(`{${pKey}}`, 'g'), String(pVal))
+      // In Arabic, each inserted value (an amount, a date, a name) is isolated so the Arabic words around it cannot
+      // re-order it: without this "$2.00" shows as "2.00$" and a trailing full stop in a name jumps to the front
+      const value = locale === 'ar' ? ISOLATE_START + String(pVal) + ISOLATE_END : String(pVal)
+      text = text.replace(new RegExp(`{${pKey}}`, 'g'), () => value)
     }
   }
   return text

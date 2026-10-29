@@ -89,8 +89,13 @@ export function percentPay(feeUsd: number, percent: number): number {
   return Math.round((Math.round(feeUsd * 100) * percent) / 100) / 100
 }
 
-export function describePayMode(mode: string | null | undefined, percent: number | null | undefined): string {
-  return mode === 'percent' && percent != null ? `${Number(percent)}% of the fee` : 'Fixed rate per zone'
+type Translate = (phrase: string, params?: Record<string, string | number>) => string
+/** The default "translation": the English sentence with its {placeholders} filled in. */
+const english: Translate = (phrase, params) => phrase.replace(/\{(\w+)\}/g, (_all, key: string) => String(params?.[key] ?? ''))
+
+/** How a courier is paid, in words. Screens pass their translate function to show it in Arabic. */
+export function describePayMode(mode: string | null | undefined, percent: number | null | undefined, t: Translate = english): string {
+  return mode === 'percent' && percent != null ? t('{percent}% of the fee', { percent: Number(percent) }) : t('Fixed rate per zone')
 }
 
 /** YYYY-MM-DD in UTC, the format the database functions take. */

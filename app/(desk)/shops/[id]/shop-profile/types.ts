@@ -14,6 +14,8 @@ export interface Shop {
   /** How the shop is paid: cash, whish, omt or bank (Phase 6). */
   payout_method?: string
   payout_account?: string | null
+  /** Where account statements are emailed (Phase 6). */
+  contact_email?: string | null
 }
 
 export interface OrderItem {

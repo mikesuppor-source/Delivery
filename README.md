@@ -111,7 +111,24 @@ npx vercel env add NEXT_PUBLIC_SITE_URL
 
 Or connect your GitHub repo to Vercel for automatic deployments.
 
-Scheduled jobs (`/api/cron/bonuses` for weekly courier bonuses, `/api/cron/holds` for warehouse hold checks) only run for a caller that sends `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET` in Vercel before scheduling them; without it they refuse every request. Nothing is scheduled by default, and courier bonuses can also be calculated by hand on the Courier Pay screen.
+Scheduled jobs (`/api/cron/bonuses` for weekly courier bonuses, `/api/cron/holds` for warehouse hold checks) only run for a caller that sends `Authorization: Bearer <CRON_SECRET>`. Without `CRON_SECRET` they refuse every request.
+
+`vercel.json` schedules the courier bonuses for every Monday at 03:00 UTC, for the week that just ended. To switch it on, add `CRON_SECRET` (any long random value) to the Production environment variables in Vercel and redeploy; Vercel then sends it with each run. Vercel does not run scheduled jobs on preview deployments, and the job is safe to run twice because a courier gets at most one bonus per week. The warehouse hold check only reports and is not scheduled. Bonuses can still be calculated by hand on the Courier Pay screen.
+
+### Emailing statements
+
+A shop's page can email its account statement as a PDF, in English or Arabic. It needs a shop email address (Edit Store) and two settings in Vercel, which keep passwords out of the code:
+
+- `SMTP_URL`: the mail server, for example `smtps://statements%40example.com:app-password@smtp.example.com:465`. Any provider that offers SMTP works: Gmail (with an app password), Outlook, Zoho, or Resend and SendGrid through their SMTP service. Special characters in the user name or password are written as `%` codes, for example `@` is `%40`.
+- `EMAIL_FROM`: the sender, for example `Cedar Express <statements@example.com>`.
+
+Until both are set, the Email button answers that email is not set up. Only owners and managers can send, the address always comes from the shop's record, and one person can send at most ten emails a minute.
+
+### Receipts and fonts
+
+Expense receipts (photos or PDFs, up to 2.5 MB) are kept in the private `expense-receipts` storage bucket, created by migration 029, and opened through links that stop working after a minute. Statement PDFs use the Cairo font in `assets/fonts` (SIL Open Font License, see `OFL.txt` there), which has Arabic and Latin letters in one file, and can be printed in English or Arabic (`lang=ar`, laid out right to left).
+
+The Arabic wording of the finance screens is in `lib/i18n/ar-finance.ts`. Its keys are the English sentences themselves, so a screen writes `t('Pay selected ({amount})')` and still shows that English text when a line is missing; `npm test` fails if a screen asks for a sentence that has no Arabic line.
 
 ## Project Structure
 

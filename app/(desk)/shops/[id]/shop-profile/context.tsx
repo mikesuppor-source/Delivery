@@ -68,6 +68,8 @@ interface ShopProfileContextType {
   setEditPhone: (p: string) => void
   editAddress: string
   setEditAddress: (a: string) => void
+  editEmail: string
+  setEditEmail: (e: string) => void
   editActive: boolean
   setEditActive: (a: boolean) => void
   savingEdit: boolean
@@ -189,6 +191,7 @@ export function ShopProfileProvider({
   const [editName, setEditName] = useState(shop.name)
   const [editPhone, setEditPhone] = useState(shop.phone || '')
   const [editAddress, setEditAddress] = useState(shop.address || '')
+  const [editEmail, setEditEmail] = useState(shop.contact_email || '')
   const [editActive, setEditActive] = useState(shop.active)
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState('')
@@ -363,6 +366,8 @@ export function ShopProfileProvider({
           name: editName,
           phone: editPhone || null,
           address: editAddress || null,
+          // Only sent when it was changed, so editing a shop never depends on the email column being in the database yet
+          ...(editEmail.trim() !== (shop.contact_email ?? '') ? { contactEmail: editEmail.trim() } : {}),
           active: editActive,
         }),
       })
@@ -375,6 +380,7 @@ export function ShopProfileProvider({
         name: data.shop.name,
         phone: data.shop.phone,
         address: data.shop.address,
+        contact_email: data.shop.contact_email ?? null,
         active: data.shop.active,
       }))
       setIsEditModalOpen(false)
@@ -449,6 +455,8 @@ export function ShopProfileProvider({
         setEditPhone,
         editAddress,
         setEditAddress,
+        editEmail,
+        setEditEmail,
         editActive,
         setEditActive,
         savingEdit,
