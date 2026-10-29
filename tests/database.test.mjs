@@ -836,5 +836,86 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     await asUser(shopUser, async () => assert.rejects(ask(), /Forbidden/)) // a merchant
   })
 
+  // ─── Server-only functions and tables (migration 031) ────────────────────────
+  // These run with full database rights and the app calls them only from its own server, so nobody else may.
+  await t.test('server-only functions refuse signed-out visitors and signed-in users, and still work for the server', async () => {
+    const serverOnly = [
+      'hold_order(uuid, uuid, text, public.hold_reason, text, date, uuid)',
+      'release_order(uuid, uuid, text)',
+      'record_delivery_attempt(uuid, uuid, public.attempt_result, text, text, double precision, double precision, date)',
+      'collect_pickup(uuid, uuid, text, uuid[])',
+      'handover_returns(uuid, uuid[], text)',
+      'set_route_positions(uuid, jsonb)',
+      'mark_received_at_hub(uuid)',
+      'get_or_create_walkin_shop(uuid)',
+      'submit_order_rating(text, integer, text)',
+      'get_driver_rating_summary(uuid)',
+      'log_customer_message(uuid, uuid, text, text, text, text, text, text)',
+    ]
+    const may = async (role, fn) => (await db.query("select has_function_privilege($1::name, $2::text, 'execute') as ok", [role, `public.${fn}`])).rows[0].ok
+    for (const fn of serverOnly) {
+      assert.equal(await may('anon', fn), false, `signed-out visitors may run ${fn}`)
+      assert.equal(await may('authenticated', fn), false, `signed-in users may run ${fn}`)
+      assert.equal(await may('service_role', fn), true, `the server may not run ${fn}`)
+    }
+    // Asking for one directly is refused before it runs, so the arguments do not matter
+    const calls = [
+      'select hold_order(null, null, null, null, null, null, null)',
+      'select release_order(null, null, null)',
+      'select record_delivery_attempt(null, null, null, null, null, null, null, null)',
+      'select collect_pickup(null, null, null, null)',
+      'select handover_returns(null, null, null)',
+      'select set_route_positions(null, null)',
+      'select mark_received_at_hub(null)',
+      'select get_or_create_walkin_shop(null)',
+      'select submit_order_rating(null, null, null)',
+      'select get_driver_rating_summary(null)',
+      'select log_customer_message(null, null, null, null, null, null, null, null)',
+    ]
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`)
+      try {
+        for (const sql of calls) await assert.rejects(db.query(sql), /permission denied for function/, `${role}: ${sql}`)
+      } finally { await db.exec('reset role') }
+    }
+    // The server itself is not locked out
+    await db.exec('set role service_role')
+    try {
+      assert.equal((await db.query('select get_driver_rating_summary($1) as r', [id(999)])).rows[0].r.total_ratings, 0)
+      const walkin = (await db.query('select get_or_create_walkin_shop($1) as id', [a])).rows[0].id
+      assert.equal((await db.query('select get_or_create_walkin_shop($1) as id', [a])).rows[0].id, walkin)
+    } finally { await db.exec('reset role') }
+  })
+
+  await t.test('no function that runs with full database rights is open to signed-out visitors', async () => {
+    const open = async role => (await db.query(
+      `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.prosecdef and p.prorettype <> 'trigger'::regtype
+         and has_function_privilege($1::name, p.oid, 'execute') order by 1`, [role])).rows.map(r => r.proname)
+    const why = 'A function that runs with full rights must be revoked from public, anon and authenticated, and granted to service_role (see migration 031)'
+    assert.deepEqual(await open('anon'), [], why)
+    // is_member and my_role are used inside the row level security rules; profit_report checks the caller's role itself (028)
+    assert.deepEqual(await open('authenticated'), ['is_member', 'my_role', 'profit_report'], why)
+  })
+
+  await t.test('every table has row level security, and courier push sign-ups are for the server only', async () => {
+    const bare = (await db.query(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1`)).rows.map(r => r.relname)
+    assert.deepEqual(bare, [], 'public tables with no row level security')
+    await db.query("insert into driver_push_subscriptions(driver_id,endpoint,p256dh,auth) values($1,'https://push.example.test/lock-test','key','secret')", [drv])
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`)
+      try {
+        for (const sql of [
+          'select * from driver_push_subscriptions',
+          'delete from driver_push_subscriptions',
+          `insert into driver_push_subscriptions(driver_id,endpoint,p256dh,auth) values('${drv}','https://push.example.test/other','k','a')`,
+        ]) await assert.rejects(db.query(sql), /permission denied/, `${role}: ${sql}`)
+      } finally { await db.exec('reset role') }
+    }
+    await db.exec('set role service_role')
+    try { assert.equal(Number((await db.query('select count(*) from driver_push_subscriptions')).rows[0].count), 1) } finally { await db.exec('reset role') }
+  })
+
   }finally{await db.close()}
 })

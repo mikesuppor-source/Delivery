@@ -146,9 +146,10 @@ Branch **`feature/zone-pricing`** contains the uncommitted file **`supabase/migr
 
 ### 3.2 Database migrations
 - New migration per change: `supabase/migrations/0NN_short_name.sql`, wrapped in `begin; ... commit;`.
-- **Never edit a migration that is already applied to production** (001 to 020). Add a new one.
+- **Never edit a migration that is already applied to production** (001 to 030). Add a new one.
 - Make migrations safe to re-run: `if not exists`, `drop policy if exists`, `exception when duplicate_object`.
 - Functions that use `gen_salt`, `crypt` or `gen_random_bytes` need `set search_path = public, extensions`.
+- Every `security definer` function is for the server only, unless it checks the caller's role itself (like `profit_report`): `revoke all on function ... from public, anon, authenticated;` then `grant execute on function ... to service_role;`. Supabase otherwise lets anyone call it from the internet with the public site key. Migration 031 closed the ones in 024 to 026 that missed this, and `tests/database.test.mjs` fails if one is open to signed-out visitors.
 - After a schema change, update `lib/supabase/database.types.ts` (`npm run types` against staging, or by hand).
 
 ### 3.3 Security
@@ -727,7 +728,7 @@ These are done by the owner in the provider dashboards. The AI must not do them 
 
 - Don't rewrite working modules "to clean up" outside the current phase.
 - Don't change the money triggers' logic without a database test showing old orders keep their balances.
-- Don't edit migrations 001 to 020.
+- Don't edit migrations 001 to 030.
 - Don't store prices only in the frontend or compute balances in the app.
 - Don't add a new UI library or CSS framework; extend `components/ui`.
 - Don't use the Supabase service role key in browser code.
