@@ -43,6 +43,11 @@ interface OrderReceiptSlipProps {
   workspaceRate?: number
   workspaceName?: string
   autoPrint?: boolean
+  /**
+   * A page that prints only this receipt. Set it where the slip is shown in a window over a longer page, so the
+   * Print button opens that page instead of printing the whole page behind the window.
+   */
+  printUrl?: string
 }
 
 export function OrderReceiptSlip({
@@ -50,6 +55,7 @@ export function OrderReceiptSlip({
   workspaceRate = 89500,
   workspaceName = 'Cedar Delivery Desk',
   autoPrint = false,
+  printUrl,
 }: OrderReceiptSlipProps) {
   const barcodeRef = useRef<SVGSVGElement | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
@@ -131,6 +137,18 @@ export function OrderReceiptSlip({
       return () => clearTimeout(timer)
     }
   }, [autoPrint])
+
+  const printButtonStyle = { fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 } as const
+  const printButtonContent = (
+    <>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="6 9 6 2 18 2 18 9" />
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+        <rect x="6" y="14" width="12" height="8" />
+      </svg>
+      Print Receipt / Slip
+    </>
+  )
 
   function handleCopyTrackingUrl() {
     navigator.clipboard.writeText(trackingUrl)
@@ -241,19 +259,15 @@ export function OrderReceiptSlip({
             </a>
           )}
 
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={() => window.print()}
-            style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
-            Print Receipt / Slip
-          </button>
+          {printUrl ? (
+            <a href={printUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={printButtonStyle}>
+              {printButtonContent}
+            </a>
+          ) : (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => window.print()} style={printButtonStyle}>
+              {printButtonContent}
+            </button>
+          )}
         </div>
       </div>
 

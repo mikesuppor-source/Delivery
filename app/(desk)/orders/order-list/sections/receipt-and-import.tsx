@@ -20,6 +20,7 @@ export function ReceiptAndImportModals() {
             <OrderReceiptSlip
               order={receiptOrder}
               workspaceRate={rate}
+              printUrl={`/print/order/${encodeURIComponent(receiptOrder.code)}?print=true`}
               workspaceName="Cedar Delivery Desk"
             />
           </div>
