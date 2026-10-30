@@ -124,7 +124,7 @@ export function Topbar({ usdToLbp: initialRate, workspaceId, userRole }: TopbarP
         }}
       >
         {/* Global Search Bar (Trigger) */}
-        <div style={{ flex: '1 1 320px', maxWidth: 440 }}>
+        <div className="topbar-search" style={{ flex: '1 1 320px', maxWidth: 440 }}>
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
@@ -145,9 +145,10 @@ export function Topbar({ usdToLbp: initialRate, workspaceId, userRole }: TopbarP
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 14 }}>🔍</span>
-              <span>{t('searchPlaceholderGlobal')}</span>
+              <span className="topbar-search-text">{t('searchPlaceholderGlobal')}</span>
             </div>
             <kbd
+              className="topbar-kbd"
               style={{
                 fontSize: 11,
                 padding: '2px 5px',
@@ -163,7 +164,7 @@ export function Topbar({ usdToLbp: initialRate, workspaceId, userRole }: TopbarP
         </div>
 
         {/* Right side controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {/* New Order Quick Action Button */}
           <Link
             href="/orders/new"
@@ -171,7 +172,7 @@ export function Topbar({ usdToLbp: initialRate, workspaceId, userRole }: TopbarP
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
           >
             <span style={{ fontSize: 14 }}>＋</span>
-            <span>{t('actionNewOrder')}</span>
+            <span className="topbar-newlabel">{t('actionNewOrder')}</span>
           </Link>
 
           {/* Rate Pill */}
@@ -204,9 +205,10 @@ export function Topbar({ usdToLbp: initialRate, workspaceId, userRole }: TopbarP
               title={canEdit ? 'Click to change Lebanese market exchange rate' : undefined}
             >
               <span style={{ color: 'var(--ui-primary)' }}>$</span>
-              <span>1 USD = {formatLBP(currentRate)}</span>
+              <span><span className="topbar-rate-prefix">1 USD = </span>{formatLBP(currentRate)}</span>
               {canEdit && (
                 <span
+                  className="topbar-edit-tag"
                   style={{
                     fontSize: 9.5,
                     color: 'var(--ui-primary)',
