@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TruckIcon } from '@/components/icons'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
@@ -14,6 +14,14 @@ export function DriverLoginClient() {
   const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  // The run sheet sends a courier here when dispatch has ended their access
+  useEffect(() => {
+    const ended = new URLSearchParams(window.location.search).get('ended')
+    if (ended === 'blocked') setNotice('Your access was ended by dispatch. Please contact dispatch.')
+    else if (ended === 'session') setNotice('You were signed out, for example because your PIN was changed. Sign in again with your PIN.')
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -98,6 +106,24 @@ export function DriverLoginClient() {
             boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
           }}
         >
+          {notice && (
+            <div
+              role="status"
+              style={{
+                background: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid #f59e0b',
+                color: '#fcd34d',
+                padding: '10px 14px',
+                borderRadius: 8,
+                fontSize: 12.5,
+                fontWeight: 600,
+                marginBottom: 18,
+              }}
+            >
+              {notice}
+            </div>
+          )}
+
           {error && (
             <div
               style={{

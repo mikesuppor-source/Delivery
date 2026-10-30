@@ -131,6 +131,12 @@ export async function changeCatalog(req:NextRequest,table:Table,recordId?:string
   ? db.from(table as 'shops').update(updates as Database['public']['Tables']['shops']['Update']).eq('id',target).eq('workspace_id',workspaceId).select().maybeSingle()
   : db.from(table as 'shops').select().eq('id',target).eq('workspace_id',workspaceId).maybeSingle()))
  if(!record)throw new ApiError(404,'Record not found')
+ if(table==='drivers'&&updates.active===false){
+  // Blocking a courier ends every session on every phone for good, even if they are unblocked later, and stops their alerts
+  const {data:credential}=await db.from('driver_credentials').select('session_version').eq('driver_id',record.id).maybeSingle()
+  if(credential)await db.from('driver_credentials').update({session_version:credential.session_version+1}).eq('driver_id',record.id)
+  await db.from('driver_push_subscriptions').delete().eq('driver_id',record.id)
+ }
  if(table==='drivers'&&req.method!=='DELETE'&&(body.pinCode||body.resetPin)){
   // Setting a new PIN also signs the courier out of every device.
   const pin=await issuePin(db,record.id,body.pinCode)

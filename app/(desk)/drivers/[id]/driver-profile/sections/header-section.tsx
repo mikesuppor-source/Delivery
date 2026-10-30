@@ -26,6 +26,30 @@ export function HeaderSection() {
   const [origin, setOrigin] = useState('')
   useEffect(() => setOrigin(window.location.origin), [])
 
+  // Blocking ends the courier's sessions on every phone at once and stops their alerts; unblocking lets them sign in again
+  const [blocking, setBlocking] = useState(false)
+  async function toggleBlock() {
+    const block = driver.active
+    const question = block
+      ? `Block ${driver.name}? They are signed out of every phone straight away, stop getting alerts, and cannot sign in until you unblock them.`
+      : `Unblock ${driver.name}? They can sign in again with their PIN.`
+    if (!window.confirm(question)) return
+    setBlocking(true)
+    try {
+      const res = await fetch(`/api/drivers/${driver.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: workspace.id, active: !block }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Could not change this courier')
+      window.location.reload()
+    } catch (err: unknown) {
+      window.alert(err instanceof Error ? err.message : 'Could not change this courier')
+      setBlocking(false)
+    }
+  }
+
   return (
     <>
       <div style={{ marginBottom: 16 }}>
@@ -226,6 +250,17 @@ export function HeaderSection() {
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                   </svg>
                   <span>Close Shift & Settle</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={toggleBlock}
+                  disabled={blocking}
+                  title={driver.active ? 'Sign this courier out everywhere and stop them signing in' : 'Let this courier sign in again'}
+                  style={driver.active ? { color: '#dc2626' } : undefined}
+                >
+                  {blocking ? 'Saving…' : driver.active ? 'Block courier' : 'Unblock courier'}
                 </button>
 
                 <button

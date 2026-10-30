@@ -163,6 +163,20 @@ export function useDriverOrders({
     pollOrdersRef.current = true
     try {
       const res = await fetch(`/api/driver/orders?driverId=${driver.id}`, { cache: 'no-store' })
+      if (res.status === 401 || res.status === 403) {
+        // Dispatch blocked this courier (403) or ended the session, for example by issuing a new PIN (401):
+        // this phone has no access any more, so clear what it keeps and go back to the sign-in page
+        try {
+          localStorage.removeItem('cedar_saved_driver_id')
+          localStorage.removeItem(`cedar_driver_orders_${driver.id}`)
+          if (res.status === 403) localStorage.removeItem(`cedar_driver_offline_queue_${driver.id}`)
+          if ('caches' in window) await Promise.all((await caches.keys()).map(key => caches.delete(key)))
+        } catch (_e) {
+          void _e
+        }
+        window.location.href = '/driver?ended=' + (res.status === 403 ? 'blocked' : 'session')
+        return
+      }
       if (!res.ok) return
       const data = await res.json()
       if (data && Array.isArray(data.orders)) {
