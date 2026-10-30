@@ -72,7 +72,7 @@ Cedar is a delivery-company operating system for Lebanon. Later it will be sold 
 | `supabase/migrations/` | SQL migrations `001` to `021` |
 | `tests/` | Unit tests, `database.test.mjs`, `e2e/*.spec.ts` |
 | `scripts/seed-local.mjs` | Local seed data |
-| `.github/workflows/` | `check.yml` (typecheck, lint, unit, DB, build, e2e) and `backup.yml` (nightly encrypted DB dump) |
+| `.github/workflows/` | `check.yml` (typecheck, lint, unit, DB, build, e2e) and `backup.yml` (nightly encrypted DB dump and Storage files copy) |
 
 ### 2.3 Database tables
 `workspaces`, `workspace_members`, `invitations`, `shops`, `shop_integrations`, `customers`, `delivery_areas`, `drivers`, `driver_credentials`, `driver_push_subscriptions`, `orders`, `order_events`, `settlements`, `money_ledger`, `cashout_requests`, `audit_log`, `oauth_states`, `request_limits`.
@@ -656,7 +656,7 @@ Replace the three roles with permission sets: `orders.create`, `orders.assign`, 
 #### 8.5 Reliability and legal
 - **Sentry** (or similar) for front-end and server errors, with secrets scrubbed.
 - **Uptime check** on `/api/health` (new route that checks the database).
-- The backups workflow (`backup.yml`) must be green every night. Add a monthly **restore test** to staging.
+- The backups workflow (`backup.yml`, jobs `backup` and `storage`) must be green every night. Do a monthly **restore test** to staging (database dump and Storage files; `scripts/restore-storage.mjs` restores the files).
 - **Terms of service and privacy policy** pages; per-workspace liability settings: maximum declared value per parcel, insurance option, prohibited items list shown on `/send` and in the portal.
 - Data export for a company (all their data as CSV/JSON) and account deletion on request.
 

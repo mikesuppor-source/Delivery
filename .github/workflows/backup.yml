@@ -1,17 +1,26 @@
-name: Nightly database backup
-# Encrypted dump of the LIVE Supabase database, kept for 30 days as a workflow artifact.
-# The repository is public, so the dump is encrypted before upload; without the
-# passphrase the artifact is unreadable.
+name: Nightly backup
+# Two encrypted backups of the LIVE Supabase project, each kept for 30 days as a workflow artifact:
+#   job "backup":  the database (roles, schema, data, including sign-in accounts)
+#   job "storage": the files in Storage (proof photos, signatures, expense receipts)
+# The repository is public, so both are encrypted before upload; without the
+# passphrase the artifacts are unreadable.
 #
 # Setup (GitHub → Settings → Secrets and variables → Actions → New repository secret):
 #   SUPABASE_DB_URL     Supabase → project → Connect → "Session pooler" connection string
 #                       (IPv4; the direct connection is IPv6-only and fails on GitHub runners)
 #   BACKUP_PASSPHRASE   A long random passphrase. Store it somewhere safe: it is the only way to decrypt.
-# Until both are set, the job skips itself.
+#   SUPABASE_URL        https://<project ref>.supabase.co  (storage job only)
+#   SUPABASE_SERVICE_ROLE_KEY   Supabase → Project Settings → API Keys → the secret ("service_role") key
+#                       (storage job only; it is full-access, so only ever put it in this secret)
+# Until its secrets are set, each job skips itself. A skipped job still shows green:
+# check that the "Dump and encrypt" / "Copy files and encrypt" step ran and an artifact exists.
 #
-# Restore: download the artifact, then
+# Restore the database: download the artifact, then
 #   gpg --decrypt cedar-backup-YYYY-MM-DD.tgz.gpg > backup.tgz && tar xzf backup.tgz
 #   psql "$TARGET_DB_URL" -f roles.sql -f schema.sql -f data.sql
+# Restore the files (practise on the test project, see docs/HANDOVER.md):
+#   gpg --decrypt cedar-storage-YYYY-MM-DD.tgz.gpg > storage.tgz && mkdir storage && tar xzf storage.tgz -C storage
+#   RESTORE_SUPABASE_URL=... RESTORE_SERVICE_ROLE_KEY=... node scripts/restore-storage.mjs storage --target=<project ref>
 on:
  schedule:
   - cron: '0 1 * * *' # 01:00 UTC, 03:00–04:00 in Beirut
@@ -56,5 +65,53 @@ jobs:
      with:
       name: cedar-backup-${{ github.run_id }}
       path: cedar-backup-*.tgz.gpg
+      retention-days: 30
+      if-no-files-found: error
+ storage:
+  runs-on: ubuntu-latest
+  steps:
+   - name: Check configuration
+     id: config
+     env:
+      SB_URL: ${{ secrets.SUPABASE_URL }}
+      SB_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+     run: |
+      if [ -z "$SB_URL" ] || [ -z "$SB_KEY" ] || [ -z "$PASSPHRASE" ]; then
+       echo "::notice::Storage backup secrets are not set yet; skipping."
+       echo "ready=false" >> "$GITHUB_OUTPUT"
+      else
+       echo "ready=true" >> "$GITHUB_OUTPUT"
+      fi
+   - uses: actions/checkout@v4
+     if: steps.config.outputs.ready == 'true'
+   - uses: actions/setup-node@v4
+     if: steps.config.outputs.ready == 'true'
+     with:
+      node-version: 22
+      cache: npm
+   - name: Install dependencies
+     if: steps.config.outputs.ready == 'true'
+     run: npm ci --omit=dev --ignore-scripts
+   - name: Copy files and encrypt
+     if: steps.config.outputs.ready == 'true'
+     env:
+      BACKUP_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      BACKUP_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+     run: |
+      set -euo pipefail
+      # Fails (exit 1) if any single file could not be copied, so a partial copy never looks fine
+      node scripts/backup-storage.mjs storage-backup
+      tar czf storage.tgz -C storage-backup .
+      out="cedar-storage-$(date -u +%F).tgz.gpg"
+      gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 -o "$out" storage.tgz
+      rm -rf storage-backup storage.tgz
+      echo "Encrypted storage backup: $out ($(du -h "$out" | cut -f1))"
+   - uses: actions/upload-artifact@v4
+     if: steps.config.outputs.ready == 'true'
+     with:
+      name: cedar-storage-${{ github.run_id }}
+      path: cedar-storage-*.tgz.gpg
       retention-days: 30
       if-no-files-found: error
