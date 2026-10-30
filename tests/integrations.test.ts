@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createHash, createHmac } from 'node:crypto'
 import { generateApiKey, hashApiKey, bearerKey } from '../lib/api-keys'
 import { signWebhook, verifyWebhookSignature } from '../lib/webhook-signature'
-import { validateWebhookUrl, isPrivateAddress } from '../lib/webhook-url'
+import { validateWebhookUrl, isPrivateAddress, allowLocalWebhooks } from '../lib/webhook-url'
 
 test('an API key is random, shown once, and only its hash is kept', () => {
   const a = generateApiKey(), b = generateApiKey()
@@ -61,4 +61,54 @@ test('private and special addresses are recognised', () => {
     assert.equal(isPrivateAddress(ip), true, ip)
   for (const ip of ['8.8.8.8', '1.1.1.1', '93.184.216.34', '172.32.0.1', '2606:4700:4700::1111', '::ffff:8.8.8.8'])
     assert.equal(isPrivateAddress(ip), false, ip)
+})
+
+test('local webhook receivers are allowed only when asked for, and only on a stack connected to a local database', () => {
+  const saved = { flag: process.env.WEBHOOK_ALLOW_LOCAL, url: process.env.NEXT_PUBLIC_SUPABASE_URL }
+  try {
+    delete process.env.WEBHOOK_ALLOW_LOCAL
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://127.0.0.1:54321'
+    assert.equal(allowLocalWebhooks(), false, 'off by default')
+    process.env.WEBHOOK_ALLOW_LOCAL = '1'
+    assert.equal(allowLocalWebhooks(), true, 'a local test stack asked for it')
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:55321'
+    assert.equal(allowLocalWebhooks(), true)
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://uzembxddgpwiibgxnigd.supabase.co'
+    assert.equal(allowLocalWebhooks(), false, 'a hosted database ignores the flag')
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://127.0.0.1.evil.example.com'
+    assert.equal(allowLocalWebhooks(), false, 'a lookalike name does not count')
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL
+    assert.equal(allowLocalWebhooks(), false, 'no database address')
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://127.0.0.1:54321'
+    process.env.WEBHOOK_ALLOW_LOCAL = 'true'
+    assert.equal(allowLocalWebhooks(), false, 'only the exact value 1 counts')
+  } finally {
+    for (const [name, value] of [['WEBHOOK_ALLOW_LOCAL', saved.flag], ['NEXT_PUBLIC_SUPABASE_URL', saved.url]] as const) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value
+    }
+  }
+})
+
+test('every shop API route is described in the OpenAPI document, and nothing else is', async () => {
+  const { readdirSync, readFileSync, statSync } = await import('node:fs')
+  const { join, relative, sep } = await import('node:path')
+  const { openApiDocument } = await import('../lib/openapi')
+  const root = join('app', 'api', 'v1')
+  const found: string[] = []
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name)
+      if (statSync(path).isDirectory()) { walk(path); continue }
+      if (name !== 'route.ts') continue
+      const urlPath = '/' + relative(root, dir).split(sep).join('/').replace(/\[(\w+)\]/g, '{$1}')
+      if (urlPath === '/openapi.json') continue // the description itself
+      const source = readFileSync(path, 'utf8')
+      for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
+        if (new RegExp(`export (const|function|async function) ${method}[^A-Za-z0-9_]`).test(source)) found.push(`${method} ${urlPath}`)
+      }
+    }
+  }
+  walk(root)
+  const documented = Object.entries(openApiDocument.paths).flatMap(([path, methods]) => Object.keys(methods).map(m => `${m.toUpperCase()} ${path}`))
+  assert.deepEqual(found.sort(), documented.sort())
 })

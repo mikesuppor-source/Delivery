@@ -4,7 +4,7 @@ import dns from 'node:dns'
 import { isIP } from 'node:net'
 import { createServiceClient } from './supabase/server'
 import { signWebhook } from './webhook-signature'
-import { isPrivateAddress, validateWebhookUrl } from './webhook-url'
+import { allowLocalWebhooks, isPrivateAddress, validateWebhookUrl } from './webhook-url'
 
 // Sends the queued webhook messages (see migration 033). The database hands out the messages that are due and
 // schedules each retry; this file only makes the request and reports what happened.
@@ -90,7 +90,7 @@ export async function processWebhookQueue(limit = 25) {
   const db = createServiceClient()
   const { data, error } = await db.rpc('claim_webhook_deliveries', { p_limit: limit })
   if (error) throw new Error('Could not read the webhook queue')
-  const allowLocal = process.env.WEBHOOK_ALLOW_LOCAL === '1' && process.env.NODE_ENV !== 'production'
+  const allowLocal = allowLocalWebhooks()
   let delivered = 0, failed = 0
   await Promise.all((data ?? []).map(async job => {
     const result = await sendWebhook(job as WebhookJob, { allowLocal })

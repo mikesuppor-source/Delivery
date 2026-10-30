@@ -74,3 +74,12 @@ export function validateWebhookUrl(input: unknown, { allowLocal = false }: { all
   }
   return url.toString()
 }
+
+/**
+ * True only on a throwaway stack that asks for it: WEBHOOK_ALLOW_LOCAL=1 AND the app is connected to a database on this
+ * machine. The live site is never connected to a local database, so the flag does nothing there even if it is set by mistake.
+ */
+export function allowLocalWebhooks() {
+  if (process.env.WEBHOOK_ALLOW_LOCAL !== '1') return false
+  try { return ['localhost', '127.0.0.1'].includes(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname) } catch { return false }
+}

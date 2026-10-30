@@ -99,6 +99,13 @@ export function PortalHeader({ shopName, shopPrefix, userEmail }: PortalHeaderPr
           >
             My Prices
           </Link>
+          <Link
+            href="/portal/integrations"
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}
+          >
+            Connect Store
+          </Link>
         </nav>
       </div>
 
