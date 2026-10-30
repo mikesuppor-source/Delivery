@@ -898,6 +898,39 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     assert.deepEqual(await open('authenticated'), ['is_member', 'my_role', 'profit_report'], why)
   })
 
+  // ─── Trigger functions (migration 032) ───────────────────────────────────────────────────────────────────
+  // Postgres checks permission to run a trigger function only when the trigger is created, so closing them
+  // to visitors does not stop the triggers firing. They are never meant to be called by hand.
+  await t.test('trigger functions are closed to signed-out visitors and signed-in users, and the triggers still fire', async () => {
+    const open = async role => (await db.query(
+      `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.prorettype = 'trigger'::regtype
+         and has_function_privilege($1::name, p.oid, 'execute') order by 1`, [role])).rows.map(r => r.proname)
+    const why = 'A trigger function must be revoked from public, anon and authenticated (see migration 032)'
+    assert.deepEqual(await open('anon'), [], why)
+    assert.deepEqual(await open('authenticated'), [], why)
+    // The two functions Supabase flagged for a changeable search path now have a fixed one
+    const loose = (await db.query(
+      `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname in ('sync_order_customer', 'set_allow_owner_delete')
+         and not coalesce(p.proconfig::text like '%search_path%', false) order by 1`)).rows.map(r => r.proname)
+    assert.deepEqual(loose, [], 'functions with a changeable search path')
+    // Triggers still fire for a role that has table rights but no right to run any function
+    await db.exec("create role trigger_probe bypassrls; grant usage on schema public to trigger_probe; grant all on all tables in schema public to trigger_probe")
+    try {
+      const probeCan = (await db.query("select has_function_privilege('trigger_probe', 'public.sync_order_customer()', 'execute') as ok")).rows[0].ok
+      assert.equal(probeCan, false, 'the probe role must not be able to run trigger functions')
+      await db.exec('set role trigger_probe')
+      try { await db.query("insert into orders(workspace_id,shop_id,usd_to_lbp_rate,recipient_name,recipient_phone) values($1,$2,100000,'Trigger Test','+96170555123')", [a, shop]) } finally { await db.exec('reset role') }
+      const made = Number((await db.query("select count(*) from customers where workspace_id = $1 and phone = '+96170555123'", [a])).rows[0].count)
+      assert.equal(made, 1, 'the order trigger did not create the customer')
+      const before = Number((await db.query('select count(*) from exchange_rates where workspace_id = $1', [a])).rows[0].count)
+      await db.exec('set role trigger_probe')
+      try { await db.query('update workspaces set usd_to_lbp = usd_to_lbp + 500 where id = $1', [a]) } finally { await db.exec('reset role') }
+      assert.equal(Number((await db.query('select count(*) from exchange_rates where workspace_id = $1', [a])).rows[0].count), before + 1, 'the rate change was not logged')
+    } finally { await db.exec("reassign owned by trigger_probe to postgres; drop owned by trigger_probe; drop role trigger_probe") }
+  })
+
   await t.test('every table has row level security, and courier push sign-ups are for the server only', async () => {
     const bare = (await db.query(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1`)).rows.map(r => r.relname)
