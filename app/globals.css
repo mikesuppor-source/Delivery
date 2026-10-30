@@ -608,6 +608,11 @@ dialog::backdrop {
 }
 @media (max-width: 550px) {
   :root { --sidebar-w: 56px; }
+  /* Desk top bar: keep every control on screen at phone width (inline styles need !important) */
+  .topbar { padding: 0 10px !important; gap: 8px !important; }
+  .topbar-search { flex: 1 1 0 !important; min-width: 0 !important; max-width: none !important; }
+  .topbar-search-text, .topbar-kbd, .topbar-newlabel, .topbar-rate-prefix, .topbar-edit-tag { display: none !important; }
+  .topbar-actions { flex-shrink: 0; gap: 6px !important; }
   .content { padding: 20px 14px; }
   .stats { grid-template-columns: 1fr 1fr; }
   .page-heading { flex-wrap: wrap; }
