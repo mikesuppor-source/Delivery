@@ -1,0 +1,36 @@
+name: Send webhooks
+# Sends the webhook messages that are due to the shops' systems (new ones and retries) every 5 minutes.
+# Vercel's free plan only runs a job once a day, so GitHub's scheduler calls the route instead.
+#
+# Setup (GitHub → Settings → Secrets and variables → Actions → New repository secret):
+#   CRON_SECRET   The same value as the CRON_SECRET setting on Vercel (Production)
+# Until it is set, the job skips itself. A skipped run still shows green: check the step "Run the webhook job".
+on:
+ schedule:
+  - cron: '*/5 * * * *'
+ workflow_dispatch:
+jobs:
+ send:
+  runs-on: ubuntu-latest
+  steps:
+   - name: Check configuration
+     id: config
+     env:
+      SECRET: ${{ secrets.CRON_SECRET }}
+     run: |
+      if [ -z "$SECRET" ]; then
+       echo "::notice::CRON_SECRET is not set yet; skipping."
+       echo "ready=false" >> "$GITHUB_OUTPUT"
+      else
+       echo "ready=true" >> "$GITHUB_OUTPUT"
+      fi
+   - name: Run the webhook job
+     if: steps.config.outputs.ready == 'true'
+     env:
+      SECRET: ${{ secrets.CRON_SECRET }}
+     run: |
+      set -euo pipefail
+      curl --fail --silent --show-error --max-time 90 \
+       -H "Authorization: Bearer $SECRET" \
+       https://delivery-five-roan.vercel.app/api/cron/webhooks
+      echo

@@ -39,6 +39,9 @@ jobs:
        echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
        echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
        echo "DRIVER_SESSION_SECRET=$secret"
+       # The webhook test calls the cron route and receives on this machine; both settings are for this throwaway stack only
+       echo "CRON_SECRET=$(openssl rand -hex 24)"
+       echo "WEBHOOK_ALLOW_LOCAL=1"
       } >> "$GITHUB_ENV"
    - run: node scripts/seed-local.mjs
    - run: npx playwright install --with-deps chromium

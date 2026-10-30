@@ -54,6 +54,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/invite/') ||
     // Scheduled jobs have no user session: each one checks the CRON_SECRET itself (lib/cron.ts)
     path.startsWith('/api/cron/') ||
+    // The shop API has no browser session: every route checks the API key itself (lib/api-v1.ts)
+    path.startsWith('/api/v1/') ||
     path === '/driver' ||
     path.startsWith('/driver/') ||
     path.startsWith('/api/driver/') ||

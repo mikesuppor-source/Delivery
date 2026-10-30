@@ -931,6 +931,74 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     } finally { await db.exec("reassign owned by trigger_probe to postgres; drop owned by trigger_probe; drop role trigger_probe") }
   })
 
+  // ─── Integrations (migration 033): shop API keys, webhooks, order references ──────────────────────────
+  await t.test('integrations: API keys and webhook tables are server-only', async () => {
+    for (const table of ['shop_api_keys', 'shop_webhooks', 'webhook_deliveries']) {
+      for (const role of ['anon', 'authenticated']) {
+        await db.exec(`set role ${role}`)
+        try { await assert.rejects(db.query(`select * from ${table}`), /permission denied/, `${role} reads ${table}`) } finally { await db.exec('reset role') }
+      }
+    }
+    const hash = 'a'.repeat(64)
+    await db.query("insert into shop_api_keys(workspace_id,shop_id,key_prefix,key_hash) values($1,$2,'cdr_abcd',$3)", [a, shop, hash])
+    await assert.rejects(db.query("insert into shop_api_keys(workspace_id,shop_id,key_prefix,key_hash) values($1,$2,'cdr_abcd',$3)", [a, shop, hash]), /duplicate/, 'a key hash must be unique')
+    await assert.rejects(db.query("insert into shop_api_keys(workspace_id,shop_id,key_prefix,key_hash) values($1,$2,'cdr_zzzz','not-a-sha256')", [a, shop]), /check/, 'only a sha256 hex digest may be stored')
+  })
+
+  await t.test('integrations: an order reference is unique per shop', async () => {
+    const make = (ws, sh, ref) => db.query('insert into orders(workspace_id,shop_id,usd_to_lbp_rate,external_ref) values($1,$2,100000,$3)', [ws, sh, ref])
+    await make(a, shop, 'WC-1001')
+    await assert.rejects(make(a, shop, 'WC-1001'), /duplicate/, 'the same shop reused a reference')
+    await make(b, otherShop, 'WC-1001') // another shop may reuse it
+    await make(a, shop, null); await make(a, shop, null) // no reference, no limit
+  })
+
+  await t.test('integrations: order changes queue webhooks, and deliveries retry with backoff', async () => {
+    const queued = async () => (await db.query('select event, status, attempts, payload from webhook_deliveries where shop_id = $1 order by created_at, event', [shop])).rows
+    const hookOrder = id(5001)
+    await db.query("insert into orders(id,workspace_id,shop_id,usd_to_lbp_rate,code,external_ref) values($1,$2,$3,100000,'HOOK-1','REF-HOOK')", [hookOrder, a, shop])
+    // No webhook set yet: nothing is queued
+    await db.query("update orders set status = 'assigned', driver_id = $2 where id = $1", [hookOrder, drv])
+    assert.equal((await queued()).length, 0, 'queued without a webhook')
+    await db.query("insert into shop_webhooks(shop_id,workspace_id,url,secret) values($1,$2,'https://hooks.example.test/cedar','s3cret')", [shop, a])
+    await db.query("update orders set status = 'picked_up' where id = $1", [hookOrder])
+    await db.query("update orders set notes = 'no status change' where id = $1", [hookOrder])
+    await db.query("update orders set status = 'delivered' where id = $1", [hookOrder])
+    const rows = await queued()
+    assert.deepEqual(rows.map(r => r.event).sort(), ['order.delivered', 'order.status_changed', 'order.status_changed'])
+    const delivered = rows.find(r => r.event === 'order.delivered')
+    assert.equal(delivered.payload.code, 'HOOK-1'); assert.equal(delivered.payload.status, 'delivered'); assert.equal(delivered.payload.externalReference, 'REF-HOOK')
+    assert.equal(JSON.stringify(rows).includes('s3cret'), false, 'the signing secret leaked into the queue')
+    // A different shop's orders never queue for this shop
+    await db.query('insert into orders(id,workspace_id,shop_id,usd_to_lbp_rate) values($1,$2,$3,100000)', [id(5002), b, otherShop])
+    await db.query("update orders set status = 'cancelled' where id = $1", [id(5002)])
+    assert.equal((await queued()).length, 3)
+    // The server claims due deliveries; each is handed out once while its lease lasts
+    await db.exec('set role service_role')
+    try {
+      const first = (await db.query('select * from claim_webhook_deliveries(10)')).rows
+      assert.equal(first.length, 3); assert.equal(first[0].url, 'https://hooks.example.test/cedar'); assert.equal(first[0].secret, 's3cret')
+      assert.equal((await db.query('select * from claim_webhook_deliveries(10)')).rows.length, 0, 'a claimed delivery was handed out twice')
+      const [one, two, three] = first.map(r => r.id)
+      await db.query('select complete_webhook_delivery($1, true, 200, null)', [one])
+      await db.query("select complete_webhook_delivery($1, false, 500, 'boom')", [two])
+      const states = Object.fromEntries((await db.query('select id, status, attempts, last_status_code, last_error, next_attempt_at > now() as later from webhook_deliveries')).rows.map(r => [r.id, r]))
+      assert.equal(states[one].status, 'delivered'); assert.equal(states[one].attempts, 1)
+      assert.equal(states[two].status, 'pending'); assert.equal(states[two].attempts, 1); assert.equal(states[two].last_error, 'boom'); assert.equal(states[two].later, true)
+      // Eight failures in a row give up for good
+      for (let i = 0; i < 7; i++) await db.query("select complete_webhook_delivery($1, false, 502, 'down')", [three])
+      assert.equal((await db.query('select status, attempts from webhook_deliveries where id = $1', [three])).rows[0].attempts, 7)
+      await db.query("select complete_webhook_delivery($1, false, 502, 'down')", [three])
+      assert.deepEqual((await db.query('select status, attempts from webhook_deliveries where id = $1', [three])).rows[0], { status: 'failed', attempts: 8 })
+    } finally { await db.exec('reset role') }
+    // Switching the webhook off fails whatever is still waiting, with a reason
+    await db.query("update orders set status = 'returned' where id = $1", [hookOrder])
+    await db.query('update shop_webhooks set enabled = false where shop_id = $1', [shop])
+    await db.exec('set role service_role')
+    try { assert.equal((await db.query('select * from claim_webhook_deliveries(10)')).rows.length, 0) } finally { await db.exec('reset role') }
+    assert.equal(Number((await db.query("select count(*) from webhook_deliveries where status = 'pending' and event = 'order.returned'")).rows[0].count), 0)
+  })
+
   await t.test('every table has row level security, and courier push sign-ups are for the server only', async () => {
     const bare = (await db.query(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1`)).rows.map(r => r.relname)
