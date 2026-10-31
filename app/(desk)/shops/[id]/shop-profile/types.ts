@@ -16,6 +16,8 @@ export interface Shop {
   payout_account?: string | null
   /** Where account statements are emailed (Phase 6). */
   contact_email?: string | null
+  /** The shop's own sign-in, when it has one. */
+  user_id?: string | null
 }
 
 export interface OrderItem {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -12,6 +12,18 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+
+  // A link made by the desk for a shop login carries the sign-in tokens in the address; take them in before the password is saved
+  useEffect(() => {
+    const tokens = new URLSearchParams(window.location.hash.slice(1))
+    const access = tokens.get('access_token')
+    const refresh = tokens.get('refresh_token')
+    if (!access || !refresh) return
+    createClient().auth.setSession({ access_token: access, refresh_token: refresh }).then(({ error: sessionError }) => {
+      if (sessionError) setError('This link has expired. Ask for a new one.')
+      window.history.replaceState(null, '', window.location.pathname)
+    })
+  }, [])
 
   async function handleUpdatePassword(e: React.FormEvent) {
     e.preventDefault()

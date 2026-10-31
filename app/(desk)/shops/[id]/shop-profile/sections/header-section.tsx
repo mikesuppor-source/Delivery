@@ -7,6 +7,7 @@ import { formatUSD } from '@/lib/utils'
 import { WhatsAppIcon } from '@/components/whatsapp-icon'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
 import { ShopifyIcon } from '@/components/shopify-icon'
+import { ShopLoginButton } from './shop-login-section'
 
 export function HeaderSection() {
   const {
@@ -270,6 +271,7 @@ export function HeaderSection() {
                   </button>
                 )}
 
+                <ShopLoginButton />
                 <button
                   type="button"
                   className="btn btn-ghost"
