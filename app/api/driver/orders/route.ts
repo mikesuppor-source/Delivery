@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { nudgeCustomerMessages } from '@/lib/customer-messages'
 import { api, ApiError, checked } from '@/lib/api'
 import { id, parseBody, z } from '@/lib/validation'
 import { driverAccess } from '@/lib/access'
@@ -61,5 +62,6 @@ export const PATCH = api(async req => {
   if(updated.status === 'delivered') {
     fulfillShopifyOrder(db, order.id).catch(e => console.error('Shopify fulfillment sync failed:', e))
   }
+  nudgeCustomerMessages(req)
   return NextResponse.json({success:true,order:updated})
 })

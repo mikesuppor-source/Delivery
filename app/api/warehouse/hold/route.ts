@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { nudgeCustomerMessages } from '@/lib/customer-messages'
 import { api, ApiError, checked } from '@/lib/api'
 import { id, idList, parseBody, z } from '@/lib/validation'
 import { workspaceAccess } from '@/lib/access'
@@ -67,6 +68,7 @@ export const POST = api(async req => {
     }
   }
 
+  nudgeCustomerMessages(req)
   return NextResponse.json({
     success: failures.length === 0,
     count: results.length,

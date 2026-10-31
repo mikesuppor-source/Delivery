@@ -1,5 +1,6 @@
 name: Send webhooks
-# Sends the webhook messages that are due to the shops' systems (new ones and retries) every 5 minutes.
+# Every 5 minutes it sends the webhook messages that are due to the shops' systems (new ones and retries) and the
+# WhatsApp messages that are due to customers (out for delivery, delivered, failed, held; new ones and retries).
 # Vercel's free plan only runs a job once a day, so GitHub's scheduler calls the route instead.
 #
 # Setup (GitHub → Settings → Secrets and variables → Actions → New repository secret):
@@ -29,8 +30,12 @@ jobs:
      env:
       SECRET: ${{ secrets.CRON_SECRET }}
      run: |
-      set -euo pipefail
-      curl --fail --silent --show-error --max-time 90 \
-       -H "Authorization: Bearer $SECRET" \
-       https://delivery-five-roan.vercel.app/api/cron/webhooks
-      echo
+      set -uo pipefail
+      failed=0
+      for job in webhooks messages; do
+       curl --fail --silent --show-error --max-time 90 \
+        -H "Authorization: Bearer $SECRET" \
+        "https://delivery-five-roan.vercel.app/api/cron/$job" || failed=1
+       echo
+      done
+      exit $failed

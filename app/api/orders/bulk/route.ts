@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { nudgeCustomerMessages } from '@/lib/customer-messages'
 import { api, ApiError, checked } from '@/lib/api'
 import { id, idList, optionalId, parseBody, z } from '@/lib/validation'
 import { workspaceAccess, validateReferences } from '@/lib/access'
@@ -32,5 +33,6 @@ export const POST = api(async req => {
       }
     } catch(error) { failures.push({id:order.id,error:error instanceof Error?error.message:'Update failed'}) }
   }
+  nudgeCustomerMessages(req)
   return NextResponse.json({success:failures.length===0,count:updatedOrders.length,orders:updatedOrders,deletedIds:body.action==='delete'?updatedOrders.map(o=>o.id):undefined,failures})
 })

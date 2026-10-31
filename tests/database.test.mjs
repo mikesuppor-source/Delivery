@@ -1020,6 +1020,64 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     assert.equal((await db.query("select count(*) from webhook_deliveries where shop_id = $1", [id(5003)])).rows[0].count == 0, true)
   })
 
+  // ─── Customer messages (migration 034): status changes queue WhatsApp messages ──────────────────────────
+  await t.test('customer messages: status changes queue each message once, with retries and server-only access', async () => {
+    const queue = async orderId => (await db.query('select template, status, attempts from customer_message_queue where order_id = $1 order by created_at, template', [orderId])).rows
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`)
+      try { await assert.rejects(db.query('select * from customer_message_queue'), /permission denied/, `${role} reads the message queue`) } finally { await db.exec('reset role') }
+    }
+    const msgOrder = id(6001)
+    await db.query("insert into orders(id,workspace_id,shop_id,usd_to_lbp_rate,code,recipient_phone) values($1,$2,$3,100000,'MSG-1','+961 71 111 222')", [msgOrder, a, shop])
+    await db.query("update orders set status = 'assigned', driver_id = $2 where id = $1", [msgOrder, drv])
+    assert.equal((await queue(msgOrder)).length, 0, 'queued before the parcel left')
+    await db.query("update orders set status = 'picked_up' where id = $1", [msgOrder])
+    await db.query("update orders set notes = 'no status change' where id = $1", [msgOrder])
+    assert.deepEqual((await queue(msgOrder)).map(r => r.template), ['out_for_delivery'])
+    // A failed attempt is announced once; the next trip out and the next failure are announced again
+    await db.query("insert into delivery_attempts(workspace_id,order_id,driver_id,attempt_no,result) values($1,$2,$3,1,'no_answer')", [a, msgOrder, drv])
+    await db.query("update orders set status = 'failed' where id = $1", [msgOrder])
+    await db.query("update orders set status = 'picked_up' where id = $1", [msgOrder])
+    await db.query("update orders set status = 'delivered' where id = $1", [msgOrder])
+    assert.deepEqual((await queue(msgOrder)).map(r => r.template).sort(), ['delivered', 'failed_attempt', 'out_for_delivery', 'out_for_delivery'])
+    // Going back to delivered after a correction never announces delivery twice
+    await db.query("update orders set status = 'picked_up' where id = $1", [msgOrder])
+    await db.query("update orders set status = 'delivered' where id = $1", [msgOrder])
+    assert.equal((await queue(msgOrder)).filter(r => r.template === 'delivered').length, 1)
+    // No phone number, no message
+    const quiet = id(6002)
+    await db.query("insert into orders(id,workspace_id,shop_id,usd_to_lbp_rate,code) values($1,$2,$3,100000,'MSG-2')", [quiet, a, shop])
+    await db.query("update orders set status = 'picked_up', driver_id = $2 where id = $1", [quiet, drv])
+    await db.query("update orders set status = 'delivered' where id = $1", [quiet])
+    assert.equal((await queue(quiet)).length, 0)
+    // A warehouse hold queues the "held" message
+    await db.query("select set_config('test.user_id',$1,false)", [owner])
+    const heldOrder = id(6003)
+    await db.query("insert into orders(id,workspace_id,shop_id,usd_to_lbp_rate,code,recipient_phone,status) values($1,$2,$3,100000,'MSG-3','+961 71 333 444','pending')", [heldOrder, a, shop])
+    await db.query("select hold_order($1, $2, 'SHELF-X1', 'weather'::hold_reason, 'storm', '2026-11-05'::date, $3)", [heldOrder, id(40), owner])
+    assert.deepEqual((await queue(heldOrder)).map(r => r.template), ['held'])
+    // The server claims what is due, once, and reports back; failures retry later and give up after five
+    await db.exec('set role service_role')
+    try {
+      const first = (await db.query('select * from claim_customer_messages(50)')).rows
+      assert.equal(first.length, 5)
+      assert.equal((await db.query('select * from claim_customer_messages(50)')).rows.length, 0, 'a claimed message was handed out twice')
+      const sent = first.find(r => r.template === 'held')
+      await db.query("select complete_customer_message($1, 'sent', null)", [sent.id])
+      const skipped = first.find(r => r.template === 'delivered')
+      await db.query("select complete_customer_message($1, 'skipped', null)", [skipped.id])
+      const flaky = first.find(r => r.template === 'failed_attempt')
+      await db.query("select complete_customer_message($1, 'failed', 'WhatsApp is down')", [flaky.id])
+      const state = Object.fromEntries((await db.query('select id, status, attempts, last_error, next_attempt_at > now() as later from customer_message_queue')).rows.map(r => [r.id, r]))
+      assert.equal(state[sent.id].status, 'sent'); assert.equal(state[skipped.id].status, 'skipped')
+      assert.equal(state[flaky.id].status, 'pending'); assert.equal(state[flaky.id].attempts, 1); assert.equal(state[flaky.id].later, true); assert.equal(state[flaky.id].last_error, 'WhatsApp is down')
+      for (let i = 0; i < 3; i++) await db.query("select complete_customer_message($1, 'failed', 'down')", [flaky.id])
+      assert.equal((await db.query('select status from customer_message_queue where id = $1', [flaky.id])).rows[0].status, 'pending')
+      await db.query("select complete_customer_message($1, 'failed', 'down')", [flaky.id])
+      assert.deepEqual((await db.query('select status, attempts from customer_message_queue where id = $1', [flaky.id])).rows[0], { status: 'failed', attempts: 5 })
+    } finally { await db.exec('reset role') }
+  })
+
   await t.test('every table has row level security, and courier push sign-ups are for the server only', async () => {
     const bare = (await db.query(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1`)).rows.map(r => r.relname)

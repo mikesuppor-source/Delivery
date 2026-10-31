@@ -16,7 +16,7 @@ test('renderTemplate: renders English order_created template with interpolated p
 
   assert.equal(
     result,
-    'Your order #CED-101 from Beirut Boutique is confirmed! Track your package here: https://track.cedar.test/track/xyz-123'
+    'Hello! Your order #CED-101 from Beirut Boutique is confirmed. Track your package here: https://track.cedar.test/track/xyz-123. Thank you for choosing us.'
   )
 })
 
@@ -29,7 +29,7 @@ test('renderTemplate: renders Arabic order_created template with interpolated pa
 
   assert.equal(
     result,
-    'تم تأكيد طلبك #CED-101 من متجر بيروت بوتيك! يمكنك تتبع شحنتك هنا: https://track.cedar.test/track/xyz-123'
+    'مرحباً! تم تأكيد طلبك #CED-101 من متجر بيروت بوتيك. يمكنك تتبع شحنتك من هنا: https://track.cedar.test/track/xyz-123. شكراً لاختيارك لنا.'
   )
 })
 
@@ -70,7 +70,7 @@ test('renderTemplate: falls back to English when language is not provided or unk
     track_url: 'https://track.cedar.test/track/555',
   })
 
-  assert.match(result, /Your order #CED-555 has been delivered!/)
+  assert.match(result, /Your order #CED-555 has been delivered\./)
 })
 
 test('SimulatedMessagingProvider: returns success with simulated ID', async () => {

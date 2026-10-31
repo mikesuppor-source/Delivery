@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { nudgeCustomerMessages } from '@/lib/customer-messages'
 import { api, ApiError } from '@/lib/api'
 import { createServiceClient } from '@/lib/supabase/server'
 import { savePod } from '@/lib/pod'
@@ -70,5 +71,6 @@ export const POST = api(async req => {
 
   if (rpcErr) throw new ApiError(500, rpcErr.message)
 
+  nudgeCustomerMessages(req)
   return NextResponse.json({ success: true, attempt: rpcRes })
 })

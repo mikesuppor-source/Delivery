@@ -1,5 +1,6 @@
 import { createServiceClient } from './supabase/server'
 import { cleanPhone, formatLebanesePhone } from './phone'
+import { META_TEMPLATES, templateMessage } from './whatsapp-templates'
 
 export type MessageChannel = 'whatsapp' | 'sms' | 'system'
 export type MessageTemplate = 'order_created' | 'out_for_delivery' | 'delivered' | 'failed_attempt' | 'held'
@@ -19,28 +20,14 @@ export interface MessagingProvider {
   send(payload: MessagePayload, bodyText: string): Promise<{ success: boolean; id?: string; error?: string }>
 }
 
-export const MESSAGE_TEMPLATES: Record<MessageTemplate, { en: string; ar: string }> = {
-  order_created: {
-    en: 'Your order #{code} from {shop} is confirmed! Track your package here: {track_url}',
-    ar: 'تم تأكيد طلبك #{code} من متجر {shop}! يمكنك تتبع شحنتك هنا: {track_url}',
-  },
-  out_for_delivery: {
-    en: 'Your order #{code} is out for delivery with our courier {courier}! Live tracking: {track_url}',
-    ar: 'طلبك #{code} في طريقه إليك الآن مع السائق {courier}! التتبع المباشر: {track_url}',
-  },
-  delivered: {
-    en: 'Your order #{code} has been delivered! Please rate your delivery service: {track_url}',
-    ar: 'تم تسليم طلبك #{code} بنجاح! نرجو تقييم مستوى الخدمة: {track_url}',
-  },
-  failed_attempt: {
-    en: 'Delivery attempt for order #{code} was unsuccessful ({reason}). We will reschedule soon: {track_url}',
-    ar: 'تعذر تسليم طلبك #{code} بسبب ({reason}). سنقوم بإعادة الجدولة قريباً: {track_url}',
-  },
-  held: {
-    en: 'Your package #{code} is held safely in our warehouse until {date}. Track here: {track_url}',
-    ar: 'شحنتك #{code} محفوظة بأمان في مستودعنا حتى موعد {date}. للتتبع: {track_url}',
-  },
-}
+/** The message texts with named placeholders ({code}), taken from the approved WhatsApp templates so the two never differ. */
+export const MESSAGE_TEMPLATES: Record<MessageTemplate, { en: string; ar: string }> = Object.fromEntries(
+  (Object.keys(META_TEMPLATES) as MessageTemplate[]).map(key => {
+    const { params, en, ar } = META_TEMPLATES[key]
+    const named = (text: string) => text.replace(/\{\{(\d+)\}\}/g, (_, n) => `{${params[Number(n) - 1]}}`).replace(/ \./g, '.')
+    return [key, { en: named(en), ar: named(ar) }]
+  })
+) as Record<MessageTemplate, { en: string; ar: string }>
 
 /** Pure string interpolation of template keys. */
 export function renderTemplate(
@@ -66,33 +53,28 @@ export class SimulatedMessagingProvider implements MessagingProvider {
   }
 }
 
-/** WhatsApp Cloud API provider using Meta Graph API. */
+/** WhatsApp Cloud API provider using Meta Graph API. Business-started messages must be approved templates. */
 export class WhatsAppCloudProvider implements MessagingProvider {
   name = 'whatsapp_cloud'
 
   constructor(
     private token: string,
-    private phoneNumberId: string
+    private phoneNumberId: string,
+    private fetcher: typeof fetch = fetch
   ) {}
 
-  async send(payload: MessagePayload, bodyText: string) {
+  async send(payload: MessagePayload, _bodyText: string) {
     const cleaned = cleanPhone(payload.toPhone).replace(/^\+/, '')
     const recipient = cleaned.startsWith('961') ? cleaned : `961${cleaned.replace(/^0/, '')}`
 
     try {
-      const res = await fetch(`https://graph.facebook.com/v21.0/${this.phoneNumberId}/messages`, {
+      const res = await this.fetcher(`https://graph.facebook.com/v21.0/${this.phoneNumberId}/messages`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${this.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipient,
-          type: 'text',
-          text: { preview_url: true, body: bodyText },
-        }),
+        body: JSON.stringify(templateMessage(recipient, payload.template, payload.lang ?? 'en', payload.params)),
       })
 
       const data = await res.json()
@@ -111,6 +93,8 @@ export class WhatsAppCloudProvider implements MessagingProvider {
 /** Resolves appropriate provider and logs message asynchronously. */
 export async function dispatchCustomerNotification(payload: MessagePayload): Promise<{
   success: boolean
+  /** True when the message was not sent because this kind of message is switched off for the company. */
+  skipped?: boolean
   logId?: string
   error?: string
 }> {
@@ -138,7 +122,7 @@ export async function dispatchCustomerNotification(payload: MessagePayload): Pro
 
   const isEnabled = ws ? (ws as any)[flagKey[payload.template]] ?? true : true
   if (!isEnabled) {
-    return { success: true }
+    return { success: true, skipped: true }
   }
 
   const token = ws?.whatsapp_cloud_token || process.env.WHATSAPP_API_TOKEN
@@ -149,7 +133,7 @@ export async function dispatchCustomerNotification(payload: MessagePayload): Pro
       ? new WhatsAppCloudProvider(token, phoneId)
       : new SimulatedMessagingProvider()
 
-  const result = await provider.send(payload, bodyText)
+  const result = await provider.send({ ...payload, lang }, bodyText)
 
   // Record to message_log table
   try {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { nudgeCustomerMessages } from '@/lib/customer-messages'
 import { api, ApiError, checked } from '@/lib/api'
 import { flag, id, idList, ilikeAny, money, optionalId, parseBody, searchTerm, serviceType, text, weightKg, z } from '@/lib/validation'
 import { authenticated, workspaceAccess, validateReferences } from '@/lib/access'
@@ -157,6 +158,7 @@ export const PATCH = api(async req => {
       tag: `order-${updated.code}`,
     }).catch(e => console.error('[Push Dispatch Error]:', e))
   }
+  nudgeCustomerMessages(req)
   return NextResponse.json({success:true,order:updated})
 })
 export const DELETE = api(async req => {

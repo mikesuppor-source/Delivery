@@ -868,6 +868,18 @@ isOneToOne: false
                     "created_at"?: string,"enabled"?: boolean,"last_order_at"?: string | null,"secret"?: string,"shop_id"?: string,"workspace_id"?: string
                   }
                   Relationships: []
+                },"customer_message_queue": {
+                  Row: {
+                    "attempts": number,"created_at": string,"dedupe_key": string,"finished_at": string | null,"id": string,"last_error": string | null,"next_attempt_at": string,"order_id": string,"status": string,"template": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempts"?: number,"created_at"?: string,"dedupe_key": string,"finished_at"?: string | null,"id"?: string,"last_error"?: string | null,"next_attempt_at"?: string,"order_id": string,"status"?: string,"template": string,"workspace_id": string
+                  }
+                  Update: {
+                    "attempts"?: number,"created_at"?: string,"dedupe_key"?: string,"finished_at"?: string | null,"id"?: string,"last_error"?: string | null,"next_attempt_at"?: string,"order_id"?: string,"status"?: string,"template"?: string,"workspace_id"?: string
+                  }
+                  Relationships: []
                 },"shop_integrations": {
                   Row: {
                     "access_token": string | null,"api_key": string,"shop_id": string,"updated_at": string
@@ -980,6 +992,15 @@ isOneToOne: false
                            },
 "enqueue_shop_webhook":
 { Args: { "p_event": string,"p_order": string,"p_payload": Json,"p_shop": string }; Returns: undefined
+                           },
+"claim_customer_messages":
+{ Args: { "p_limit": number }; Returns: { "attempts": number,"id": string,"order_id": string,"template": string,"workspace_id": string }[]
+                           },
+"complete_customer_message":
+{ Args: { "p_error": string | null,"p_id": string,"p_outcome": string }; Returns: undefined
+                           },
+"queue_customer_message":
+{ Args: { "p_key": string,"p_order": string,"p_template": string }; Returns: undefined
                            },
 "consume_limit":
 { Args: { "p_key": string,"p_max": number }; Returns: boolean
