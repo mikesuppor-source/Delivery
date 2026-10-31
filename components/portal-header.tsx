@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -10,8 +10,16 @@ interface PortalHeaderProps {
   userEmail: string
 }
 
+const TABS = [
+  { href: '/portal', label: 'Orders' },
+  { href: '/portal/prices', label: 'My Prices' },
+  { href: '/portal/integrations', label: 'Connect Store' },
+  { href: '/portal/api-docs', label: 'API Guide' },
+]
+
 export function PortalHeader({ shopName, shopPrefix, userEmail }: PortalHeaderProps) {
   const router = useRouter()
+  const pathname = usePathname()
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -21,117 +29,63 @@ export function PortalHeader({ shopName, shopPrefix, userEmail }: PortalHeaderPr
   }
 
   return (
-    <header
-      style={{
-        background: 'var(--surface)',
-        borderBottom: '1.5px solid var(--line)',
-        height: 'var(--topbar-h)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 24px',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <Link href="/portal" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 10,
-              background: '#ffffff',
-              border: '1px solid var(--line)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-            }}
-          >
-            <img src="/logo.png" alt="Cedar" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-          </div>
-          <div>
-            <b style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'block', lineHeight: 1.1 }}>cedar</b>
-            <small style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--brand)' }}>
-              DELIVERY PORTAL
-            </small>
-          </div>
-        </Link>
+    <header className="portal-header">
+      <div className="portal-header-row">
+        <div className="portal-brand-group">
+          <Link href="/portal" className="portal-brand">
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                background: '#ffffff',
+                border: '1px solid var(--line)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+              }}
+            >
+              <img src="/logo.png" alt="Cedar" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
+            <div>
+              <b style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'block', lineHeight: 1.1 }}>cedar</b>
+              <small style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--brand)' }}>
+                DELIVERY PORTAL
+              </small>
+            </div>
+          </Link>
 
-        <span style={{ color: 'var(--line)', fontSize: 18 }}>|</span>
+          <span className="portal-divider" aria-hidden="true" />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 800,
-              fontFamily: 'monospace',
-              padding: '2px 6px',
-              borderRadius: 4,
-              background: 'var(--brand-light)',
-              color: 'var(--brand)',
-              border: '1px solid var(--line)',
-            }}
-          >
-            {shopPrefix}
-          </span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-            {shopName}
-          </span>
+          <div className="portal-shop">
+            <span className="portal-prefix">{shopPrefix}</span>
+            <span className="portal-shop-name" title={shopName}>{shopName}</span>
+          </div>
         </div>
 
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 16 }}>
-          <Link
-            href="/portal"
-            className="btn btn-ghost btn-sm"
-            style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}
-          >
-            Orders
+        <div className="portal-actions">
+          <small className="portal-email">{userEmail}</small>
+          <Link href="/" className="btn btn-secondary btn-sm portal-desk-link" title="Open Cedar Delivery Desk">
+            Delivery Desk
           </Link>
-          <Link
-            href="/portal/prices"
-            className="btn btn-ghost btn-sm"
-            style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}
-          >
-            My Prices
-          </Link>
-          <Link
-            href="/portal/integrations"
-            className="btn btn-ghost btn-sm"
-            style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}
-          >
-            Connect Store
-          </Link>
-        </nav>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ textAlign: 'right' }}>
-          <small style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>{userEmail}</small>
+          <button type="button" onClick={handleSignOut} className="btn btn-ghost btn-sm portal-signout">
+            Sign out
+          </button>
         </div>
-
-        <Link
-          href="/"
-          className="btn btn-secondary btn-sm"
-          style={{ fontSize: 11, padding: '4px 10px', textDecoration: 'none' }}
-          title="Open Cedar Delivery Desk"
-        >
-          Delivery Desk
-        </Link>
-
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="btn btn-ghost btn-sm"
-          style={{ fontSize: 12, color: 'var(--muted)', padding: '4px 8px' }}
-        >
-          Sign out
-        </button>
       </div>
+
+      <nav className="portal-tabs" aria-label="Shop menu">
+        {TABS.map(tab => {
+          const current = tab.href === '/portal' ? pathname === '/portal' : pathname === tab.href || pathname.startsWith(tab.href + '/')
+          return (
+            <Link key={tab.href} href={tab.href} aria-current={current ? 'page' : undefined}>
+              {tab.label}
+            </Link>
+          )
+        })}
+      </nav>
     </header>
   )
 }

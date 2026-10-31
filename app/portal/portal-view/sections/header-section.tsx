@@ -37,7 +37,7 @@ export function HeaderSection() {
           <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--brand)' }}>
             Verified Store Portfolio
           </span>
-          <span style={{ fontSize: 11, color: 'var(--muted)' }}>• Daily Desk Rate: ${formatUSD(1)} = {formatLBP(rate)}</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>• Daily Desk Rate: {formatUSD(1)} = {formatLBP(rate)}</span>
         </div>
         <h1 style={{ fontSize: 24, fontWeight: 900, color: 'var(--text)' }}>
           {shop.name}
