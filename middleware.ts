@@ -56,6 +56,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/cron/') ||
     // The shop API has no browser session: every route checks the API key itself (lib/api-v1.ts)
     path.startsWith('/api/v1/') ||
+    // WooCommerce stores post new orders here; each request is checked against that shop's signing secret
+    path.startsWith('/api/webhooks/woocommerce/') ||
     path === '/driver' ||
     path.startsWith('/driver/') ||
     path.startsWith('/api/driver/') ||

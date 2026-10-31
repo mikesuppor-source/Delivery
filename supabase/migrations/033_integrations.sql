@@ -7,7 +7,9 @@
 --    secret used to sign each message, and a queue of messages with retries. A database trigger queues
 --    them whenever an order changes status, so every path (desk, courier phone, server functions)
 --    is covered without any app code having to remember.
--- 3. orders.external_ref: the shop's own order number, unique per shop, so a shop that sends the same
+-- 3. payout.paid: paying a shop queues a message too (see the end of this file).
+-- 4. shop_woocommerce: the signing secret for a shop's WooCommerce store (see the end of this file).
+-- 5. orders.external_ref: the shop's own order number, unique per shop, so a shop that sends the same
 --    order twice does not get two deliveries.
 --
 -- All three tables are for the server only (row level security on, no access for anon or authenticated).
@@ -152,5 +154,35 @@ grant execute on function public.enqueue_shop_webhook(uuid, text, uuid, jsonb) t
 grant execute on function public.queue_order_webhooks() to service_role;
 grant execute on function public.claim_webhook_deliveries(integer) to service_role;
 grant execute on function public.complete_webhook_delivery(uuid, boolean, integer, text) to service_role;
+
+-- A payment to a shop (a payout) queues "payout.paid". Money collected from a shop (a negative amount) and
+-- courier payments are not announced. Only the amount, the time and the payout run are sent, never the staff note.
+create function public.queue_payout_webhook() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.type = 'shop_payment' and new.shop_id is not null and new.amount_usd > 0 then
+    perform public.enqueue_shop_webhook(new.shop_id, 'payout.paid', null,
+      jsonb_build_object('amountUsd', new.amount_usd, 'paidAt', new.created_at, 'payoutRunId', new.payout_run_id));
+  end if;
+  return new;
+end $$;
+create trigger settlement_payout_webhook after insert on public.settlements
+  for each row execute function public.queue_payout_webhook();
+revoke all on function public.queue_payout_webhook() from public, anon, authenticated;
+grant execute on function public.queue_payout_webhook() to service_role;
+
+-- WooCommerce: a shop's WooCommerce sends each new order to Cedar through its own Webhooks feature. The only thing
+-- kept is the signing secret Cedar made for that shop, which proves a message really came from that store.
+create table public.shop_woocommerce (
+  shop_id uuid primary key references public.shops(id) on delete cascade,
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  secret text not null,
+  enabled boolean not null default true,
+  last_order_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.shop_woocommerce enable row level security;
+revoke all on public.shop_woocommerce from public, anon, authenticated;
+grant all on public.shop_woocommerce to service_role;
 
 commit;

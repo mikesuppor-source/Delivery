@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 interface Key { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null; revokedAt: string | null }
 interface Delivery { id: string; event: string; status: 'pending' | 'delivered' | 'failed'; attempts: number; statusCode: number | null; error: string | null; createdAt: string; nextAttemptAt: string; orderCode: string | null }
-interface Data { keys: Key[]; webhook: { url: string; enabled: boolean } | null; deliveries: Delivery[] }
+interface Data { keys: Key[]; webhook: { url: string; enabled: boolean } | null; woo: { enabled: boolean; lastOrderAt: string | null; deliveryUrl: string } | null; deliveries: Delivery[] }
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'never')
 const STATE: Record<Delivery['status'], string> = { delivered: 'badge badge-delivered', pending: 'badge badge-pending', failed: 'badge badge-failed' }
@@ -15,7 +15,7 @@ export function IntegrationsClient({ shopId }: { shopId: string }) {
   const [busy, setBusy] = useState(false)
   const [keyName, setKeyName] = useState('')
   const [url, setUrl] = useState('')
-  const [shown, setShown] = useState<{ title: string; value: string } | null>(null)
+  const [shown, setShown] = useState<{ title: string; value: string; extra?: { label: string; value: string } } | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch('/api/portal/integrations?shopId=' + shopId, { cache: 'no-store' })
@@ -48,6 +48,7 @@ export function IntegrationsClient({ shopId }: { shopId: string }) {
           <strong>{shown.title}</strong>
           <p style={{ margin: '6px 0', fontSize: 13, color: 'var(--muted)' }}>Copy it now and keep it safe. For your security it is shown only this once and cannot be shown again.</p>
           <code data-testid="secret-value" style={{ display: 'block', padding: 10, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 6, wordBreak: 'break-all', userSelect: 'all' }}>{shown.value}</code>
+          {shown.extra && <p style={{ margin: '10px 0 4px', fontSize: 13 }}>{shown.extra.label}: <code data-testid="secret-extra" style={{ wordBreak: 'break-all' }}>{shown.extra.value}</code></p>}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard?.writeText(shown.value)}>Copy</button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShown(null)}>I have saved it</button>
@@ -108,6 +109,28 @@ export function IntegrationsClient({ shopId }: { shopId: string }) {
             <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => { if (confirm('Remove the webhook?')) act({ action: 'removeWebhook' }, () => setUrl('')) }}>Remove</button>
           </div>
         )}
+      </section>
+
+      <section className="panel" style={{ padding: 18 }} aria-labelledby="woo-title">
+        <h2 id="woo-title" style={{ margin: '0 0 4px', fontSize: 17 }}>WooCommerce</h2>
+        <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--muted)' }}>Have each new order from your WooCommerce store arrive in Cedar by itself. Cedar keeps no login to your store, only a signing secret that proves a message came from it.</p>
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => {
+          if (data?.woo && !confirm('Connect again? This makes a new secret, and your store must be updated with it.')) return
+          act({ action: 'connectWoo' }, b => setShown({ title: 'Your WooCommerce signing secret', value: b.secret, extra: { label: 'Delivery URL', value: b.deliveryUrl } }))
+        }}>{data?.woo ? 'New secret' : 'Connect WooCommerce'}</button>
+        {data?.woo && (
+          <div data-testid="woo-connected" style={{ marginTop: 14 }}>
+            <p style={{ margin: '0 0 6px', fontSize: 13 }}><span className="badge badge-delivered">Connected</span> Last order received: {when(data.woo.lastOrderAt)}</p>
+            <p style={{ margin: '0 0 6px', fontSize: 13 }}>Delivery URL: <code style={{ wordBreak: 'break-all' }}>{data.woo.deliveryUrl}</code></p>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => { if (confirm('Disconnect WooCommerce? New orders will stop arriving.')) act({ action: 'disconnectWoo' }) }}>Disconnect</button>
+          </div>
+        )}
+        <ol style={{ margin: '14px 0 0', paddingInlineStart: 20, fontSize: 13, lineHeight: 1.7, color: 'var(--muted)' }}>
+          <li>Press <strong>Connect WooCommerce</strong> and copy the secret and the delivery URL. They are shown only once.</li>
+          <li>In your WordPress admin open <strong>WooCommerce → Settings → Advanced → Webhooks → Add webhook</strong>.</li>
+          <li>Name: Cedar. Status: Active. Topic: <strong>Order created</strong>. Delivery URL and Secret: the two you copied. API version: WP REST API Integration v3.</li>
+          <li>Save. New orders paid by cash on delivery are made in Cedar with the cash to collect; orders already paid online are made with nothing to collect.</li>
+        </ol>
       </section>
 
       <section className="panel" style={{ padding: 18 }} aria-labelledby="log-title">

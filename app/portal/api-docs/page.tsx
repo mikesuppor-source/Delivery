@@ -101,7 +101,7 @@ export default async function ApiDocsPage() {
         <section className="panel" style={{ padding: 18 }}>
           <h2 style={{ marginTop: 0, fontSize: 17 }}>Webhook messages</h2>
           <p style={{ fontSize: 14, marginTop: 0 }}>
-            Cedar sends <code>order.status_changed</code> for every change, plus <code>order.delivered</code> and <code>order.returned</code>.
+            Cedar sends <code>order.status_changed</code> for every change, plus <code>order.delivered</code> and <code>order.returned</code>, and <code>payout.paid</code> when Cedar pays your shop (with <code>amountUsd</code>, <code>paidAt</code> and <code>payoutRunId</code>).
             Answer with any 2xx status within 10 seconds. If you do not, Cedar tries again after 1 minute, 5, 15, 60, 3 hours, 6, 12 and 24 hours.
             The same message can arrive twice: use its <code>id</code> to ignore repeats. Every message carries the header <code>X-Cedar-Signature: t=&lt;unix seconds&gt;,v1=&lt;hex&gt;</code>, where <code>v1</code> is the HMAC-SHA256 of <code>&lt;t&gt;.&lt;exact body&gt;</code> made with your webhook signing secret. Check it before you act on a message:
           </p>

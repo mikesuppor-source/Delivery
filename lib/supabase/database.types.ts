@@ -856,6 +856,18 @@ isOneToOne: false
                     "attempts"?: number,"created_at"?: string,"delivered_at"?: string | null,"event"?: string,"id"?: string,"last_error"?: string | null,"last_status_code"?: number | null,"next_attempt_at"?: string,"order_id"?: string | null,"payload"?: Json,"shop_id"?: string,"status"?: string,"workspace_id"?: string
                   }
                   Relationships: []
+                },"shop_woocommerce": {
+                  Row: {
+                    "created_at": string,"enabled": boolean,"last_order_at": string | null,"secret": string,"shop_id": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"enabled"?: boolean,"last_order_at"?: string | null,"secret": string,"shop_id": string,"workspace_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"enabled"?: boolean,"last_order_at"?: string | null,"secret"?: string,"shop_id"?: string,"workspace_id"?: string
+                  }
+                  Relationships: []
                 },"shop_integrations": {
                   Row: {
                     "access_token": string | null,"api_key": string,"shop_id": string,"updated_at": string

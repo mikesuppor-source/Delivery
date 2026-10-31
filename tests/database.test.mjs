@@ -933,7 +933,7 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
 
   // ─── Integrations (migration 033): shop API keys, webhooks, order references ──────────────────────────
   await t.test('integrations: API keys and webhook tables are server-only', async () => {
-    for (const table of ['shop_api_keys', 'shop_webhooks', 'webhook_deliveries']) {
+    for (const table of ['shop_api_keys', 'shop_webhooks', 'webhook_deliveries', 'shop_woocommerce']) {
       for (const role of ['anon', 'authenticated']) {
         await db.exec(`set role ${role}`)
         try { await assert.rejects(db.query(`select * from ${table}`), /permission denied/, `${role} reads ${table}`) } finally { await db.exec('reset role') }
@@ -997,6 +997,27 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     await db.exec('set role service_role')
     try { assert.equal((await db.query('select * from claim_webhook_deliveries(10)')).rows.length, 0) } finally { await db.exec('reset role') }
     assert.equal(Number((await db.query("select count(*) from webhook_deliveries where status = 'pending' and event = 'order.returned'")).rows[0].count), 0)
+  })
+
+  await t.test('integrations: paying a shop queues a payout.paid webhook, other settlements do not', async () => {
+    const payouts = async () => (await db.query("select payload from webhook_deliveries where shop_id = $1 and event = 'payout.paid' order by created_at", [shop])).rows.map(r => r.payload)
+    await db.query("insert into shop_webhooks(shop_id,workspace_id,url,secret) values($1,$2,'https://hooks.example.test/payout','s3cret2') on conflict (shop_id) do update set enabled = true, url = excluded.url", [shop, a])
+    const pay = (type, shopId, driverId, amount) => db.query('insert into settlements(workspace_id,type,amount_usd,amount_lbp,usd_to_lbp,shop_id,driver_id) values($1,$2,$3,0,100000,$4,$5)', [a, type, amount, shopId, driverId])
+    const before = (await payouts()).length
+    await pay('shop_payment', shop, null, 42.5)
+    const after = await payouts()
+    assert.equal(after.length, before + 1)
+    assert.equal(Number(after[after.length - 1].amountUsd), 42.5)
+    assert.ok(after[after.length - 1].paidAt)
+    assert.equal(JSON.stringify(after).includes('s3cret2'), false)
+    await pay('shop_payment', shop, null, -5) // money collected from the shop, not paid to it
+    await db.query('update drivers set pay_owed_usd = 50 where id = $1', [drv])
+    await pay('driver_pay', null, drv, 10) // a courier payment is not the shop's business
+    assert.equal((await payouts()).length, before + 1)
+    // Another shop with no webhook queues nothing
+    await db.query("insert into shops(id,workspace_id,name) values($1,$2,'Quiet shop')", [id(5003), a])
+    await pay('shop_payment', id(5003), null, 7)
+    assert.equal((await db.query("select count(*) from webhook_deliveries where shop_id = $1", [id(5003)])).rows[0].count == 0, true)
   })
 
   await t.test('every table has row level security, and courier push sign-ups are for the server only', async () => {

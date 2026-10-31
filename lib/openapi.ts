@@ -111,7 +111,7 @@ export const openApiDocument = {
         summary: 'Order events sent to your webhook address',
         description:
           'Set your webhook address in the portal under Connect Store. Cedar sends a POST with a JSON body {id, event, createdAt, data} whenever one of your orders changes status. ' +
-          'Events: order.status_changed (every change), order.delivered, order.returned. ' +
+          'Events: order.status_changed (every change), order.delivered, order.returned, and payout.paid (a payout to your shop; data holds amountUsd, paidAt and payoutRunId). ' +
           'Every message has the header X-Cedar-Signature: t=<unix seconds>,v1=<hex>. v1 is HMAC-SHA256, using your webhook signing secret, of the text "<t>.<exact request body>". ' +
           'Check it, and reject a message whose t is more than 5 minutes old. Answer with any 2xx status to confirm. Any other answer, or no answer within 10 seconds, is tried again after 1 minute, 5, 15, 60, 3 hours, 6, 12 and 24 hours, then dropped. ' +
           'The same message can arrive twice, so use the id to ignore repeats.',
@@ -159,7 +159,7 @@ export const openApiDocument = {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid', description: 'Unique per message; use it to ignore repeats' },
-          event: { type: 'string', enum: ['order.status_changed', 'order.delivered', 'order.returned'] },
+          event: { type: 'string', enum: ['order.status_changed', 'order.delivered', 'order.returned', 'payout.paid'] },
           createdAt: { type: 'string', format: 'date-time' },
           data: {
             type: 'object',
@@ -168,6 +168,7 @@ export const openApiDocument = {
               externalReference: { type: ['string', 'null'], description: 'Your reference from when the order was created' },
               changedAt: { type: 'string', format: 'date-time' },
               collectedUsd: { type: ['number', 'null'], description: 'Only on order.delivered' }, collectedLbp: { type: ['number', 'null'], description: 'Only on order.delivered' },
+              amountUsd: { type: 'number', description: 'Only on payout.paid: the amount paid to your shop' }, paidAt: { type: 'string', format: 'date-time', description: 'Only on payout.paid' }, payoutRunId: { type: ['string', 'null'], description: 'Only on payout.paid' },
             },
           },
         },

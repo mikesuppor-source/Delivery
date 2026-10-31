@@ -5,11 +5,18 @@ import { shopAccess } from '@/lib/access'
 import { generateApiKey } from '@/lib/api-keys'
 import { parseBody, id, requiredText, z } from '@/lib/validation'
 import { allowLocalWebhooks, validateWebhookUrl } from '@/lib/webhook-url'
+import { siteUrl } from '@/lib/shopify-security'
 
 export const dynamic = 'force-dynamic'
 
 const MAX_ACTIVE_KEYS = 5
 const newSecret = () => 'whsec_' + randomBytes(24).toString('hex')
+/** Where a shop's WooCommerce should send new orders. */
+const wooUrl = (req: Request, shopId: string) => {
+  let base: string
+  try { base = siteUrl() } catch { base = new URL(req.url).origin }
+  return `${base}/api/webhooks/woocommerce/${shopId}`
+}
 
 const Action = z.discriminatedUnion('action', [
   z.object({ action: z.literal('createKey'), shopId: id.optional(), name: requiredText(80) }),
@@ -17,18 +24,22 @@ const Action = z.discriminatedUnion('action', [
   z.object({ action: z.literal('saveWebhook'), shopId: id.optional(), url: z.string().max(500), enabled: z.boolean().optional() }),
   z.object({ action: z.literal('rotateSecret'), shopId: id.optional() }),
   z.object({ action: z.literal('removeWebhook'), shopId: id.optional() }),
+  z.object({ action: z.literal('connectWoo'), shopId: id.optional() }),
+  z.object({ action: z.literal('disconnectWoo'), shopId: id.optional() }),
 ])
 
 /** GET /api/portal/integrations: this shop's API keys (never the keys themselves), webhook setting and recent messages. */
 export const GET = api(async req => {
   const { db, shop } = await shopAccess(new URL(req.url).searchParams.get('shopId'))
-  const [keys, webhook, deliveries] = await Promise.all([
+  const [keys, webhook, deliveries, woo] = await Promise.all([
     db.from('shop_api_keys').select('id, name, key_prefix, created_at, last_used_at, revoked_at').eq('shop_id', shop.id).order('created_at', { ascending: false }),
     db.from('shop_webhooks').select('url, enabled, created_at, updated_at').eq('shop_id', shop.id).maybeSingle(),
     db.from('webhook_deliveries').select('id, event, status, attempts, last_status_code, last_error, created_at, delivered_at, next_attempt_at, payload').eq('shop_id', shop.id).order('created_at', { ascending: false }).limit(30),
+    db.from('shop_woocommerce').select('enabled, last_order_at').eq('shop_id', shop.id).maybeSingle(),
   ])
   return NextResponse.json({
     keys: (keys.data ?? []).map(k => ({ id: k.id, name: k.name, prefix: k.key_prefix, createdAt: k.created_at, lastUsedAt: k.last_used_at, revokedAt: k.revoked_at })),
+    woo: woo.data ? { enabled: woo.data.enabled, lastOrderAt: woo.data.last_order_at, deliveryUrl: wooUrl(req, shop.id) } : null,
     webhook: webhook.data ? { url: webhook.data.url, enabled: webhook.data.enabled, updatedAt: webhook.data.updated_at } : null,
     deliveries: (deliveries.data ?? []).map(d => ({
       id: d.id, event: d.event, status: d.status, attempts: d.attempts, statusCode: d.last_status_code, error: d.last_error,
@@ -74,6 +85,18 @@ export const POST = api(async req => {
     const secret = newSecret()
     checked(await db.from('shop_webhooks').update({ secret, updated_at: new Date().toISOString() }).eq('shop_id', shop.id).select('shop_id').maybeSingle())
     return NextResponse.json({ secret })
+  }
+
+  if (body.action === 'connectWoo') {
+    // A new secret each time: connecting again replaces the old one, so a store holding the old secret stops being accepted
+    const secret = newSecret()
+    checked(await db.from('shop_woocommerce').upsert({ shop_id: shop.id, workspace_id: shop.workspace_id, secret, enabled: true }, { onConflict: 'shop_id' }).select('shop_id').single())
+    return NextResponse.json({ secret, deliveryUrl: wooUrl(req, shop.id) }, { status: 201 })
+  }
+
+  if (body.action === 'disconnectWoo') {
+    await db.from('shop_woocommerce').delete().eq('shop_id', shop.id)
+    return NextResponse.json({ removed: true })
   }
 
   await db.from('shop_webhooks').delete().eq('shop_id', shop.id)
