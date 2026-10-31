@@ -1,6 +1,6 @@
 # Cedar Delivery Desk: handover and pending list
 
-Written 2026-10-30 for the next person or AI. Read this first, then `docs/BUILD_PLAN.md` (the full product plan and the rules).
+Written 2026-10-30, updated 2026-10-31, for the next person or AI. Read this first, then `docs/BUILD_PLAN.md` (the full product plan and the rules).
 This file holds no secrets and must never get any: the repository is public.
 
 ## 1. What this is
@@ -17,9 +17,10 @@ Stack: Next.js 15, React 19, Supabase (Postgres, Auth, Storage), Vercel. The own
 | Live database | Supabase project `supabase-erin-nest`, ref `uzembxddgpwiibgxnigd` |
 | Test database | Supabase project `cedar-staging`, ref `mkqtxqkivtouucrtfgyz` (used by Vercel preview deployments) |
 | Local test stack | Docker Desktop, Supabase CLI project `cedar` (API on port 64321). Its database is out of step with the migrations (see section 8) |
+| Webhook sender | `.github/workflows/webhooks.yml`, every 5 minutes, calls `/api/cron/webhooks` with the GitHub secret `CRON_SECRET` (must equal Vercel Production's `CRON_SECRET`). A green run whose step "Run the webhook job" says skipped means the secret is missing |
 | Nightly backup | `.github/workflows/backup.yml`, 01:00 UTC, encrypted, kept 30 days as workflow artifacts: job `backup` (database) and job `storage` (files, see section 6B.1) |
 
-Live state on 2026-10-30: migrations 001 to 031 applied on both live and test databases; `main` is at the commit that holds the courier access fix.
+Live state on 2026-10-31: migrations 001 to 033 applied on both live and test databases, and `main` holds the Phase 7 code (merchant API, webhooks, WooCommerce).
 
 ## 3. How to work here (rules that were followed and must continue)
 
@@ -27,7 +28,7 @@ Live state on 2026-10-30: migrations 001 to 031 applied on both live and test da
 2. Never print, paste or store secret values. Never ask for passwords in chat. If the owner pastes a secret anyway, use it only for what they asked, never repeat it, and tell them to replace it.
 3. One branch per change. Checks before shipping: `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:db`, `npm run build`, and the browser tests (`npm run test:e2e`, needs Docker; GitHub runs them on every push).
 4. Shipping route used so far: push the branch, wait for GitHub's `Verify` run (jobs `check` and `e2e`) to be green, then fast-forward `main` with `git push origin <sha>:refs/heads/main` (no force). Vercel then builds production in about 3 minutes. Confirm by comparing the deployment id the live address points to (`npx vercel inspect delivery-five-roan.vercel.app`, output is on stderr, capture with `2>&1`).
-5. Database changes are new numbered files in `supabase/migrations/`. Never edit 001 to 031. Every `security definer` function must be revoked from `public, anon, authenticated` and granted to `service_role` unless it checks the caller itself. A test enforces this.
+5. Database changes are new numbered files in `supabase/migrations/`. Never edit 001 to 033. Every `security definer` function must be revoked from `public, anon, authenticated` and granted to `service_role` unless it checks the caller itself. A test enforces this.
 6. Never write a key, token or password in code, not even as a fallback. A test enforces this.
 7. Keep line endings as each file has them (some files are CRLF, most are LF).
 8. Verify what you claim: prove a bug with a failing test first, then fix, then show it passing. Real checks beat assumptions (for example the sign-in redirect test in section 6).
@@ -46,6 +47,8 @@ Live state on 2026-10-30: migrations 001 to 031 applied on both live and test da
 
 - Phases 1 to 6 of `docs/BUILD_PLAN.md`: pricing and profit report, design foundation, warehouse, dispatch, customer experience, finance (payout runs, courier pay, expenses with receipts, P&L, shop statements as PDF in English and Arabic, emailing statements, weekly bonus cron).
 - Security fixes: server-only database functions closed to the public (migration 031), courier push signing key moved out of the code into Vercel settings (new keys stored for Production and Preview), push registrations table protected.
+- Phase 7 (integrations), live since 2026-10-31: merchant REST API under `/api/v1` (create, list, track and cancel orders, list zones; per-shop API keys stored only as a hash and shown once; 120 requests a minute per key), OpenAPI document at `/api/v1/openapi.json` and a docs page at `/portal/api-docs`, signed webhooks to shops (`order.status_changed`, `order.delivered`, `order.returned`, `payout.paid`; header `X-Cedar-Signature: t=<unix>,v1=<hex>` = HMAC-SHA256 of `<t>.<body>`; queue table with up to 8 tries over about a day; sent by the 5-minute GitHub job; unsafe addresses refused), WooCommerce import through WooCommerce's own webhooks (Cedar keeps only a signing secret, no store login), and the portal page `/portal/integrations` for all of it. Migration 033.
+- Migration 032: execute rights on every trigger function revoked from the public; two functions got a fixed search path.
 - Waybill printing from the desk prints only the receipt (opens the print page).
 - Courier access: blocking a courier or resetting a PIN signs the open courier screen out; Block / Unblock button in the courier profile.
 - Supabase sign-in web address: Site URL and redirect list set to the live address.
@@ -67,16 +70,19 @@ Live state on 2026-10-30: migrations 001 to 031 applied on both live and test da
 ### B. Engineering work for an AI
 
 1. **Storage files backup: live and verified 2026-10-30.** `backup.yml` has a second job `storage` that runs `scripts/backup-storage.mjs` (copies every file of every bucket plus a `manifest.json` with size and SHA-256, fails if any file cannot be copied), encrypts it like the database dump and keeps it 30 days as artifact `cedar-storage-<run id>`. `scripts/restore-storage.mjs` puts a backup back (recreates missing buckets as they were, checks every file against the manifest before and after upload, never overwrites a different file, refuses a `--target` that does not match the URL). GitHub secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set; run 41129267083 made `cedar-storage-41129267083` (154 KB, step "Copy files and encrypt" green). Restore practised once: a live backup (2 proof files) was restored into the test project `cedar-staging` with read-back checks and no problems. Lesson: a missing secret makes the job skip itself and the run still shows green; the first attempt skipped because `SUPABASE_URL` had not been added. **Still to do:** repeat the restore practice monthly (download the artifact, decrypt, run the restore script with `--target=mkqtxqkivtouucrtfgyz` and the test project's own URL and key; commands are at the top of `backup.yml`). A restore of the database dump has never been tried.
-2. **Phase 7 (integrations):** merchant REST API under `/api/v1` with hashed API keys, OpenAPI document, signed webhooks with retries, WooCommerce import. Nothing exists yet. See `docs/BUILD_PLAN.md` section 5, Phase 7.
+2. **Phase 7 (integrations): done and live 2026-10-31.** Not yet tried by a real shop or a real WooCommerce store: have one shop make a key, place a test order through the API and receive a test webhook. Tests: `tests/integrations.test.ts`, `webhooks.test.ts`, `woocommerce.test.ts`, `tests/e2e/shop-api.spec.ts`, `portal-integrations.spec.ts`, `woocommerce.spec.ts` (they need `CRON_SECRET` and `WEBHOOK_ALLOW_LOCAL=1`; CI sets both). Webhook addresses on localhost are allowed only when that flag is set and the database address is also localhost. Not built: a WooCommerce plugin (the store uses its own built-in webhooks) and per-key permissions (every key can do everything for its shop).
 3. **Phase 8 (selling to other delivery companies):** plans and billing, super-admin console, detailed permissions, onboarding wizard, branding and custom domains, Sentry, `/api/health` uptime route, terms and privacy pages, data export and deletion. Nothing exists yet.
 4. **Invoices (plan item 6.6, optional):** not built, rules unclear; ask the owner first.
 5. **Arabic:** most older screens have no Arabic yet; the finance screens and statements do.
 6. **Desk top bar** overflows at phone width on every page.
-7. **Tidy-ups:** Supabase's checker still warns about trigger functions executable by anon, mutable search paths on two functions; revoking execute on trigger functions is safe (Postgres checks it only when a trigger is created) but test first. Delete the unused `POSTGRES_*` variables on Vercel only if the owner agrees.
+7. **Tidy-ups:** the trigger-function warnings were closed by migration 032; the checker now shows only the three intended functions and leaked-password protection. Delete the unused `POSTGRES_*` variables on Vercel only if the owner agrees.
 8. **Not audited this session:** Phases 1 to 5 were not re-checked line by line against the plan; earlier notes say they are built and tested.
 
 ## 7. Lessons that cost time
 
+- The webhook job behaves the same way: with `CRON_SECRET` missing on GitHub the run is green but its step "Run the webhook job" is skipped. Vercel hides a secret's value, so if the GitHub copy is lost, make a new value and set it in both places (then redeploy production so Vercel uses it).
+- A branch cut from an older `origin/main` is not a fast-forward once `main` moves: cherry-pick onto a fresh branch from `origin/main` and wait for green checks on the new commit.
+- On Windows, Docker Desktop may reserve ports 64309 to 64408 after a restart; the local test stack was then moved to ports 55320 to 55329 by an uncommitted edit of `supabase/config.toml` (never commit that file).
 - A green backup run does not prove a copy was made: the job skips itself when secrets are missing. Check the step "Dump and encrypt" and the artifact.
 - `pg_stat_user_tables` row estimates can read 0 on a database with data; count exactly before deleting or resetting anything.
 - Vercel's CLI prints its tables on stderr. Suppressing stderr hides everything.

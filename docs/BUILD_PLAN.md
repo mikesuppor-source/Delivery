@@ -146,7 +146,7 @@ Branch **`feature/zone-pricing`** contains the uncommitted file **`supabase/migr
 
 ### 3.2 Database migrations
 - New migration per change: `supabase/migrations/0NN_short_name.sql`, wrapped in `begin; ... commit;`.
-- **Never edit a migration that is already applied to production** (001 to 030). Add a new one.
+- **Never edit a migration that is already applied to production** (001 to 033). Add a new one.
 - Make migrations safe to re-run: `if not exists`, `drop policy if exists`, `exception when duplicate_object`.
 - Functions that use `gen_salt`, `crypt` or `gen_random_bytes` need `set search_path = public, extensions`.
 - Every `security definer` function is for the server only, unless it checks the caller's role itself (like `profit_report`): `revoke all on function ... from public, anon, authenticated;` then `grant execute on function ... to service_role;`. Supabase otherwise lets anyone call it from the internet with the public site key. Migration 031 closed the ones in 024 to 026 that missed this, and `tests/database.test.mjs` fails if one is open to signed-out visitors.
@@ -603,6 +603,8 @@ Optional invoice per shop per month for delivery fees when the shop pays fees se
 
 ### PHASE 7: Integrations and merchant API
 
+> **Status: built and live (2026-10-31), migration 033.** How it differs from the text below: keys live in a new table `shop_api_keys` (hash only), not in `shop_integrations.api_key`; `/api/v1` is rate limited to 120 requests a minute per key; webhooks are queued by database triggers and sent by `.github/workflows/webhooks.yml` every 5 minutes (needs the GitHub secret `CRON_SECRET`); retries run up to 8 times over about a day; WooCommerce is connected through WooCommerce's own webhooks, so Cedar keeps no store keys, only a signing secret per shop (`shop_woocommerce`), and orders are made by the shared `lib/import-orders.ts`; the portal pages are `/portal/integrations` and `/portal/api-docs`.
+
 #### 7.1 Merchant API (REST)
 - API keys per shop. Use the existing `shop_integrations.api_key` field, but **store only a hash** (sha256) and show the key once on creation, like courier PINs.
 - Endpoints under `/api/v1/` (authenticated by `Authorization: Bearer <key>`, rate limited):
@@ -729,7 +731,7 @@ These are done by the owner in the provider dashboards. The AI must not do them 
 
 - Don't rewrite working modules "to clean up" outside the current phase.
 - Don't change the money triggers' logic without a database test showing old orders keep their balances.
-- Don't edit migrations 001 to 030.
+- Don't edit migrations 001 to 033.
 - Don't store prices only in the frontend or compute balances in the app.
 - Don't add a new UI library or CSS framework; extend `components/ui`.
 - Don't use the Supabase service role key in browser code.
