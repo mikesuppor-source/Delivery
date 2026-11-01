@@ -394,14 +394,14 @@ isOneToOne: false
                   ]
                 },"message_log": {
                   Row: {
-                    "body": string | null,"channel": string,"created_at": string,"error": string | null,"id": string,"order_id": string | null,"sent_at": string | null,"status": string,"template": string,"to_phone": string,"workspace_id": string
+                    "body": string | null,"channel": string,"created_at": string,"error": string | null,"id": string,"order_id": string | null,"sent_at": string | null,"status": string,"template": string,"to_phone": string,"workspace_id": string,"provider_message_id": string | null,"direction": string,"delivered_at": string | null,"read_at": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "body"?: string | null,"channel": string,"created_at"?: string,"error"?: string | null,"id"?: string,"order_id"?: string | null,"sent_at"?: string | null,"status"?: string,"template": string,"to_phone": string,"workspace_id": string
+                    "body"?: string | null,"channel": string,"created_at"?: string,"error"?: string | null,"id"?: string,"order_id"?: string | null,"sent_at"?: string | null,"status"?: string,"template": string,"to_phone": string,"workspace_id": string,"provider_message_id"?: string | null,"direction"?: string,"delivered_at"?: string | null,"read_at"?: string | null
                   }
                   Update: {
-                    "body"?: string | null,"channel"?: string,"created_at"?: string,"error"?: string | null,"id"?: string,"order_id"?: string | null,"sent_at"?: string | null,"status"?: string,"template"?: string,"to_phone"?: string,"workspace_id"?: string
+                    "body"?: string | null,"channel"?: string,"created_at"?: string,"error"?: string | null,"id"?: string,"order_id"?: string | null,"sent_at"?: string | null,"status"?: string,"template"?: string,"to_phone"?: string,"workspace_id"?: string,"provider_message_id"?: string | null,"direction"?: string,"delivered_at"?: string | null,"read_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -878,6 +878,18 @@ isOneToOne: false
                   }
                   Update: {
                     "attempts"?: number,"created_at"?: string,"dedupe_key"?: string,"finished_at"?: string | null,"id"?: string,"last_error"?: string | null,"next_attempt_at"?: string,"order_id"?: string,"status"?: string,"template"?: string,"workspace_id"?: string
+                  }
+                  Relationships: []
+                },"customer_opt_outs": {
+                  Row: {
+                    "created_at": string,"phone": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"phone": string,"workspace_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"phone"?: string,"workspace_id"?: string
                   }
                   Relationships: []
                 },"shop_integrations": {

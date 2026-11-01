@@ -1,6 +1,7 @@
 import { createServiceClient } from './supabase/server'
 import { cleanPhone, formatLebanesePhone } from './phone'
 import { META_TEMPLATES, templateMessage } from './whatsapp-templates'
+import { phoneKey } from './whatsapp-webhook'
 
 export type MessageChannel = 'whatsapp' | 'sms' | 'system'
 export type MessageTemplate = 'order_created' | 'out_for_delivery' | 'delivered' | 'failed_attempt' | 'held'
@@ -125,6 +126,12 @@ export async function dispatchCustomerNotification(payload: MessagePayload): Pro
     return { success: true, skipped: true }
   }
 
+  // A customer who replied STOP is never messaged again until they reply START
+  const { data: optedOut } = await db.from('customer_opt_outs').select('phone').eq('workspace_id', payload.workspaceId).eq('phone', phoneKey(payload.toPhone)).maybeSingle()
+  if (optedOut) {
+    return { success: true, skipped: true }
+  }
+
   const token = ws?.whatsapp_cloud_token || process.env.WHATSAPP_API_TOKEN
   const phoneId = ws?.whatsapp_phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID
 
@@ -148,6 +155,8 @@ export async function dispatchCustomerNotification(payload: MessagePayload): Pro
       p_error: result.error || undefined,
     })
 
+    // WhatsApp's own id lets its delivery receipts find this message later
+    if (logId && result.id) await db.from('message_log').update({ provider_message_id: result.id }).eq('id', logId)
     return { success: result.success, logId: logId || undefined, error: result.error }
   } catch (err: unknown) {
     console.warn('Could not log customer message:', err)

@@ -58,6 +58,11 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/v1/') ||
     // WooCommerce stores post new orders here; each request is checked against that shop's signing secret
     path.startsWith('/api/webhooks/woocommerce/') ||
+    // Meta posts WhatsApp delivery receipts and replies here; the GET check and every POST are verified inside the route
+    path === '/api/webhooks/whatsapp' ||
+    // Public pages Meta and customers must be able to read
+    path === '/privacy' ||
+    path === '/terms' ||
     path === '/driver' ||
     path.startsWith('/driver/') ||
     path.startsWith('/api/driver/') ||

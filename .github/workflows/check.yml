@@ -42,6 +42,9 @@ jobs:
        # The webhook test calls the cron route and receives on this machine; both settings are for this throwaway stack only
        echo "CRON_SECRET=$(openssl rand -hex 24)"
        echo "WEBHOOK_ALLOW_LOCAL=1"
+       # The WhatsApp webhook test signs its own messages with these; throwaway values for this stack only
+       echo "WHATSAPP_VERIFY_TOKEN=$(openssl rand -hex 16)"
+       echo "WHATSAPP_APP_SECRET=$(openssl rand -hex 32)"
       } >> "$GITHUB_ENV"
    - run: node scripts/seed-local.mjs
    - run: npx playwright install --with-deps chromium

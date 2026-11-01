@@ -1078,6 +1078,24 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     } finally { await db.exec('reset role') }
   })
 
+  // ─── WhatsApp receipts and opt-outs (migration 035) ──────────────────────────
+  await t.test('whatsapp status: opt-outs are server-only and unique, and the message log takes receipts and replies', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`)
+      try { await assert.rejects(db.query('select * from customer_opt_outs'), /permission denied/, `${role} reads opt-outs`) } finally { await db.exec('reset role') }
+    }
+    await db.query("insert into customer_opt_outs(workspace_id,phone) values($1,'96171123456')", [a])
+    await assert.rejects(db.query("insert into customer_opt_outs(workspace_id,phone) values($1,'96171123456')", [a]), /duplicate/, 'one opt-out per number and company')
+    await assert.rejects(db.query("insert into customer_opt_outs(workspace_id,phone) values($1,'+961 71 123 456')", [a]), /check/, 'only digits with the country code are stored')
+    await db.query("insert into customer_opt_outs(workspace_id,phone) values($1,'96171123456')", [b]) // another company is separate
+    const log = (status, extra = '') => db.query(`insert into message_log(workspace_id,channel,template,to_phone,status,provider_message_id${extra ? ',direction' : ''}) values($1,'whatsapp','delivered','+961 71 123 456',$2,$3${extra ? ",'in'" : ''})`, [a, status, 'wamid.' + status + Math.random()])
+    for (const status of ['pending', 'sent', 'delivered', 'read', 'failed']) await log(status)
+    await log('received', 'in')
+    await assert.rejects(log('bogus'), /check/, 'unknown message states are refused')
+    const row = (await db.query("select direction, delivered_at, read_at from message_log where status = 'received'")).rows[0]
+    assert.equal(row.direction, 'in'); assert.equal(row.delivered_at, null); assert.equal(row.read_at, null)
+  })
+
   await t.test('every table has row level security, and courier push sign-ups are for the server only', async () => {
     const bare = (await db.query(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1`)).rows.map(r => r.relname)
