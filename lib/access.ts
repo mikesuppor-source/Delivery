@@ -66,3 +66,33 @@ export async function validateReferences(db: ReturnType<typeof createServiceClie
     if (!data) throw new ApiError(400, 'Invalid ' + table + ' reference for this workspace')
   }
 }
+
+/**
+ * Who is calling a route that couriers and staff both use: a courier signed in on a phone (a valid, current session) or a
+ * signed-in user. A cookie that merely exists proves nothing: the session is checked here.
+ */
+export async function callerOf() {
+  const db = createServiceClient()
+  const driverId = await sessionDriverId(db)
+  if (driverId) return { db, driverId, user: null as User | null }
+  const user = await createClient().then(client => client.auth.getUser()).then(({ data }) => data?.user || null).catch(() => null)
+  if (!user) throw new ApiError(401, 'Please sign in')
+  return { db, driverId: null as string | null, user }
+}
+
+/**
+ * Work on one order as its courier, as that courier's own staff login, or as an owner or manager of the order's company.
+ * The courier recorded is never taken from the request: it is the order's own courier.
+ */
+export async function orderCourierAccess(orderId: unknown) {
+  const caller = await callerOf()
+  const { db } = caller
+  const order = checked(await db.from('orders').select('id, workspace_id, shop_id, driver_id, status').eq('id', uuid(orderId, 'order ID')).maybeSingle())
+  if (caller.driverId) {
+    if (order.driver_id !== caller.driverId) throw new ApiError(403, 'This order is not assigned to you')
+    return { ...caller, order }
+  }
+  const { data: courier } = order.driver_id ? await db.from('drivers').select('user_id').eq('id', order.driver_id).maybeSingle() : { data: null }
+  if (courier?.user_id !== caller.user!.id) await workspaceAccess(order.workspace_id, ['owner', 'manager'], caller.user!)
+  return { ...caller, order }
+}

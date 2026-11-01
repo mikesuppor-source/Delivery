@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { api, ApiError } from '@/lib/api'
-import { createServiceClient } from '@/lib/supabase/server'
+import { callerOf, driverAccess, shopAccess, validateReferences, workspaceAccess } from '@/lib/access'
 import { savePod } from '@/lib/pod'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -13,7 +13,10 @@ export const GET = api(async req => {
   const driverId = url.searchParams.get('driverId')
   const status = url.searchParams.get('status')
 
-  const db = createServiceClient()
+  // Couriers see their own pickups, a shop sees its own, and owners and managers see their company's
+  const access = driverId ? await driverAccess(driverId) : shopId ? await shopAccess(shopId) : workspaceId ? await workspaceAccess(workspaceId) : null
+  if (!access) throw new ApiError(400, 'workspaceId, shopId or driverId is required')
+  const { db } = access
 
   // Query pickups
   let query = db
@@ -52,7 +55,9 @@ export const POST = api(async req => {
   if (!shopId) throw new ApiError(400, 'shopId is required')
   if (Number(parcelCount) < 1) throw new ApiError(400, 'parcelCount must be at least 1')
 
-  const db = createServiceClient()
+  // The shop's own login, or an owner or manager of its company
+  const { db, shop: owned } = await shopAccess(shopId)
+  if (owned.workspace_id !== workspaceId) throw new ApiError(404, 'Shop not found in this workspace')
 
   // Verify shop belongs to workspace
   const { data: shop, error: shopErr } = await db
@@ -91,7 +96,8 @@ export const PATCH = api(async req => {
 
   if (!pickupId) throw new ApiError(400, 'pickupId is required')
 
-  const db = createServiceClient()
+  const caller = await callerOf()
+  const db = caller.db
   const { data: pickup, error: fetchErr } = await db
     .from('pickups')
     .select('*')
@@ -99,6 +105,18 @@ export const PATCH = api(async req => {
     .single()
 
   if (fetchErr || !pickup) throw new ApiError(404, 'Pickup not found')
+
+  // A courier may only collect a pickup that is theirs or that nobody has taken yet; everything else is for owners and managers
+  let collectorId: string | null = null
+  if (caller.driverId) {
+    if (status !== 'collected' || (pickup.driver_id && pickup.driver_id !== caller.driverId)) throw new ApiError(403, 'You cannot change this pickup')
+    const { data: me } = await db.from('drivers').select('workspace_id').eq('id', caller.driverId).maybeSingle()
+    if (me?.workspace_id !== pickup.workspace_id) throw new ApiError(403, 'You cannot change this pickup')
+    collectorId = caller.driverId
+  } else {
+    await workspaceAccess(pickup.workspace_id, ['owner', 'manager'], caller.user!)
+    if (driverId) await validateReferences(db, pickup.workspace_id, { drivers: driverId })
+  }
 
   // If marking collected
   if (status === 'collected') {
@@ -109,7 +127,7 @@ export const PATCH = api(async req => {
 
     const { data: rpcRes, error: rpcErr } = await db.rpc('collect_pickup', {
       p_pickup_id: pickup.id,
-      p_driver_id: driverId || pickup.driver_id || undefined,
+      p_driver_id: collectorId || driverId || pickup.driver_id || undefined,
       p_proof_photo_path: photoPath || undefined,
       p_order_ids: orderIds && orderIds.length > 0 ? orderIds : undefined,
     })

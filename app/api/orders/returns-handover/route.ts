@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { api, ApiError } from '@/lib/api'
-import { createServiceClient } from '@/lib/supabase/server'
+import { api, ApiError, uuid } from '@/lib/api'
+import { callerOf, shopAccess, workspaceAccess } from '@/lib/access'
 import { savePod } from '@/lib/pod'
 
 export const GET = api(async req => {
@@ -12,7 +12,8 @@ export const GET = api(async req => {
     throw new ApiError(400, 'workspaceId or shopId is required')
   }
 
-  const db = createServiceClient()
+  // A shop sees its own returns; owners and managers see their company's
+  const { db } = shopId ? await shopAccess(shopId) : await workspaceAccess(workspaceId)
 
   // First day of current month for "Returned this month"
   const now = new Date()
@@ -72,7 +73,19 @@ export const POST = api(async req => {
     throw new ApiError(400, 'orderIds array is required')
   }
 
-  const db = createServiceClient()
+  // The parcels must be this shop's, and the caller must be their courier or an owner or manager of the company
+  const caller = await callerOf()
+  const db = caller.db
+  const { data: shop } = await db.from('shops').select('id, workspace_id').eq('id', uuid(shopId, 'shop ID')).maybeSingle()
+  if (!shop) throw new ApiError(404, 'Shop not found')
+  const ids = orderIds.map((orderId: unknown) => uuid(orderId, 'order ID'))
+  const { data: parcels } = await db.from('orders').select('id, shop_id, driver_id').in('id', ids)
+  if (!parcels || parcels.length !== new Set(ids).size || parcels.some(p => p.shop_id !== shop.id)) throw new ApiError(400, 'Some of these orders do not belong to this shop')
+  if (caller.driverId) {
+    if (parcels.some(p => p.driver_id !== caller.driverId)) throw new ApiError(403, 'Some of these parcels are not yours')
+  } else {
+    await workspaceAccess(shop.workspace_id, ['owner', 'manager'], caller.user!)
+  }
 
   let signaturePath: string | null = null
   if (signature) {

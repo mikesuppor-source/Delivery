@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { api, ApiError } from '@/lib/api'
-import { createServiceClient } from '@/lib/supabase/server'
+import { driverAccess } from '@/lib/access'
 import { parseLocation, calculateDistanceKm, getLebanonAreaCoordinates } from '@/lib/maps'
 
 interface OrderForRouting {
@@ -21,7 +21,7 @@ export const POST = api(async req => {
 
   if (!driverId) throw new ApiError(400, 'driverId is required')
 
-  const db = createServiceClient()
+  const { db } = await driverAccess(driverId)
 
   // 1. Manual order sequence saving
   if (Array.isArray(positions)) {
