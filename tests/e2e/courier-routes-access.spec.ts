@@ -1,11 +1,12 @@
 import { test, expect, type Page } from 'playwright/test'
-import { apiCall, seeded, signInMerchant, COURIER } from './helpers'
+import { apiCall, seeded, signInMerchant, paceCourierLogin, COURIER } from './helpers'
 
 // Pickups, route order and returns handover are used by couriers and staff. Each call must come from a real courier session or a
 // permitted login, and must only touch what that caller owns.
 const FAKE = { Cookie: 'cedar_driver_session=anything', 'Content-Type': 'application/json' }
 
 async function courierSignIn(page: Page, courierId: string) {
+  await paceCourierLogin()
   await page.goto('/driver')
   await page.locator('input[type=tel]').fill(COURIER.phone)
   await page.locator('input[type=password]').fill(COURIER.pin)

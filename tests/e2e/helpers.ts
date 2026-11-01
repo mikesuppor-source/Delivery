@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { expect, type Page } from 'playwright/test'
 import type { Database } from '../../lib/supabase/database.types'
@@ -66,7 +67,24 @@ async function signIn(page: Page, path: string, account: { email: string; passwo
 export const signInOwner = (page: Page) => signIn(page, '/login', OWNER, /localhost:3000\/$/)
 export const signInMerchant = (page: Page) => signIn(page, '/portal/login', MERCHANT, /\/portal$/)
 
+/**
+ * The server lets one phone number log in 5 times a minute. Tests that log the courier in often could trip that at random on a fast
+ * machine, so this waits for the next minute when the current minute is nearly used up. It reads the server's own counter.
+ */
+export async function paceCourierLogin() {
+  const key = createHash('sha256').update('driver-login:' + COURIER.phone.replace(/\D/g, '').slice(-8)).digest('hex')
+  for (let i = 0; i < 2; i++) {
+    const minute = new Date(Math.floor(Date.now() / 60_000) * 60_000).toISOString()
+    const { data } = await (localDb() as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: { bucket: string; hits: number } | null }> } } } })
+      .from('request_limits').select('bucket, hits').eq('key', key).maybeSingle()
+    const used = data && new Date(data.bucket).toISOString() === minute ? data.hits : 0
+    if (used < 4) return
+    await new Promise(resolve => setTimeout(resolve, 60_000 - (Date.now() % 60_000) + 1500))
+  }
+}
+
 export async function signInCourier(page: Page) {
+  await paceCourierLogin()
   const { courierId } = await seeded()
   await page.goto('/driver')
   await page.locator('input[type=tel]').fill(COURIER.phone)

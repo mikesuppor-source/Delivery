@@ -1,10 +1,11 @@
 import { test, expect } from 'playwright/test'
-import { COURIER, apiCall, seeded, signInOwner } from './helpers'
+import { COURIER, apiCall, paceCourierLogin, seeded, signInOwner } from './helpers'
 
 // When dispatch blocks a courier or issues a new PIN, the courier's open screen must stop working at once:
 // it signs itself out and says why, instead of going on showing saved orders.
 
 async function openRunSheet(page: import('playwright/test').Page, courierId: string) {
+  await paceCourierLogin()
   const login = await page.request.post('/api/driver/auth', { data: { phone: COURIER.phone, pin: COURIER.pin } })
   expect(login.status()).toBe(200)
   await page.goto('/driver/' + courierId)

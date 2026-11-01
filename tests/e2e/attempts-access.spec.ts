@@ -1,5 +1,5 @@
 import { test, expect } from 'playwright/test'
-import { seeded, signInMerchant, apiCall, COURIER } from './helpers'
+import { seeded, signInMerchant, apiCall, paceCourierLogin, COURIER } from './helpers'
 
 // Recording or reading a delivery attempt must be limited to the courier who has the order (or the desk staff of that company).
 async function newOrder(status: 'assigned' | 'picked_up' = 'picked_up') {
@@ -41,6 +41,7 @@ test('a courier can record attempts only on their own orders', async ({ page }) 
   const { db, id, courierId } = await newOrder()
   const { otherCourierId } = await seeded()
   try {
+    await paceCourierLogin()
     await page.goto('/driver')
     await page.locator('input[type=tel]').fill(COURIER.phone)
     await page.locator('input[type=password]').fill(COURIER.pin)

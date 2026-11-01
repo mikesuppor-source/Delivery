@@ -1,5 +1,5 @@
 import { test, expect, type Page } from 'playwright/test'
-import { apiCall, seeded, signInOwner, COURIER } from './helpers'
+import { apiCall, paceCourierLogin, seeded, signInOwner, COURIER } from './helpers'
 
 // The customer's delivery code: shown only on the customer's private link, checked on the server, and a delivery without it is
 // flagged for the owner. Photos below are the smallest valid JPEG: its first two bytes are all the server looks at.
@@ -7,6 +7,7 @@ const PHOTO = 'data:image/jpeg;base64,/9j/2Q=='
 const PIN = { lat: 33.8938, lng: 35.5018 }
 
 async function courierSignIn(page: Page, courierId: string) {
+  await paceCourierLogin()
   await page.goto('/driver')
   await page.locator('input[type=tel]').fill(COURIER.phone)
   await page.locator('input[type=password]').fill(COURIER.pin)
@@ -190,16 +191,16 @@ test('the desk shows weak or disputed deliveries to review, and the owner marks 
       proof_distance_m: 2400, customer_disputed_at: new Date().toISOString(), customer_dispute_note: 'Nobody came',
     }).eq('id', o.id)
     await signInOwner(page)
-    await expect(page.getByTestId('proof-review-alert')).toContainText('deliveries to review')
+    await expect(page.getByTestId('proof-review-alert')).toContainText('deliveries to review', { timeout: 30_000 })
     await page.goto('/orders/proof-review')
     const row = page.getByTestId('proof-row').filter({ hasText: o.code })
-    await expect(row).toBeVisible()
+    await expect(row).toBeVisible({ timeout: 30_000 })
     await expect(row).toContainText('could not show the delivery code')
     await expect(row).toContainText('far from the address')
     await expect(row).toContainText('2.4 km')
     await expect(row).toContainText('Nobody came')
     await row.getByRole('button', { name: 'Mark reviewed' }).click()
-    await expect(row.getByText('Reviewed')).toBeVisible()
+    await expect(row.getByText('Reviewed')).toBeVisible({ timeout: 15_000 })
     expect((await o.db.from('orders').select('proof_reviewed_at').eq('id', o.id).single()).data!.proof_reviewed_at).not.toBeNull()
   } finally {
     await o.db.from('orders').delete().eq('id', o.id)

@@ -1,5 +1,5 @@
 import { test, expect } from 'playwright/test'
-import { COURIER, apiCall, seeded, signInOwner } from './helpers'
+import { COURIER, apiCall, paceCourierLogin, seeded, signInOwner } from './helpers'
 
 test('a courier ID on its own opens nothing', async ({ page, request }) => {
   const { courierId } = await seeded()
@@ -19,6 +19,7 @@ test('a courier ID on its own opens nothing', async ({ page, request }) => {
 test('a courier signs in with phone and PIN and can only reach their own run sheet', async ({ page }) => {
   const { courierId, otherCourierId } = await seeded()
 
+  await paceCourierLogin()
   await page.goto('/driver')
   await page.locator('input[type=tel]').fill(COURIER.phone)
   await page.locator('input[type=password]').fill(COURIER.pin)
@@ -48,6 +49,7 @@ test('wrong PINs are refused and repeated guesses are rate limited', async ({ re
 
 test('resetting a PIN signs the courier out of every device', async ({ page, browser }) => {
   const { courierId, workspaceId } = await seeded()
+  await paceCourierLogin()
   const login = await page.request.post('/api/driver/auth', { data: { phone: COURIER.phone, pin: COURIER.pin } })
   expect(login.status()).toBe(200)
   await page.goto('/driver/' + courierId)

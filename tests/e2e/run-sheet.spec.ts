@@ -1,5 +1,5 @@
 import { test, expect } from 'playwright/test'
-import { COURIER, seeded } from './helpers'
+import { COURIER, paceCourierLogin, seeded } from './helpers'
 
 // Exercises the courier run sheet screen itself, so refactors of its UI are covered.
 test('courier run sheet: search, pick up, tabs, language, shift handover, exit', async ({ page }) => {
@@ -13,6 +13,7 @@ test('courier run sheet: search, pick up, tabs, language, shift handover, exit',
   })
   expect(error).toBeNull()
 
+  await paceCourierLogin()
   expect((await page.request.post('/api/driver/auth', { data: { phone: COURIER.phone, pin: COURIER.pin } })).status()).toBe(200)
   await page.goto('/driver/' + courierId)
   await expect(page.getByText('Rami Courier')).toBeVisible({ timeout: 30_000 })
