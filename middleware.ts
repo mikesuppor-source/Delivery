@@ -64,6 +64,8 @@ export async function middleware(request: NextRequest) {
     path === '/privacy' ||
     // Uptime monitors call this without signing in; it shows no data
     path === '/api/health' ||
+    // The customer answers "did you receive it?" from their private tracking link; the route checks the 64-character token
+    path === '/api/orders/confirm' ||
     path === '/terms' ||
     path === '/driver' ||
     path.startsWith('/driver/') ||

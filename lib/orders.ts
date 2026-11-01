@@ -26,6 +26,8 @@ export function orderPatch(body: Record<string, unknown>, order: Record<string, 
         : Math.min(1, Number(order.driver_pay_usd))
     }
   }
+  // Staff only: a flagged delivery has been looked at
+  if (!driver && body.proofReviewed === true) updates.proof_reviewed_at = new Date().toISOString()
   if (body.notes !== undefined) updates.notes = textField(body.notes, 'notes', 4000)
   if (body.failureReason) updates.notes = '[Failed: ' + textField(body.failureReason, 'failure reason', 200) + '] ' + (updates.notes || '')
   if (!driver) {

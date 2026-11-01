@@ -10,6 +10,8 @@ import { formatOrderCode } from '@/lib/order-codes'
 import { SUPPORT_WHATSAPP } from '@/lib/support'
 import { CustomerGpsShare } from '@/components/customer-gps-share'
 import { CustomerOrderRating } from '@/components/customer-order-rating'
+import { DeliveryCodeCard } from '@/components/delivery-code-card'
+import { DeliveryReceivedCard } from '@/components/delivery-received-card'
 import type { Metadata } from 'next'
 
 interface TrackPageProps {
@@ -478,6 +480,11 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
           )}
         </div>
 
+        {/* The customer's delivery code: only on the private link (never from the printed order code or a phone search) while the parcel is on its way */}
+        {openedWithToken && ['assigned', 'picked_up'].includes(order.status) && (
+          <DeliveryCodeCard orderId={order.id} orderCode={order.code} />
+        )}
+
         {/* Live GPS Pin Sharing for Lebanese Customer Addresses.
             Only on the private /track/<token> link: the printed order code must not let anyone move the pin. */}
         {openedWithToken && order.status !== 'delivered' && (
@@ -535,6 +542,11 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
               )}
             </div>
           </div>
+        )}
+
+        {/* "Did you receive it?" on the private link after delivery */}
+        {openedWithToken && order.status === 'delivered' && order.tracking_token && (
+          <DeliveryReceivedCard orderId={order.id} trackingToken={order.tracking_token} />
         )}
 
         {/* Customer Rating Component (After Delivery) */}

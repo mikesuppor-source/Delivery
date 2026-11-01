@@ -70,6 +70,13 @@ export interface OfflineSyncItem {
     podCollectedUsd?: number | null
     podCollectedLbp?: number | null
     failureReason?: string
+    /** The customer code or fallback the courier gave, and where they were. */
+    deliveryCode?: string
+    proofFallbackReason?: string
+    deliveryLat?: number
+    deliveryLng?: number
+    /** Set when the delivery was saved offline: the code could not be checked at the door. */
+    queuedAt?: number
   }
   timestamp: number
 }

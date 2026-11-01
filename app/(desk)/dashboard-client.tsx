@@ -31,6 +31,7 @@ export interface DashboardClientProps {
     failedAttemptsCount: number
     pendingCashoutsCount: number
     overdueHoldsCount?: number
+    proofReviewCount?: number
     inStorageCount?: number
   }
   couriersNow: Array<{
@@ -78,7 +79,8 @@ export function DashboardClient({
     attention.stuckTransitCount +
     attention.failedAttemptsCount +
     attention.pendingCashoutsCount +
-    (attention.overdueHoldsCount || 0)
+    (attention.overdueHoldsCount || 0) +
+    (attention.proofReviewCount || 0)
 
   const maxDayCount = Math.max(1, ...chartData.days.map(d => d.count))
 
@@ -339,6 +341,31 @@ export function DashboardClient({
                 <span>{attention.overdueHoldsCount} parcels in warehouse ready or overdue</span>
                 <span className="ui-btn ui-btn--warning ui-btn--sm" style={{ padding: '3px 8px', fontSize: 11 }}>
                   Release
+                </span>
+              </Link>
+            )}
+
+            {(attention.proofReviewCount ?? 0) > 0 && (
+              <Link
+                href="/orders/proof-review"
+                data-testid="proof-review-alert"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  background: 'var(--ui-surface-2)',
+                  border: '1px solid var(--ui-border)',
+                  borderRadius: 'var(--ui-radius-sm)',
+                  textDecoration: 'none',
+                  color: 'var(--ui-text)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                <span>{attention.proofReviewCount} deliveries to review (weak or disputed proof)</span>
+                <span className="ui-btn ui-btn--warning ui-btn--sm" style={{ padding: '3px 8px', fontSize: 11 }}>
+                  Review
                 </span>
               </Link>
             )}

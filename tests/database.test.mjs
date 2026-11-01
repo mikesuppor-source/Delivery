@@ -1113,6 +1113,58 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     }
   })
 
+  // ─── Customer delivery codes (migration 037) ──────────────────────────
+  await t.test('delivery codes: server-only, made for every order, locked after five wrong tries', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`)
+      try { await assert.rejects(db.query('select * from order_delivery_codes'), /permission denied/, `${role} reads delivery codes`) } finally { await db.exec('reset role') }
+    }
+    const o = id(8501)
+    await db.query("insert into orders(id,workspace_id,shop_id,usd_to_lbp_rate,code,recipient_phone) values($1,$2,$3,100000,'DC-1','+961 71 999 888')", [o, a, shop])
+    const code = (await db.query('select code, attempts from order_delivery_codes where order_id = $1', [o])).rows[0]
+    assert.match(code.code, /^[0-9]{4}$/); assert.equal(code.attempts, 0)
+    const wrong = code.code === '0000' ? '1111' : '0000'
+    await db.exec('set role service_role')
+    try {
+      const check = async (c, order = o) => (await db.query('select check_delivery_code($1, $2) as r', [order, c])).rows[0].r
+      assert.deepEqual(await check('  ' + code.code + ' '), { result: 'ok', triesLeft: 5 }, 'spaces around the code are ignored')
+      assert.deepEqual(await check(wrong), { result: 'wrong', triesLeft: 4 })
+      assert.deepEqual(await check(code.code), { result: 'ok', triesLeft: 4 })
+      for (const left of [3, 2, 1]) assert.deepEqual(await check(wrong), { result: 'wrong', triesLeft: left })
+      assert.deepEqual(await check(wrong), { result: 'locked', triesLeft: 0 })
+      assert.deepEqual(await check(code.code), { result: 'locked', triesLeft: 0 }, 'even the right code is refused once locked')
+      assert.deepEqual(await check('1234', id(9999)), { result: 'none', triesLeft: 0 }, 'an order with no code')
+    } finally { await db.exec('reset role') }
+    // Orders still on their way before the migration got codes too: new orders always do
+    const missing = (await db.query("select count(*) from orders where status in ('pending','assigned','picked_up','failed') and id not in (select order_id from order_delivery_codes)")).rows[0].count
+    assert.equal(Number(missing), 0, 'an open order without a delivery code')
+  })
+
+  await t.test('delivery codes: the customer confirms or disputes a delivery once, from their own link', async () => {
+    const respond = async (token, received, note) => { await db.exec('set role service_role'); try { return (await db.query('select customer_respond_delivery($1, $2, $3) as r', [token, received, note])).rows[0].r } finally { await db.exec('reset role') } }
+    const make = async (n, status) => {
+      const oid = id(8600 + n)
+      await db.query("insert into orders(id,workspace_id,shop_id,driver_id,usd_to_lbp_rate,code,recipient_phone) values($1,$2,$3,$4,100000,$5,'+961 71 111 000')", [oid, a, shop, drv, 'CR-' + n])
+      if (status !== 'pending') { await db.query("update orders set status = 'picked_up' where id = $1", [oid]); if (status === 'delivered') await db.query("update orders set status = 'delivered', delivered_at = now() where id = $1", [oid]) }
+      return (await db.query('select tracking_token from orders where id = $1', [oid])).rows[0].tracking_token
+    }
+    assert.deepEqual(await respond('short', true, null), { result: 'not_found' })
+    assert.deepEqual(await respond('a'.repeat(64), true, null), { result: 'not_found' })
+    assert.deepEqual(await respond(await make(1, 'pending'), true, null), { result: 'closed' }, 'not delivered yet')
+    const yes = await make(2, 'delivered')
+    assert.deepEqual(await respond(yes, true, null), { result: 'confirmed' })
+    assert.deepEqual(await respond(yes, false, 'changed my mind'), { result: 'already' }, 'one answer only')
+    const no = await make(3, 'delivered')
+    await db.query("update orders set proof_reviewed_at = now() where tracking_token = $1", [no])
+    assert.deepEqual(await respond(no, false, ' never arrived ' + 'x'.repeat(600)), { result: 'disputed' })
+    const row = (await db.query('select proof_flags, proof_reviewed_at, customer_disputed_at, customer_dispute_note from orders where tracking_token = $1', [no])).rows[0]
+    assert.deepEqual(row.proof_flags, ['customer_disputed']); assert.equal(row.proof_reviewed_at, null, 'a dispute needs a fresh review')
+    assert.ok(row.customer_disputed_at); assert.equal(row.customer_dispute_note.length, 500); assert.ok(row.customer_dispute_note.startsWith('never arrived'))
+    const old = await make(4, 'delivered')
+    await db.query("update orders set delivered_at = now() - interval '15 days' where tracking_token = $1", [old])
+    assert.deepEqual(await respond(old, true, null), { result: 'closed' }, 'too late to answer')
+  })
+
   await t.test('every table has row level security, and courier push sign-ups are for the server only', async () => {
     const bare = (await db.query(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1`)).rows.map(r => r.relname)

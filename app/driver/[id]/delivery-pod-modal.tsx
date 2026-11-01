@@ -3,6 +3,17 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { formatUSD, formatLBP, usdToLbp } from '@/lib/utils'
 import { CameraIcon, CheckIcon } from '@/components/icons'
+import { QrCodeScanner } from '@/components/qr-code-scanner'
+
+/** Where the courier is right now, for the delivery record. Null when the phone says no or takes too long. */
+function currentPlace(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise(resolve => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null)
+    navigator.geolocation.getCurrentPosition(p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }), () => resolve(null), { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 })
+  })
+}
+
+const FALLBACK_REASONS: Array<[string, string]> = [['not_present', 'Customer is not there'], ['no_phone', 'Customer has no phone or data'], ['refused_code', 'Customer will not give the code'], ['other', 'Another reason']]
 
 interface DeliveryPodModalProps {
   order: {
@@ -13,6 +24,8 @@ interface DeliveryPodModalProps {
     recipient_address: string | null
     collection_usd: number
     usd_to_lbp_rate: number
+    /** The order has a customer delivery code the courier must collect. */
+    code_required?: boolean
   }
   rate: number
   onClose: () => void
@@ -22,6 +35,10 @@ interface DeliveryPodModalProps {
     podCollectedUsd: number | null
     podCollectedLbp: number | null
     notes?: string
+    deliveryCode?: string
+    proofFallbackReason?: string
+    deliveryLat?: number
+    deliveryLng?: number
   }) => Promise<void>
 }
 
@@ -48,6 +65,13 @@ export function DeliveryPodModal({
   const [collectedLbp, setCollectedLbp] = useState<string>('0')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Customer delivery code
+  const [deliveryCode, setDeliveryCode] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [fallbackOn, setFallbackOn] = useState(false)
+  const [fallbackReason, setFallbackReason] = useState('not_present')
+  const [formError, setFormError] = useState('')
 
   // Initialize canvas
   useEffect(() => {
@@ -164,9 +188,15 @@ export function DeliveryPodModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (order.code_required) {
+      if (!fallbackOn && !/^\d{4}$/.test(deliveryCode.trim())) { setFormError('Ask the customer for their 4-digit delivery code, or choose "Customer cannot show the code".'); return }
+      if (fallbackOn && !photoPreview) { setFormError('Take a photo of the parcel at the door first.'); return }
+    }
+    setFormError('')
     setSaving(true)
 
     try {
+      const place = order.code_required ? await currentPlace() : null
       let signatureDataUrl: string | null = null
       if (hasSignature && canvasRef.current) {
         signatureDataUrl = canvasRef.current.toDataURL('image/png')
@@ -178,11 +208,14 @@ export function DeliveryPodModal({
         podCollectedUsd: Number(collectedUsd) || 0,
         podCollectedLbp: Number(collectedLbp) || 0,
         notes: notes.trim() || undefined,
+        ...(order.code_required ? { deliveryCode: deliveryCode.trim() || undefined, proofFallbackReason: fallbackOn ? fallbackReason : undefined, deliveryLat: place?.lat, deliveryLng: place?.lng } : {}),
       })
       onClose()
     } catch (err) {
       console.error(err)
-      alert(err instanceof Error ? err.message : 'Error confirming delivery')
+      const message = err instanceof Error ? err.message : 'Error confirming delivery'
+      if (order.code_required) setFormError(message)
+      else alert(message)
     } finally {
       setSaving(false)
     }
@@ -345,7 +378,53 @@ export function DeliveryPodModal({
             </div>
           </div>
 
-          {/* Touch Signature Pad */}
+          {/* The customer's own proof: a code only they can see, typed or scanned from their phone */}
+          {order.code_required && (
+            <div data-testid="delivery-code-box" style={{ background: '#1e293b', border: '1.5px solid #38bdf8', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>Customer delivery code</div>
+              <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 8px' }}>Ask the customer for the 4-digit code on their tracking link, or scan their QR.</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  aria-label="Customer delivery code"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  placeholder="0000"
+                  value={deliveryCode}
+                  onChange={e => setDeliveryCode(e.target.value.replace(/\D/g, ''))}
+                  style={{ flex: 1, background: '#0f172a', border: '1px solid #475569', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 22, fontWeight: 800, letterSpacing: 8, textAlign: 'center', fontFamily: 'monospace' }}
+                />
+                <button type="button" onClick={() => setScanning(s => !s)} style={{ background: '#0369a1', border: 'none', color: '#fff', borderRadius: 8, padding: '0 14px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Scan QR</button>
+              </div>
+              {scanning && (
+                <QrCodeScanner
+                  onClose={() => setScanning(false)}
+                  onResult={text => {
+                    // The QR says CEDAR-DC:<order code>:<code>; it must be for this order
+                    const match = /^CEDAR-DC:([^:]+):(\d{4})$/.exec(text.trim())
+                    if (!match || match[1].toUpperCase() !== order.code.toUpperCase()) { setFormError('That QR is for a different order.'); setScanning(false); return }
+                    setDeliveryCode(match[2]); setFormError(''); setScanning(false)
+                  }}
+                />
+              )}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: '#e2e8f0' }}>
+                <input type="checkbox" checked={fallbackOn} onChange={e => setFallbackOn(e.target.checked)} />
+                <span>Customer cannot show the code</span>
+              </label>
+              {fallbackOn && (
+                <div style={{ marginTop: 8 }}>
+                  <select aria-label="Why the code is missing" value={fallbackReason} onChange={e => setFallbackReason(e.target.value)} style={{ width: '100%', background: '#0f172a', border: '1px solid #475569', borderRadius: 6, padding: '8px 10px', color: '#fff', fontSize: 13 }}>
+                    {FALLBACK_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  <p style={{ fontSize: 11, color: '#fbbf24', margin: '6px 0 0' }}>A photo of the parcel at the door is required. The owner will review this delivery.</p>
+                </div>
+              )}
+              {formError && <p role="alert" data-testid="proof-error" style={{ color: '#fca5a5', fontSize: 12, margin: '8px 0 0', fontWeight: 600 }}>{formError}</p>}
+            </div>
+          )}
+
+          {/* Touch Signature Pad (orders without a customer code only: a signature on the courier's own phone proves little) */}
+          {!order.code_required && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -416,12 +495,13 @@ export function DeliveryPodModal({
               )}
             </div>
           </div>
+          )}
 
           {/* Camera Photo Upload */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <CameraIcon size={14} color="#38bdf8" />
-              <span>Doorstep / Handover Photo (Optional)</span>
+              <span>Doorstep / Handover Photo ({order.code_required && fallbackOn ? 'Required' : 'Optional'})</span>
             </label>
 
             <input

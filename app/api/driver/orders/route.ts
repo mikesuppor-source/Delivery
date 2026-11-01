@@ -9,6 +9,7 @@ import { loadReturnPricing } from '@/lib/pricing-server'
 import { savePod } from '@/lib/pod'
 import { fulfillShopifyOrder } from '@/lib/shopify-fulfillment'
 import { allRows } from '@/lib/pagination'
+import { markCodeRequired, proveDelivery } from '@/lib/delivery-proof'
 
 const CourierUpdate = z.looseObject({ driverId: id, orderId: id })
 
@@ -42,7 +43,7 @@ export const GET = api(async req => {
         : o.recipient_address,
   }))
 
-  return NextResponse.json({ success: true, orders })
+  return NextResponse.json({ success: true, orders: await markCodeRequired(db, orders) })
 })
 export const PATCH = api(async req => {
   const body=await parseBody(req,CourierUpdate)
@@ -55,6 +56,8 @@ export const PATCH = api(async req => {
     returnPricing={returnFeeUsd:rp.returnFeeUsd,returnDriverPayUsd:rp.returnDriverPayUsd}
   }
   const updates=orderPatch(body,order,true,returnPricing)
+  // Delivered: the customer's code (or a flagged fallback with a photo) proves it, and where the courier was is recorded
+  if(updates.status==='delivered'&&order.status!=='delivered') Object.assign(updates,await proveDelivery(db,order,body))
   if(body.podPhoto) updates.pod_photo=await savePod(db,order.id,body.podPhoto,'photo')
   if(body.podSignature) updates.pod_signature=await savePod(db,order.id,body.podSignature,'signature')
   const updated=checked(await db.from('orders').update(updates).eq('id',order.id).eq('driver_id',driver.id).eq('updated_at',order.updated_at).select(ORDER_SELECT).maybeSingle())

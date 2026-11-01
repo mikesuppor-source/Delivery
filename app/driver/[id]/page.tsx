@@ -2,6 +2,7 @@ import { allRows } from '@/lib/pagination'
 import { notFound, redirect } from 'next/navigation'
 import { ApiError } from '@/lib/api'
 import { driverAccess } from '@/lib/access'
+import { markCodeRequired } from '@/lib/delivery-proof'
 import { DriverRunSheetClient } from './driver-run-sheet-client'
 import type { Metadata } from 'next'
 
@@ -52,7 +53,7 @@ export default async function DriverRunSheetPage({ params }: DriverRunSheetPageP
     .eq('driver_id', id)
     .order('created_at', { ascending: false }))
 
-  const orders = ((rawOrders as any[]) || []).map(o => ({...o, recipient_address: o.location_lat != null && o.location_lng != null ? (o.recipient_address || '') + ' (https://maps.google.com/?q=' + o.location_lat + ',' + o.location_lng + ')' : o.recipient_address}))
+  const orders = await markCodeRequired(supabase, ((rawOrders as any[]) || []).map(o => ({...o, recipient_address: o.location_lat != null && o.location_lng != null ? (o.recipient_address || '') + ' (https://maps.google.com/?q=' + o.location_lat + ',' + o.location_lng + ')' : o.recipient_address})))
 
   // 4. Fetch pickups assigned to this driver
   const { data: rawPickups } = await supabase

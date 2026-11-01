@@ -297,6 +297,10 @@ export function useDriverOrders({
       failureReason?: string
       resultId?: string
       rescheduledFor?: string
+      deliveryCode?: string
+      proofFallbackReason?: string
+      deliveryLat?: number
+      deliveryLng?: number
     }
   ) {
     setUpdatingId(orderId)
@@ -316,7 +320,7 @@ export function useDriverOrders({
         orderId,
         orderCode: targetOrder?.code || orderId,
         status: newStatus,
-        payload,
+        payload: { ...payload, queuedAt: Date.now() },
         timestamp: Date.now(),
       }
 
@@ -399,7 +403,7 @@ export function useDriverOrders({
           orderId,
           orderCode: targetOrder?.code || orderId,
           status: newStatus,
-          payload,
+          payload: { ...payload, queuedAt: Date.now() },
           timestamp: Date.now(),
         }
 

@@ -126,6 +126,16 @@ export default async function OverviewPage() {
       now.getTime() - new Date(h.held_at).getTime() > 7 * 86400000,
   ).length
 
+  // Deliveries whose proof needs a second look (no customer code, far from the address, or the customer says not received)
+  const proofReviewRes = await supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspace.id)
+    .eq('status', 'delivered')
+    .not('proof_flags', 'eq', '{}')
+    .is('proof_reviewed_at', null)
+  const proofReviewCount = proofReviewRes.count ?? 0
+
   // 3. Couriers Now fleet status
   const couriersNow = drivers.map(d => {
     const activeOrders = orders.filter(
@@ -212,6 +222,7 @@ export default async function OverviewPage() {
         failedAttemptsCount,
         pendingCashoutsCount,
         overdueHoldsCount,
+        proofReviewCount,
         inStorageCount: activeHolds.length,
       }}
       couriersNow={couriersNow}
