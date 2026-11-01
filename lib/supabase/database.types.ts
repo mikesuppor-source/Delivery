@@ -892,6 +892,18 @@ isOneToOne: false
                     "created_at"?: string,"phone"?: string,"workspace_id"?: string
                   }
                   Relationships: []
+                },"error_log": {
+                  Row: {
+                    "created_at": string,"id": string,"message": string | null,"method": string,"path": string,"request_id": string | null,"status": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"message"?: string | null,"method": string,"path": string,"request_id"?: string | null,"status": number
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"message"?: string | null,"method"?: string,"path"?: string,"request_id"?: string | null,"status"?: number
+                  }
+                  Relationships: []
                 },"shop_integrations": {
                   Row: {
                     "access_token": string | null,"api_key": string,"shop_id": string,"updated_at": string

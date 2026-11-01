@@ -62,6 +62,8 @@ export async function middleware(request: NextRequest) {
     path === '/api/webhooks/whatsapp' ||
     // Public pages Meta and customers must be able to read
     path === '/privacy' ||
+    // Uptime monitors call this without signing in; it shows no data
+    path === '/api/health' ||
     path === '/terms' ||
     path === '/driver' ||
     path.startsWith('/driver/') ||

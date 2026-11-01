@@ -1096,6 +1096,23 @@ assert.equal((await db.query('select status from cashout_requests where id=$1',[
     assert.equal(row.direction, 'in'); assert.equal(row.delivered_at, null); assert.equal(row.read_at, null)
   })
 
+  // ─── Server error log (migration 036) ──────────────────────────
+  await t.test('error log: the server writes it, no sign-in can read or change it', async () => {
+    await db.exec('set role service_role')
+    try {
+      await db.query("insert into error_log(method,path,status,message,request_id) values('POST','/api/orders',500,'boom','req-1')")
+      assert.equal(Number((await db.query('select count(*) from error_log')).rows[0].count) >= 1, true)
+    } finally { await db.exec('reset role') }
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`)
+      try {
+        for (const sql of ['select * from error_log', "insert into error_log(method,path,status) values('GET','/x',500)", 'delete from error_log']) {
+          await assert.rejects(db.query(sql), /permission denied/, `${role}: ${sql}`)
+        }
+      } finally { await db.exec('reset role') }
+    }
+  })
+
   await t.test('every table has row level security, and courier push sign-ups are for the server only', async () => {
     const bare = (await db.query(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1`)).rows.map(r => r.relname)

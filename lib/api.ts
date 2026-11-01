@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logServerError } from './error-log'
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }
@@ -17,7 +18,10 @@ export function api<T extends unknown[]>(handler: (req: NextRequest, ...args: T)
       return response
     } catch (error) {
       const status = error instanceof ApiError ? error.status : error instanceof SyntaxError ? 400 : 500
-      if (status === 500) console.error('Request failed', { requestId, error })
+      if (status === 500) {
+        console.error('Request failed', { requestId, error })
+        logServerError({ method: req.method, path: new URL(req.url).pathname, status, message: (error as Error)?.message, requestId })
+      }
       return NextResponse.json({ error: status === 500 ? 'Request failed. Contact support with the request ID.' : (error as Error).message, requestId }, { status })
     }
   }
