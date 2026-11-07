@@ -67,7 +67,7 @@ export function AreaListClient({
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([])
   const [savingDrivers, setSavingDrivers] = useState(false)
 
-  const canEdit = userRole === 'owner' || userRole === 'manager'
+  const canEdit = userRole === 'owner'
 
   function showToast(message: string, type: 'success' | 'error') {
     setToast({ message, type })

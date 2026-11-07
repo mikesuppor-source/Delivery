@@ -62,18 +62,18 @@ export const GET = api(async req => {
 })
 export const POST = api(async req => {
   const body=await parseBody(req, CreateOrder)
-  const { db,user,workspaceId }=await workspaceAccess(body.workspaceId)
+  const { db,user,member,workspaceId }=await workspaceAccess(body.workspaceId)
   let resolvedDriverId: string | null = (body.driverId && body.driverId !== 'auto') ? body.driverId : null
   if ((!resolvedDriverId && body.areaId && body.driverId === 'auto') || (body.autoAssign && body.areaId && !resolvedDriverId)) {
     resolvedDriverId = await findBestDriverForArea(db, workspaceId, body.areaId)
   }
   await validateReferences(db,workspaceId,{shops:body.shopId,drivers:resolvedDriverId,delivery_areas:body.areaId})
   const ws=checked(await db.from('workspaces').select('usd_to_lbp').eq('id',workspaceId).single())
-  // Fill pricing from the waterfall when the caller omits fee/pay (shops, API imports)
-  // Managers who send explicit values always win (§4.1)
+  // Fill pricing from the waterfall. Only the owner can override fee or driver pay.
   const pricing=await loadPricing(db,{workspaceId,areaId:body.areaId||null,shopId:body.shopId||null})
-  const resolvedFee=body.deliveryFeeUsd??pricing.feeUsd
-  const resolvedPay=body.driverPayUsd??pricing.driverPayUsd
+  const isOwner = member?.role === 'owner'
+  const resolvedFee = isOwner ? (body.deliveryFeeUsd ?? pricing.feeUsd) : pricing.feeUsd
+  const resolvedPay = isOwner ? (body.driverPayUsd ?? pricing.driverPayUsd) : pricing.driverPayUsd
   const code=body.code ? formatOrderCode(body.code) : await generateUniqueOrderCode(db,'CD')
   if (!code) throw new ApiError(400,'Invalid tracking code')
   const order=checked(await db.from('orders').insert({

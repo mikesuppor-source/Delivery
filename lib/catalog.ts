@@ -47,7 +47,8 @@ type Table='shops'|'drivers'|'delivery_areas'
 export function createCatalog(table:Table) {
  return api(async req=>{
   const body=await parseBody(req,CreateCatalog)
-  const {db,workspaceId}=await workspaceAccess(body.workspaceId)
+  const requiredRoles = table === 'delivery_areas' ? ['owner'] : ['owner', 'manager']
+  const {db,workspaceId}=await workspaceAccess(body.workspaceId, requiredRoles)
   const row:Record<string,unknown>={workspace_id:workspaceId,name:body.name}
   if(table==='delivery_areas'){
    row.fee_usd=body.feeUsd
@@ -85,7 +86,8 @@ export function createCatalog(table:Table) {
 export async function changeCatalog(req:NextRequest,table:Table,recordId?:string) {
  const body=await parseBody(req,ChangeCatalog)
  const target=uuid(recordId||body.areaId||body.id)
- const {db,workspaceId}=await workspaceAccess(body.workspaceId)
+ const requiredRoles = (table === 'delivery_areas' || (table === 'drivers' && (body.payMode !== undefined || body.payPercent !== undefined))) ? ['owner'] : ['owner', 'manager']
+ const {db,workspaceId}=await workspaceAccess(body.workspaceId, requiredRoles)
  const updates:Record<string,unknown>={}
  if(req.method==='DELETE')updates.active=false
  else{

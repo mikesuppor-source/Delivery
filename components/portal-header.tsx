@@ -12,7 +12,6 @@ interface PortalHeaderProps {
 
 const TABS = [
   { href: '/portal', label: 'Orders' },
-  { href: '/portal/prices', label: 'My Prices' },
   { href: '/portal/integrations', label: 'Connect Store' },
   { href: '/portal/api-docs', label: 'API Guide' },
 ]
