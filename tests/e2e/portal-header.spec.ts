@@ -1,7 +1,7 @@
 import { test, expect, type Page } from 'playwright/test'
 import { signInMerchant } from './helpers'
 
-const TABS = ['Orders', 'My Prices', 'Connect Store', 'API Guide']
+const TABS = ['Orders', 'Connect Store', 'API Guide']
 
 /** Every menu link must sit inside the top bar (not above or below it) and the page must not scroll sideways. */
 async function expectCleanHeader(page: Page) {

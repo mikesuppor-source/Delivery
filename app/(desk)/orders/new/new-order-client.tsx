@@ -642,6 +642,18 @@ export function NewOrderClient({
                 )}
               </div>
 
+              {/* Order Notes */}
+              <div className="field full">
+                <label htmlFor="order-notes">Order Notes / Package details</label>
+                <input
+                  id="order-notes"
+                  type="text"
+                  placeholder="Fragile, call on arrival, etc."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                />
+              </div>
+
             </div>
           </div>
         </div>
@@ -1077,17 +1089,7 @@ export function NewOrderClient({
                   />
                 </div>
 
-                {/* Order Notes */}
-                <div className="field full">
-                  <label htmlFor="order-notes">Order Notes / Package details</label>
-                  <input
-                    id="order-notes"
-                    type="text"
-                    placeholder="Fragile, call on arrival, etc."
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                  />
-                </div>
+
 
                 {/* Owner-Only Margin Price Card */}
                 {isOwner && (
